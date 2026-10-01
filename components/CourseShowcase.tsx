@@ -34,6 +34,14 @@ const courses = [
   },
 ];
 
+const categories = [
+  { label: "Popular now", href: "/courses" },
+  { label: "Creative practice", href: "/courses?category=creative-practice" },
+  { label: "Business", href: "/courses?category=business" },
+  { label: "Technology", href: "/courses?category=technology" },
+  { label: "Wellbeing", href: "/courses?category=wellbeing" },
+];
+
 export default function CourseShowcase() {
   return (
     <section className="bg-[#f6f5ef] px-5 py-20 text-[#1b241c] transition-colors dark:bg-[#0d100e] dark:text-[#f4f4f0] lg:px-12">
@@ -49,12 +57,16 @@ export default function CourseShowcase() {
           are proud to share.
         </p>
 
-        <div className="mt-10 flex justify-center gap-6 text-xs font-medium text-[#6a7469] dark:text-[#aeb8aa]">
-          <span className="font-bold text-[#4e6638] dark:text-[#a4c17e]">Popular now</span>
-          <span>Creative practice</span>
-          <span>Business</span>
-          <span className="hidden sm:inline">Technology</span>
-          <span className="hidden sm:inline">Wellbeing</span>
+        <div className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs font-medium text-[#6a7469] dark:text-[#aeb8aa]">
+          {categories.map((category, index) => (
+            <Link
+              key={category.label}
+              href={category.href}
+              className={index === 0 ? "font-bold text-[#4e6638] transition hover:text-[#263b20] dark:text-[#a4c17e] dark:hover:text-white" : "transition hover:text-[#263b20] dark:hover:text-white"}
+            >
+              {category.label}
+            </Link>
+          ))}
         </div>
 
         <div className="mt-8 grid gap-5 md:grid-cols-3">
