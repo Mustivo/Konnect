@@ -4,6 +4,7 @@ import { ArrowUpRight, Star } from "lucide-react";
 const courses = [
   {
     category: "DESIGN",
+    href: "/courses/designing-clearer-digital-products",
     title: "Designing Clearer Digital Products",
     teacher: "Maya Lin",
     level: "Intermediate",
@@ -14,6 +15,7 @@ const courses = [
   },
   {
     category: "DATA",
+    href: "/courses/data-stories-that-move-people",
     title: "Data Stories That Move People",
     teacher: "Ravi Kapoor",
     level: "Beginner",
@@ -24,6 +26,7 @@ const courses = [
   },
   {
     category: "COMMUNICATION",
+    href: "/courses/speak-with-calm-confidence",
     title: "Speak With Calm Confidence",
     teacher: "Sofia Alvarez",
     level: "All levels",
@@ -71,8 +74,9 @@ export default function CourseShowcase() {
 
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {courses.map((course) => (
-            <article
+            <Link
               key={course.title}
+              href={course.href}
               className="overflow-hidden rounded-lg border border-[#e0e4da] bg-[#fffefa] shadow-[0_12px_26px_rgba(24,35,20,0.08)] transition hover:-translate-y-1 dark:border-white/10 dark:bg-[#171c18] dark:shadow-black/20"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -95,7 +99,7 @@ export default function CourseShowcase() {
                   <span className="font-bold text-[#1b241c] dark:text-[#f4f4f0]">Included</span>
                 </div>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
 
