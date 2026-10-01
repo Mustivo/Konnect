@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   title: "Konnect – Learn together, anywhere.",
   description:
     "Engaging live classes, verified educators, and authentic progress tracking built for real achievement.",
+  icons: {
+    icon: "/konnect-mark.svg",
+    shortcut: "/konnect-mark.svg",
+    apple: "/konnect-mark.svg",
+  },
 };
 
 export default function RootLayout({
