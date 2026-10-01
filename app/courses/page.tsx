@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -156,7 +155,7 @@ function Stars({ rating }: { rating: number }) {
         ★★★★★
       </span>
 
-      <span className="text-[11px] text-[#6b7565]">
+      <span className="text-[11px] text-[var(--muted)]">
         {rating.toFixed(1)}
       </span>
     </div>
@@ -165,7 +164,7 @@ function Stars({ rating }: { rating: number }) {
 
 function CourseCard({ course }: { course: Course }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-[#e6e9dc] bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md">
+    <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md">
       <img
         src={course.image}
         alt={course.title}
@@ -174,27 +173,27 @@ function CourseCard({ course }: { course: Course }) {
 
       <div className="p-5">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b7565]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
             {course.category}
           </span>
 
           <Stars rating={course.rating} />
         </div>
 
-        <h3 className="text-[16px] font-semibold leading-snug text-[#1f2a1c]">
+        <h3 className="text-[16px] font-semibold leading-snug text-[var(--foreground)]">
           {course.title}
         </h3>
 
-        <p className="mt-2 text-xs text-[#6b7565]">
+        <p className="mt-2 text-xs text-[var(--muted)]">
           with {course.instructor}
         </p>
 
-        <div className="mt-5 flex items-center justify-between border-t border-[#eef0e6] pt-4 text-xs">
-          <span className="text-[#6b7565]">
+        <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4 text-xs">
+          <span className="text-[var(--muted)]">
             {course.level} · {course.duration}
           </span>
 
-          <span className="font-semibold text-[#1f2a1c]">
+          <span className="font-semibold text-[var(--foreground)]">
             {course.price}
           </span>
         </div>
@@ -235,30 +234,30 @@ export default function CoursesPage() {
   const visibleCourses = filteredCourses.slice(0, visible);
 
   return (
-    <div className="min-h-screen bg-[#f8f9f1] text-[#1f2a1c]">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
       <Navbar />
 
       <main>
         {/* HERO */}
         <section className="mx-auto max-w-3xl px-6 pb-10 pt-14 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6b7565]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             Course catalogue
           </p>
 
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-[#1f2a1c] md:text-5xl">
+          <h1 className="mt-3 text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl">
             Learn something worth using.
           </h1>
 
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#6b7565]">
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[var(--muted)]">
             Live, fun-sized courses taught by verified experts. Search by
             subject, experience, or the outcome you want next.
           </p>
 
           {/* SEARCH */}
-          <div className="mx-auto mt-7 flex max-w-2xl items-center gap-3 rounded-lg border border-[#e0e4d4] bg-white px-4 py-3 shadow-sm">
+          <div className="mx-auto mt-7 flex max-w-2xl items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-sm">
             <span
               aria-hidden="true"
-              className="text-xl leading-none text-[#9aa393]"
+              className="text-xl leading-none text-[var(--muted)]"
             >
               ⌕
             </span>
@@ -272,11 +271,11 @@ export default function CoursesPage() {
               }}
               placeholder="Search courses, skills or instructors"
               aria-label="Search courses"
-              className="w-full bg-transparent text-sm text-[#1f2a1c] outline-none placeholder:text-[#9aa393]"
+              className="w-full bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[11px] text-[#6b7565]">
+          <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[11px] text-[var(--muted)]">
             <span>40 live courses</span>
             <span>40 verified publishers</span>
             <span>New release every week</span>
@@ -284,7 +283,7 @@ export default function CoursesPage() {
         </section>
 
         {/* FEATURED COURSE */}
-        <section className="border-y border-[#eef0e6] bg-[#f3f5ea] py-10">
+        <section className="border-y border-[var(--border)] bg-[var(--surface-soft)] py-10 transition-colors duration-300">
           <div className="mx-auto grid max-w-6xl items-center gap-8 px-6 md:grid-cols-2">
             <img
               src={img("konnect-featured", 1000, 700)}
@@ -293,24 +292,24 @@ export default function CoursesPage() {
             />
 
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b7565]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
                 Featured · Best of Sept · Starts 14 October
               </p>
 
-              <h2 className="mt-3 text-3xl font-bold leading-tight text-[#1f2a1c]">
+              <h2 className="mt-3 text-3xl font-bold leading-tight text-[var(--foreground)]">
                 Sustainable Spaces: Design for Real Life
               </h2>
 
-              <p className="mt-3 text-sm leading-6 text-[#5a6554]">
+              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
                 Turn climate principles into thoughtful, buildable design
                 choices through live studios and a personal capstone.
               </p>
 
-              <p className="mt-4 text-xs text-[#6b7565]">
+              <p className="mt-4 text-xs text-[var(--muted)]">
                 with Amara Okafor · Architect & educator
               </p>
 
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#6b7565]">
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
                 <Stars rating={4.8} />
                 <span>Intermediate</span>
                 <span>6 weeks</span>
@@ -319,7 +318,7 @@ export default function CoursesPage() {
 
               <button
                 type="button"
-                className="mt-6 rounded-md bg-[#2f4a2a] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#243a20]"
+                className="mt-6 rounded-md bg-[#2f4a2a] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#243a20] dark:bg-[#879b5c] dark:text-[#0b0d0b] dark:hover:bg-[#9aad6e]"
               >
                 View featured course
               </button>
@@ -331,18 +330,18 @@ export default function CoursesPage() {
         <section className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-[#1f2a1c]">
+              <h2 className="text-2xl font-bold text-[var(--foreground)]">
                 Explore all courses
               </h2>
 
-              <p className="mt-1 text-xs text-[#6b7565]">
+              <p className="mt-1 text-xs text-[var(--muted)]">
                 {filteredCourses.length} courses · showing the most relevant
               </p>
             </div>
 
             <button
               type="button"
-              className="self-start text-xs text-[#6b7565] transition hover:text-[#2f4a2a] sm:self-auto"
+              className="self-start text-xs text-[var(--muted)] transition hover:text-[var(--primary)] sm:self-auto"
             >
               Sort: Recommended ▾
             </button>
@@ -363,8 +362,8 @@ export default function CoursesPage() {
                   }}
                   className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
                     isActive
-                      ? "border-[#2f4a2a] bg-[#2f4a2a] text-white"
-                      : "border-[#e0e4d4] bg-white text-[#3d4a38] hover:border-[#2f4a2a]"
+                      ? "border-[#2f4a2a] bg-[#2f4a2a] text-white dark:border-[#879b5c] dark:bg-[#879b5c] dark:text-[#0b0d0b]"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:border-[var(--primary)]"
                   }`}
                 >
                   {item}
@@ -376,7 +375,7 @@ export default function CoursesPage() {
           {/* COURSES */}
           {visibleCourses.length === 0 ? (
             <div className="py-20 text-center">
-              <p className="text-sm text-[#6b7565]">
+              <p className="text-sm text-[var(--muted)]">
                 No courses match your search yet.
               </p>
 
@@ -387,7 +386,7 @@ export default function CoursesPage() {
                   setFilter("All subjects");
                   setVisible(PAGE_SIZE);
                 }}
-                className="mt-4 text-xs font-medium text-[#2f4a2a] underline"
+                className="mt-4 text-xs font-medium text-[var(--primary)] underline"
               >
                 Clear filters
               </button>
@@ -411,7 +410,7 @@ export default function CoursesPage() {
                 onClick={() => {
                   setVisible((current) => current + PAGE_SIZE);
                 }}
-                className="rounded-md border border-[#cfd5c0] bg-[#f3f5ea] px-5 py-2.5 text-xs font-medium text-[#3d4a38] transition hover:bg-[#e9ecdf]"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface-soft)] px-5 py-2.5 text-xs font-medium text-[var(--foreground)] transition hover:border-[var(--primary)]"
               >
                 Load more courses
               </button>
@@ -420,21 +419,21 @@ export default function CoursesPage() {
         </section>
 
         {/* CTA */}
-        <section className="bg-[#e6ecd8]">
+        <section className="bg-[var(--surface-soft)] transition-colors duration-300">
           <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-5 px-6 py-10 md:flex-row md:items-center">
             <div>
-              <h2 className="text-2xl font-bold text-[#1f2a1c]">
+              <h2 className="text-2xl font-bold text-[var(--foreground)]">
                 Choose one thing to learn well.
               </h2>
 
-              <p className="mt-1 text-xs leading-5 text-[#5a6554]">
+              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
                 Pick a course that fits your pace, your goals, and your time.
               </p>
             </div>
 
             <button
               type="button"
-              className="rounded-md border border-[#2f4a2a] px-5 py-2.5 text-sm font-medium text-[#2f4a2a] transition hover:bg-[#2f4a2a] hover:text-white"
+              className="rounded-md border border-[var(--primary)] px-5 py-2.5 text-sm font-medium text-[var(--primary)] transition hover:bg-[var(--primary)] hover:text-white"
             >
               Get started
             </button>
@@ -446,4 +445,3 @@ export default function CoursesPage() {
     </div>
   );
 }
-
