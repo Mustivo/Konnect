@@ -5,13 +5,27 @@
 :root {
   --font-sans: "Manrope", sans-serif;
 
-  --background: #f7f8f2;
-  --foreground: #1a261a;
+  /* ================= LIGHT MODE ================= */
+
+  --background: #f7f6f0;
+  --foreground: #1b241c;
+
   --surface: #ffffff;
-  --surface-soft: #f1f4ed;
-  --border: #dfe5d8;
-  --muted: #667064;
-  --primary: #5a6b3d;
+  --surface-soft: #e8efe0;
+
+  --border: #dde1d8;
+  --muted: #697067;
+
+  --primary: #2f4a2a;
+
+  /* Buttons */
+  --button-bg: #2f4a2a;
+  --button-text: #ffffff;
+
+  /* CTA */
+  --cta-background: #e8efe0;
+  --cta-button-bg: #2f4a2a;
+  --cta-button-text: #ffffff;
 }
 
 html {
@@ -23,20 +37,51 @@ html {
 html[data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #0b0d0b;
-  --foreground: #f3f5ef;
-  --surface: #121612;
-  --surface-soft: #181d18;
-  --border: rgba(255, 255, 255, 0.1);
-  --muted: #a6afa2;
-  --primary: #879b5c;
+  /* ================= DARK MODE ================= */
+
+  /* Main page */
+  --background: #0b0e0c;
+
+  /* Main text */
+  --foreground: #e9ebe6;
+
+  /* Cards / inputs */
+  --surface: #151916;
+
+  /* Hero and soft areas */
+  --surface-soft: #151916;
+
+  /* Very subtle borders */
+  --border: #292e2a;
+
+  /* Secondary text */
+  --muted: #858b84;
+
+  /* Green accent */
+  --primary: #607a59;
+
+  /* Normal dark-mode buttons */
+  --button-bg: #30472c;
+  --button-text: #f0f2ed;
+
+  /* CTA section */
+  --cta-background: #1e371b;
+
+  /* IMPORTANT:
+     Screenshot shows the instructor button as
+     a light sage button in dark mode. */
+  --cta-button-bg: #dce5d7;
+  --cta-button-text: #1d291d;
 }
 
 body {
   margin: 0;
+
   background: var(--background);
   color: var(--foreground);
+
   font-family: var(--font-sans);
+
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
@@ -54,7 +99,8 @@ a {
     border-color 0.2s ease;
 }
 
-/* Reusable surfaces */
+/* ================= REUSABLE SURFACES ================= */
+
 .theme-surface {
   background: var(--surface);
   border-color: var(--border);
@@ -72,8 +118,9 @@ a {
   color: var(--muted);
 }
 
-/* Selection */
+/* ================= SELECTION ================= */
+
 ::selection {
-  background: #879b5c;
+  background: var(--primary);
   color: #ffffff;
 }
