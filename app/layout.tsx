@@ -32,8 +32,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${script.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${manrope.variable} ${script.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `const savedTheme = localStorage.getItem("konnect-theme"); document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");`,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

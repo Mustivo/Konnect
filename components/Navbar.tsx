@@ -20,6 +20,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [themeLoaded, setThemeLoaded] = useState(false);
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -31,12 +32,17 @@ export default function Navbar() {
 
     setTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
+    setThemeLoaded(true);
   }, []);
 
   useEffect(() => {
+    if (!themeLoaded) {
+      return;
+    }
+
     document.documentElement.setAttribute("data-theme", theme);
     window.localStorage.setItem("konnect-theme", theme);
-  }, [theme]);
+  }, [theme, themeLoaded]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -92,7 +98,7 @@ export default function Navbar() {
           id="primary-nav"
           className={`${
             open ? "flex" : "hidden"
-            } absolute left-0 top-full z-40 w-1/2 flex-col items-start gap-2 border-r px-5 py-6 shadow-2xl md:static md:z-auto md:w-auto md:flex-row md:items-center md:justify-center md:gap-2 md:border-0 md:bg-transparent md:p-0 md:shadow-none lg:gap-8 ${
+            } absolute left-0 top-full z-40 w-1/2 flex-col items-start gap-2 border-r px-5 py-6 shadow-2xl md:static md:z-auto md:flex md:min-h-0 md:w-auto md:flex-row md:items-center md:justify-center md:gap-2 md:border-0 md:bg-transparent md:p-0 md:shadow-none lg:gap-8 ${
             isDark ? "min-h-[calc(100vh-73px)] border-white/10 bg-[#0b0d0b]" : "min-h-[calc(100vh-73px)] border-[#e9efe7] bg-[#f5f3ee]"
           }`}
           aria-label="Primary"
@@ -119,6 +125,22 @@ export default function Navbar() {
               {l.label}
             </Link>
           ))}
+          <div className="mt-3 flex w-full gap-2 border-t border-[#dfe5d8] pt-4 md:hidden dark:border-white/10">
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="flex-1 rounded border border-[#dfe5d8] px-3 py-2 text-center text-sm font-medium text-[#1a261a] dark:border-white/10 dark:text-white"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => setOpen(false)}
+              className="flex-1 rounded bg-[#263d21] px-3 py-2 text-center text-sm font-medium text-white"
+            >
+              Sign up
+            </Link>
+          </div>
         </nav>
 
         <div className="flex items-center gap-3 md:gap-4">
