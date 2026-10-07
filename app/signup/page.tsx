@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AccountPage from "@/components/AccountPage";
+import SignupExperience from "./SignupPage";
 
 export const metadata: Metadata = {
   title: "Sign up | Konnect",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function SignupPage() {
-  return <AccountPage mode="signup" />;
+  return <SignupExperience />;
 }
