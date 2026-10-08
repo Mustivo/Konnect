@@ -140,7 +140,7 @@ export default function LearnerSettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f2f3eb] px-4 py-6 text-[#20291f] transition-colors dark:bg-[#111510] dark:text-[#edf1e9] sm:px-6 lg:px-8">
+    <div>
       <div className="mx-auto max-w-[1320px]">
         <header>
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#63774f] dark:text-[#a8be97]">Your learning space</p>
@@ -260,6 +260,6 @@ export default function LearnerSettingsPage() {
           </div>
         </footer>
       </div>
-    </main>
+    </div>
   );
 }

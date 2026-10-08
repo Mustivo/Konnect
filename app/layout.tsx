@@ -36,7 +36,19 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `const savedTheme = localStorage.getItem("konnect-theme"); document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");`,
+            __html: `
+              (() => {
+                try {
+                  const savedTheme = localStorage.getItem("konnect-theme");
+                  const theme = savedTheme === "dark" ? "dark" : "light";
+                  document.documentElement.setAttribute("data-theme", theme);
+                  document.documentElement.classList.toggle("dark", theme === "dark");
+                } catch (error) {
+                  document.documentElement.setAttribute("data-theme", "light");
+                  document.documentElement.classList.remove("dark");
+                }
+              })();
+            `,
           }}
         />
       </head>

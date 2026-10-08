@@ -32,6 +32,7 @@ export default function Navbar() {
 
     setTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
     setThemeLoaded(true);
   }, []);
 
@@ -41,6 +42,7 @@ export default function Navbar() {
     }
 
     document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem("konnect-theme", theme);
   }, [theme, themeLoaded]);
 

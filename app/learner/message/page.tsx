@@ -137,7 +137,7 @@ export default function LearnerMessagesPage() {
   }
 
   return (
-    <main className="learner-page min-h-[calc(100vh-5rem)] bg-[#f2f3eb] px-4 py-6 text-[#20291f] sm:px-6 lg:px-8">
+    <div>
       <div className="mx-auto max-w-[1320px]">
         <header className="mb-4">
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#63774f]">Your learning space</p>
@@ -246,7 +246,7 @@ export default function LearnerMessagesPage() {
           </section>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

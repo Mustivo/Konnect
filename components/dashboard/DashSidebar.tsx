@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
   BookOpen,
@@ -24,14 +27,16 @@ const menuItems = [
   { name: "Live Classes", href: "/dashboard/live-classes", icon: Video, left: 20, marginTop: 5 },
   { name: "Calendar", href: "/dashboard/calendar", icon: CalendarDays, left: 17, marginTop: 2 },
   { name: "Assignments", href: "/dashboard/assignments", icon: ClipboardList, left: 20, marginTop: 0 },
-  { name: "Attendance", href: "/dashboard/attendance", icon: UserCheck, left: 17, marginTop: 0 },
+  { name: "Attendance", href: "/learner", icon: UserCheck, left: 17, marginTop: 0 },
   { name: "Grades", href: "/dashboard/grades", icon: GraduationCap, left: 23, marginTop: 1 },
-  { name: "Resources", href: "/dashboard/resources", icon: FolderOpen, left: 24, marginTop: 0 },
-  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare, left: 26, marginTop: 0 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, left: 25, marginTop: 0 },
+  { name: "Resources", href: "/learner/resource", icon: FolderOpen, left: 24, marginTop: 0 },
+  { name: "Messages", href: "/learner/message", icon: MessageSquare, left: 26, marginTop: 0 },
+  { name: "Settings", href: "/learner/settings", icon: Settings, left: 25, marginTop: 0 },
 ];
 
 export default function DashSidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="flex h-full w-[252px] flex-col rounded-l-[14px] bg-[#cddbbd]">
       {/* Logo block: first menu item starts 120px from the top */}
@@ -50,16 +55,19 @@ export default function DashSidebar() {
       <nav>
         {menuItems.map((item) => {
           const Icon = item.icon;
+          const isActive = pathname === item.href ||
+            (item.name === "Attendance" && pathname === "/learner/attendance");
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               style={{
                 marginTop: item.marginTop,
                 paddingLeft: item.left - 4,
               }}
-              className="ml-1 flex h-11 items-center rounded-l-lg text-[#596052] transition-colors hover:bg-[#f2f3ed] hover:text-[#40522c]"
+              className={`ml-1 flex h-11 items-center rounded-l-lg transition-colors ${isActive ? "bg-[#f2f3ed] font-semibold text-[#40522c]" : "text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c]"}`}
             >
               <Icon size={14} className="shrink-0" />
 

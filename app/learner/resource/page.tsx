@@ -83,7 +83,7 @@ export default function LearnerResourcesPage() {
   }
 
   return (
-    <main className="learner-page min-h-screen bg-[#f2f3eb] px-4 py-7 text-[#20291f] sm:px-6 lg:px-8">
+    <div>
       <div className="mx-auto max-w-[1320px]">
         <header>
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#63774f]">Your learning space</p>
@@ -183,6 +183,6 @@ export default function LearnerResourcesPage() {
           </aside>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
