@@ -4,63 +4,125 @@
 
 :root {
   --font-sans: "Manrope", sans-serif;
+
+  /* ================= LIGHT MODE ================= */
+
+  --background: #f7f6f0;
+  --foreground: #1b241c;
+
+  --surface: #ffffff;
+  --surface-soft: #e8efe0;
+
+  --border: #dde1d8;
+  --muted: #697067;
+
+  --primary: #2f4a2a;
+
+  /* Buttons */
+  --button-bg: #2f4a2a;
+  --button-text: #ffffff;
+
+  /* CTA */
+  --cta-background: #e8efe0;
+  --cta-button-bg: #2f4a2a;
+  --cta-button-text: #ffffff;
 }
 
 html {
   scroll-behavior: smooth;
   color-scheme: light;
-  background: #f7f8f2;
+  background: var(--background);
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  background: #050804;
+
+  /* ================= DARK MODE ================= */
+
+  /* Main page */
+  --background: #0b0e0c;
+
+  /* Main text */
+  --foreground: #e9ebe6;
+
+  /* Cards / inputs */
+  --surface: #151916;
+
+  /* Hero and soft areas */
+  --surface-soft: #151916;
+
+  /* Very subtle borders */
+  --border: #292e2a;
+
+  /* Secondary text */
+  --muted: #858b84;
+
+  /* Green accent */
+  --primary: #607a59;
+
+  /* Normal dark-mode buttons */
+  --button-bg: #30472c;
+  --button-text: #f0f2ed;
+
+  /* CTA section */
+  --cta-background: #1e371b;
+
+  /* IMPORTANT:
+     Screenshot shows the instructor button as
+     a light sage button in dark mode. */
+  --cta-button-bg: #dce5d7;
+  --cta-button-text: #1d291d;
 }
 
-@layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+body {
+  margin: 0;
 
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    min-height: 100%;
-  }
+  background: var(--background);
+  color: var(--foreground);
 
-  body {
-    background: transparent;
-    color: #1b241c;
-    font-family: var(--font-sans), sans-serif;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
+  font-family: var(--font-sans);
 
-  html[data-theme="dark"] body {
-    background: transparent;
-    color: #f4f4f0;
-  }
-
-  ::selection {
-    background: #c9dabb;
-    color: #1b241c;
-  }
-
-  a {
-    text-decoration: none;
-  }
-
-  img {
-    display: block;
-    max-width: 100%;
-  }
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-@layer utilities {
-  .font-script {
-    font-family: var(--font-script), cursive;
-  }
+* {
+  box-sizing: border-box;
+}
+
+button,
+a {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* ================= REUSABLE SURFACES ================= */
+
+.theme-surface {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.theme-soft {
+  background: var(--surface-soft);
+}
+
+.theme-text {
+  color: var(--foreground);
+}
+
+.theme-muted {
+  color: var(--muted);
+}
+
+/* ================= SELECTION ================= */
+
+::selection {
+  background: var(--primary);
+  color: #ffffff;
 }
 
 html[data-theme="dark"] .learner-page {
