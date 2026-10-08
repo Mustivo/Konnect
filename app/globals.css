@@ -62,3 +62,32 @@ html[data-theme="dark"] {
     font-family: var(--font-script), cursive;
   }
 }
+
+html[data-theme="dark"] .learner-page {
+  background-color: #111510;
+  color: #edf1e9;
+}
+
+html[data-theme="dark"] .learner-page [class*="bg-white"],
+html[data-theme="dark"] .learner-page [class*="bg-[#"]:not([class*="bg-[#293e27]"]):not([class*="bg-[#273c25]"]) {
+  background-color: #1b211a !important;
+}
+
+html[data-theme="dark"] .learner-page [class*="bg-[#293e27]"],
+html[data-theme="dark"] .learner-page [class*="bg-[#273c25]"] {
+  background-color: #354c2e !important;
+}
+
+html[data-theme="dark"] .learner-page [class*="text-[#"] {
+  color: #c2ccb9 !important;
+}
+
+html[data-theme="dark"] .learner-page [class*="border-[#"] {
+  border-color: #323b30 !important;
+}
+
+html[data-theme="dark"] .learner-page input,
+html[data-theme="dark"] .learner-page textarea,
+html[data-theme="dark"] .learner-page select {
+  color-scheme: dark;
+}
