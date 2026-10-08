@@ -3,9 +3,13 @@ import Image from "next/image";
 import {
   LayoutGrid,
   BookOpen,
+  Video,
   CalendarDays,
   ClipboardList,
-  ChartNoAxesCombined, // on older lucide versions use BarChart3
+  UserCheck,
+  GraduationCap,
+  FolderOpen,
+  MessageSquare,
   Settings,
   ChevronDown,
 } from "lucide-react";
@@ -17,13 +21,13 @@ import {
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutGrid, left: 17, marginTop: 0 },
   { name: "My Courses", href: "/dashboard/courses", icon: BookOpen, left: 20, marginTop: 3 },
-  { name: "Live Classes", href: "/dashboard/live-classes", icon: BookOpen, left: 20, marginTop: 5 },
+  { name: "Live Classes", href: "/dashboard/live-classes", icon: Video, left: 20, marginTop: 5 },
   { name: "Calendar", href: "/dashboard/calendar", icon: CalendarDays, left: 17, marginTop: 2 },
   { name: "Assignments", href: "/dashboard/assignments", icon: ClipboardList, left: 20, marginTop: 0 },
-  { name: "Attendance", href: "/dashboard/attendance", icon: ChartNoAxesCombined, left: 17, marginTop: 0 },
-  { name: "Grades", href: "/dashboard/grades", icon: ChartNoAxesCombined, left: 23, marginTop: 1 },
-  { name: "Resources", href: "/dashboard/resources", icon: BookOpen, left: 24, marginTop: 0 },
-  { name: "Messages", href: "/dashboard/messages", icon: BookOpen, left: 26, marginTop: 0 },
+  { name: "Attendance", href: "/dashboard/attendance", icon: UserCheck, left: 17, marginTop: 0 },
+  { name: "Grades", href: "/dashboard/grades", icon: GraduationCap, left: 23, marginTop: 1 },
+  { name: "Resources", href: "/dashboard/resources", icon: FolderOpen, left: 24, marginTop: 0 },
+  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare, left: 26, marginTop: 0 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, left: 25, marginTop: 0 },
 ];
 
@@ -31,17 +35,16 @@ export default function DashSidebar() {
   return (
     <aside className="flex h-full w-[252px] flex-col rounded-l-[14px] bg-[#cddbbd]">
       {/* Logo block: first menu item starts 120px from the top */}
-   {/* Logo block: first menu item starts 120px from the top */}
-<div className="h-[120px] shrink-0 pl-[64px] pt-[52px]">
-  <Image
-    src="/konnect-wordmark.png"
-    alt="Konnect"
-    width={80}
-    height={34}
-    priority
-    className="h-[34px] w-[80px] object-contain object-left"
-  />
-</div>
+      <div className="h-[120px] shrink-0 pl-[64px] pt-[52px]">
+        <Image
+          src="/konnect-wordmark.png"
+          alt="Konnect"
+          width={80}
+          height={34}
+          priority
+          className="h-[34px] w-[80px] object-contain object-left"
+        />
+      </div>
 
       {/* Menu: nothing selected, only hover */}
       <nav>
