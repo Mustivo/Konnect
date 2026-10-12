@@ -26,7 +26,7 @@ const menuItems = [
   { name: "Assignments", href: "/dashboard/assignments", icon: ClipboardList, left: 20, marginTop: 0 },
   { name: "Attendance", href: "/dashboard/attendance", icon: UserCheck, left: 17, marginTop: 0 },
   { name: "Grades", href: "/dashboard/grades", icon: GraduationCap, left: 23, marginTop: 1 },
-  { name: "Resources", href: "/dashboard/resources", icon: FolderOpen, left: 24, marginTop: 0 },
+  { name: "Resources", href: "/learner/resources", icon: FolderOpen, left: 24, marginTop: 0 },
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare, left: 26, marginTop: 0 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, left: 25, marginTop: 0 },
 ];
