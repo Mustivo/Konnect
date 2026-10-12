@@ -19,7 +19,7 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
   };
 
   return (
-    <div className="w-full max-w-[420px]">
+    <div className="w-full max-w-[600px]">
       <p className="text-[0.58rem] font-bold uppercase tracking-[0.17em] text-[#687c50] dark:text-[#a8bd8c]">
         Join Konnect
       </p>

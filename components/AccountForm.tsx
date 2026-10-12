@@ -14,8 +14,8 @@ export default function AccountForm() {
   };
 
   return (
-    <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-6 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-10 md:min-h-screen md:px-12 md:py-5">
-      <div className="w-full max-w-[420px]">
+    <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-5 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-8 md:min-h-screen md:px-8 md:py-5">
+      <div className="w-full max-w-[600px]">
         <div className="mb-7 flex justify-center">
           <Link href="/" aria-label="Konnect home">
             {/* eslint-disable-next-line @next/next/no-img-element */}

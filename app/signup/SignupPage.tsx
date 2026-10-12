@@ -11,7 +11,7 @@ export default function SignupPage() {
   const isTeacher = role === "teacher";
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="signup-page flex min-h-screen flex-col md:flex-row">
       <section className={`relative flex min-h-[320px] flex-col items-center justify-start overflow-hidden bg-white px-6 pt-9 text-center md:min-h-screen md:w-[41%] ${isTeacher ? "md:pt-[6vh]" : "md:pt-[12vh]"}`}>
         {isTeacher ? (
           <video className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop playsInline>
@@ -50,7 +50,7 @@ export default function SignupPage() {
         </nav>
       </section>
 
-      <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-6 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-10 md:min-h-screen md:px-12 md:py-5">
+      <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-5 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-8 md:min-h-screen md:px-8 md:py-5">
         <div className="w-full">
           <div className="mb-7 flex justify-center">
             <Link href="/" aria-label="Konnect home">

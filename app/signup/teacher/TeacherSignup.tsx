@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import AccountStep from "./AccountStep";
 import ProfileStep from "./ProfileStep";
@@ -18,7 +19,7 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
   const [notice, setNotice] = useState("");
 
   return (
-    <div className="w-full max-w-[640px]">
+    <div className="w-full max-w-[840px]">
       <div className="mb-4 flex items-center text-[0.55rem] text-[#6c7469] dark:text-[#b0b8aa]">
         {steps.map((label, index) => (
           <div key={label} className="flex flex-1 items-center gap-2 last:flex-none">
@@ -48,7 +49,7 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
       </div>
       <p aria-live="polite" className="mt-2 min-h-4 text-center text-[0.58rem] text-[#526d43] dark:text-[#b7cc9d]">{notice}</p>
       <p className="mt-2 text-center text-[0.62rem] text-[#70786d] dark:text-[#b0b8aa]">
-        Already have an account? <a href="/login" className="font-semibold text-[#263d21] dark:text-[#c5d6bc]">Log in</a>
+        Already have an account? <Link href="/login" className="font-semibold text-[#263d21] dark:text-[#c5d6bc]">Log in</Link>
       </p>
     </div>
   );
