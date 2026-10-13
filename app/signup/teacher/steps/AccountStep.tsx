@@ -1,15 +1,16 @@
 "use client";
 
-import RoleSelector from "../RoleSelector";
+import RoleSelector from "../../RoleSelector";
 
 type AccountStepProps = {
   hidden: boolean;
   role: "learner" | "teacher";
   onRoleChange: (role: "learner" | "teacher") => void;
+  onEmailChange: (email: string) => void;
   onContinue: () => void;
 };
 
-export default function AccountStep({ hidden, role, onRoleChange, onContinue }: AccountStepProps) {
+export default function AccountStep({ hidden, role, onRoleChange, onEmailChange, onContinue }: AccountStepProps) {
   return (
     <fieldset hidden={hidden} className="space-y-3 border-0 p-0">
       <RoleSelector role={role} onChange={onRoleChange} />
@@ -24,7 +25,7 @@ export default function AccountStep({ hidden, role, onRoleChange, onContinue }: 
         </label>
         <label className="block text-[0.65rem] font-medium">
           Email address
-          <input autoComplete="email" name="email" type="email" placeholder="you@example.com" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
+          <input autoComplete="email" name="email" type="email" placeholder="you@example.com" onChange={(event) => onEmailChange(event.target.value)} className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
         <label className="block text-[0.65rem] font-medium">
           Phone number
