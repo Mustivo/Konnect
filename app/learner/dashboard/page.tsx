@@ -35,42 +35,6 @@ export default function LearnerDashboardPage() {
             TUESDAY, 6 OCTOBER 2026
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Search bar */}
-          <div className="relative w-60 sm:w-68 md:w-72">
-            <Search
-              size={14}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9da697]"
-            />
-            <input
-              type="text"
-              placeholder="Search courses, classes..."
-              className="h-10 w-full rounded-xl border border-[#dce3d6] bg-white pl-9 pr-3.5 text-xs text-[#172115] shadow-[0_1px_2px_rgba(0,0,0,0.03)] outline-none placeholder:text-[#9da697] focus:border-[#35522b] transition"
-            />
-          </div>
-
-          {/* Notifications button */}
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#dce3d6] bg-white text-[#2f3d2a] shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-[#f6f8f3] transition"
-          >
-            <Bell size={15} />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#ef4444] text-[9px] font-bold text-white shadow-sm">
-              2
-            </span>
-          </button>
-
-          {/* View schedule button */}
-          <button
-            type="button"
-            className="flex h-10 items-center gap-2 rounded-xl border border-[#dce3d6] bg-white px-3.5 text-xs font-semibold text-[#172115] shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-[#f6f8f3] transition"
-          >
-            <CalendarDays size={14} className="text-[#35522b]" />
-            <span>View schedule</span>
-          </button>
-        </div>
       </header>
 
       {/* ========================================================= */}
