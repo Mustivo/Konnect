@@ -25,8 +25,11 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = [
-    h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',') if h.strip()
+    h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,.onrender.com').split(',') if h.strip()
 ]
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Application definition
 INSTALLED_APPS = [
@@ -58,6 +61,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -87,62 +91,71 @@ TEMPLATES = [
 WSGI_APPLICATION = 'konnect_core.wsgi.application'
 
 # ========================================================
-# Database Configuration (PostgreSQL with fallback)
+# Database Configuration (Render PostgreSQL, local Postgres, or SQLite)
 # ========================================================
-DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.postgresql')
-DB_NAME = os.getenv('DB_NAME', 'konnect_db')
-DB_USER = os.getenv('DB_USER', 'postgres')
-DB_PASSWORD = os.getenv('DB_PASSWORD', '')
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = os.getenv('DB_PORT', '5432')
-
-# Verify if PostgreSQL connection is available or if fallback is needed
-USE_POSTGRES = (
-    DB_ENGINE == 'django.db.backends.postgresql' and
-    bool(DB_PASSWORD) and
-    'test' not in sys.argv
-)
-
-# Test PostgreSQL availability if credentials are provided
-if USE_POSTGRES:
-    try:
-        import psycopg2
-        conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT,
-            connect_timeout=2
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
         )
-        conn.close()
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': DB_NAME,
-                'USER': DB_USER,
-                'PASSWORD': DB_PASSWORD,
-                'HOST': DB_HOST,
-                'PORT': DB_PORT,
-                'CONN_MAX_AGE': 600,
+    }
+else:
+    DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.postgresql')
+    DB_NAME = os.getenv('DB_NAME', 'konnect_db')
+    DB_USER = os.getenv('DB_USER', 'postgres')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+    DB_HOST = os.getenv('DB_HOST', 'localhost')
+    DB_PORT = os.getenv('DB_PORT', '5432')
+
+    # Verify if PostgreSQL connection is available or if fallback is needed
+    USE_POSTGRES = (
+        DB_ENGINE == 'django.db.backends.postgresql' and
+        bool(DB_PASSWORD) and
+        'test' not in sys.argv
+    )
+
+    # Test PostgreSQL availability if credentials are provided
+    if USE_POSTGRES:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                host=DB_HOST,
+                port=DB_PORT,
+                connect_timeout=2
+            )
+            conn.close()
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.postgresql',
+                    'NAME': DB_NAME,
+                    'USER': DB_USER,
+                    'PASSWORD': DB_PASSWORD,
+                    'HOST': DB_HOST,
+                    'PORT': DB_PORT,
+                    'CONN_MAX_AGE': 600,
+                }
             }
-        }
-    except Exception as exc:
-        print(f"[KONNECT NOTICE] PostgreSQL not accessible with current .env credentials ({exc}).")
-        print("[KONNECT NOTICE] Falling back to SQLite for local session. Configure .env with your PostgreSQL credentials for production.")
+        except Exception as exc:
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': BASE_DIR / 'db.sqlite3',
+                }
+            }
+    else:
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
@@ -173,6 +186,15 @@ USE_TZ = True
 # Static & Media files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -205,7 +227,7 @@ if not DEBUG:
 # CORS Configuration
 # ========================================================
 CORS_ALLOW_ALL = os.getenv('CORS_ALLOW_ALL', 'True').lower() in ('true', '1', 't')
-if CORS_ALLOW_ALL and DEBUG:
+if CORS_ALLOW_ALL:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
