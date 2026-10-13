@@ -112,16 +112,13 @@ export default function InstructionsPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
 
-      {/* ================= NAVBAR ================= */}
       <Navbar />
 
-      {/* ================= HERO ================= */}
       <section
         id="home"
         className="grid min-h-[430px] grid-cols-1 md:grid-cols-[43%_57%]"
       >
-        {/* Hero text */}
-        <div className="flex flex-col justify-center bg-[var(--surface-soft)] px-[7%] py-16 transition-colors duration-300 md:px-[10%]">
+        <div className="flex flex-col justify-center bg-[var(--surface-soft)] px-6 py-16 transition-colors duration-300 md:px-8 lg:px-12">
           <p className="mb-5 text-[12px] font-bold uppercase tracking-[2px] text-[var(--primary)]">
             Meet your mentor
           </p>
@@ -140,7 +137,6 @@ export default function InstructionsPage() {
           </p>
         </div>
 
-        {/* Hero image */}
         <div className="h-[320px] overflow-hidden md:h-auto">
           <img
             src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1400&q=90"
@@ -150,14 +146,12 @@ export default function InstructionsPage() {
         </div>
       </section>
 
-      {/* ================= TEACHERS / EXPERTISE ================= */}
       <section
         id="teachers"
-        className="bg-[var(--background)] px-[5%] py-16 transition-colors duration-300 lg:py-[75px]"
+        className="bg-[var(--background)] px-6 py-16 transition-colors duration-300 lg:py-[75px]"
       >
-        <div className="mx-auto max-w-[1450px]">
+        <div className="mx-auto max-w-6xl">
 
-          {/* Heading */}
           <div className="text-left">
             <p className="mb-4 text-[12px] font-bold uppercase tracking-[2px] text-[var(--primary)]">
               Find your teacher
@@ -173,7 +167,6 @@ export default function InstructionsPage() {
             </p>
           </div>
 
-          {/* ================= SEARCH ================= */}
           <div className="mt-9 flex w-full items-center gap-2">
 
             <div className="flex h-[50px] flex-1 items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 transition-colors duration-300">
@@ -207,7 +200,6 @@ export default function InstructionsPage() {
             </button>
           </div>
 
-          {/* ================= FILTERS ================= */}
           <div className="my-7 flex flex-wrap justify-center gap-2">
             {categories.map((category) => {
               const selected = activeCategory === category;
@@ -229,14 +221,12 @@ export default function InstructionsPage() {
             })}
           </div>
 
-          {/* ================= TEACHER CARDS ================= */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {filteredTeachers.map((teacher) => (
               <article
                 key={teacher.name}
                 className="group overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] transition duration-300 hover:-translate-y-1 hover:border-[var(--primary)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.25)]"
               >
-                {/* Image */}
                 <div className="relative h-[225px] overflow-hidden">
                   <img
                     src={teacher.image}
@@ -244,7 +234,6 @@ export default function InstructionsPage() {
                     className="h-full w-full object-cover saturate-[.85] transition duration-500 group-hover:scale-[1.04]"
                   />
 
-                  {/* Save */}
                   <button
                     type="button"
                     aria-label={`Save ${teacher.name}`}
@@ -254,7 +243,6 @@ export default function InstructionsPage() {
                   </button>
                 </div>
 
-                {/* Information */}
                 <div className="p-5">
                   <h3 className="text-[17px] font-semibold text-[var(--foreground)]">
                     {teacher.name}
@@ -355,7 +343,7 @@ export default function InstructionsPage() {
       {/* ================= FOOTER ================= */}
       <footer
         id="contact"
-        className="grid gap-10 bg-[var(--background)] px-[7%] py-10 transition-colors duration-300 sm:grid-cols-2 lg:grid-cols-[2.2fr_1fr_1fr_1fr] lg:px-[5.5%]"
+        className="grid gap-10 bg-[#fffdf9] px-6 py-10 shadow-[inset_0_1px_0_rgba(72,88,69,0.08)] transition-colors duration-300 sm:grid-cols-2 lg:grid-cols-[2.2fr_1fr_1fr_1fr]"
       >
         {/* Brand */}
         <div className="sm:col-span-2 lg:col-span-1">

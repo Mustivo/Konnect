@@ -4,7 +4,7 @@ import DashSidebar from "@/components/dashboard/DashSidebar";
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
 	return (
-		<div className="learner-page flex h-screen overflow-hidden bg-[#f2f3ed]">
+		<div className="learner-page flex h-screen overflow-hidden bg-[#f2f3ed] dark:bg-[#111510] text-[#171d15] dark:text-[#ecf1ea] transition-colors">
 			<div className="h-screen shrink-0 pb-px pl-[7px] pt-[11px]">
 				<DashSidebar />
 			</div>
@@ -14,8 +14,10 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 					<DashNav />
 				</div>
 
-				<main className="-mt-[5px] min-h-0 flex-1 overflow-y-auto pb-8 pl-4 pr-[31px] [scrollbar-color:#cddbbd_transparent] [scrollbar-width:thin]">
-					{children}
+				<main className="learner-main-scroll -mt-[5px] min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-8 pl-2 pr-0">
+					<div className="mx-auto w-full max-w-[1440px]">
+						{children}
+					</div>
 				</main>
 			</div>
 		</div>

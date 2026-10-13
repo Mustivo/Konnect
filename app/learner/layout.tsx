@@ -10,7 +10,7 @@ function LearnerThemeInitializer() {
 
     document.documentElement.setAttribute("data-theme", shouldUseLight ? "light" : "dark");
     document.documentElement.classList.toggle("dark", !shouldUseLight);
-    document.body.style.backgroundColor = "#f2f3ed";
+    document.body.style.backgroundColor = shouldUseLight ? "#f2f3ed" : "#111510";
 
     if (!savedTheme) {
       window.localStorage.setItem("konnect-theme", "light");
