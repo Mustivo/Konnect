@@ -31,7 +31,7 @@ export default function LearnerDashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight text-[#172115] flex items-center gap-1.5">
             Gabriella Igabe <span className="text-xl">👋</span>
           </h1>
-          <p className="text-[10px] font-bold tracking-wider uppercase text-[#707c6c] mt-0.5">
+          <p className="text-[9.5px] font-bold tracking-wider uppercase text-[#707c6c] mt-0.5">
             TUESDAY, 6 OCTOBER 2026
           </p>
         </div>
@@ -57,7 +57,7 @@ export default function LearnerDashboardPage() {
                   <BookOpen size={14} />
                 </span>
               </div>
-              <p className="text-[10px] text-[#8e9a8a]">Active classes</p>
+              <p className="text-[9.5px] text-[#8e9a8a]">Active classes</p>
             </div>
 
             {/* Classes Today */}
@@ -73,7 +73,7 @@ export default function LearnerDashboardPage() {
                   <CalendarDays size={14} />
                 </span>
               </div>
-              <p className="text-[10px] text-[#8e9a8a]">Upcoming</p>
+              <p className="text-[9.5px] text-[#8e9a8a]">Upcoming</p>
             </div>
 
             {/* Assignments Due */}
@@ -89,7 +89,7 @@ export default function LearnerDashboardPage() {
                   <ClipboardList size={14} />
                 </span>
               </div>
-              <p className="text-[10px] text-[#8e9a8a]">Pending</p>
+              <p className="text-[9.5px] text-[#8e9a8a]">Pending</p>
             </div>
 
             {/* Attendance */}
@@ -105,7 +105,7 @@ export default function LearnerDashboardPage() {
                   <TrendingUp size={14} />
                 </span>
               </div>
-              <p className="text-[10px] text-[#8e9a8a]">This Month</p>
+              <p className="text-[9.5px] text-[#8e9a8a]">This Month</p>
             </div>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function LearnerDashboardPage() {
             <h2 className="text-xs font-bold text-[#172115]">Learning Progress</h2>
             <button
               type="button"
-              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[10px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
+              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[9.5px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
             >
               <span>This Week</span>
               <ChevronDown size={11} />
@@ -209,7 +209,7 @@ export default function LearnerDashboardPage() {
           </div>
 
           {/* Sub Stats Row */}
-          <div className="flex items-center justify-between pt-1 border-t border-[#f0f4ed] text-[10px]">
+          <div className="flex items-center justify-between pt-1 border-t border-[#f0f4ed] text-[9.5px]">
             <div>
               <span className="text-[#7d8979]">Attendance </span>
               <span className="font-bold text-[#172115]">96%</span>
@@ -221,7 +221,7 @@ export default function LearnerDashboardPage() {
           </div>
 
           {/* Bottom Motivation */}
-          <p className="mt-1 text-[10px] font-medium text-[#2b4724]">
+          <p className="mt-1 text-[9.5px] font-medium text-[#2b4724]">
             You&apos;re showing up. Keep it going. ↗
           </p>
         </div>
@@ -233,7 +233,7 @@ export default function LearnerDashboardPage() {
             <h2 className="text-xs font-bold text-[#172115]">Study Goals</h2>
             <Link
               href="/learner/resource"
-              className="text-[10px] font-bold text-[#172115] hover:underline"
+              className="text-[9.5px] font-bold text-[#172115] hover:underline"
             >
               View All →
             </Link>
@@ -299,7 +299,7 @@ export default function LearnerDashboardPage() {
             </div>
             <button
               type="button"
-              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[10px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
+              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[9.5px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
             >
               <span>This Month</span>
               <ChevronDown size={11} />
@@ -420,7 +420,7 @@ export default function LearnerDashboardPage() {
                   Network security, ethical hacking basics, threat analysis & modern defence strategies.
                 </p>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-[#616d5c]">
+                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
                   <span>Marcus Adeyemi · 10 live lessons</span>
                   <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[9px] font-semibold text-[#0284c7]">
                     Intermediate
@@ -475,7 +475,7 @@ export default function LearnerDashboardPage() {
                   Typography, colour theory, brand identity & Adobe Illustrator for modern graphic designers.
                 </p>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-[#616d5c]">
+                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
                   <span>Nadia Fernandez · 10 live lessons</span>
                   <span className="rounded-full bg-[#fce7f3] px-2 py-0.5 text-[9px] font-semibold text-[#db2777]">
                     Beginner
@@ -530,7 +530,7 @@ export default function LearnerDashboardPage() {
                   Communication, leadership, critical thinking & emotional intelligence for modern professionals.
                 </p>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-[#616d5c]">
+                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
                   <span>Prof. James Osei · 8 live lessons</span>
                   <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[9px] font-semibold text-[#b45309]">
                     All Levels
@@ -585,7 +585,7 @@ export default function LearnerDashboardPage() {
                   Supervised & unsupervised learning, model evaluation, Python scikit-learn & real datasets.
                 </p>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-[#616d5c]">
+                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
                   <span>Dr. Priya Nair · 14 live lessons</span>
                   <span className="rounded-full bg-[#ede9fe] px-2 py-0.5 text-[9px] font-semibold text-[#6d28d9]">
                     Advanced

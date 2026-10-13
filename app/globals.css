@@ -201,16 +201,54 @@ html[data-theme="dark"] .learner-page select {
   display: none;
 }
 
-.learner-page [class*="text-[8px]"] { font-size: 8px !important; }
-.learner-page [class*="text-[9px]"] { font-size: 9px !important; }
-.learner-page [class*="text-[10px]"] { font-size: 10px !important; }
-.learner-page [class*="text-[11px]"] { font-size: 11px !important; }
-.learner-page [class*="text-[12px]"] { font-size: 12px !important; }
-.learner-page [class*="text-[13px]"] { font-size: 13px !important; }
-.learner-page [class*="text-[14px]"] { font-size: 14px !important; }
-.learner-page [class*="text-[15px]"] { font-size: 15px !important; }
-.learner-page [class*="text-[17px]"] { font-size: 17px !important; }
-.learner-page [class*="text-[26px]"] { font-size: 20px !important; }
+.learner-page [class*="text-[6px]"],
+.learner-page [class*="text-[6.5px]"],
+.learner-page [class*="text-[7px]"],
+.learner-page [class*="text-[7.5px]"],
+.learner-page [class*="text-[8px]"],
+.learner-page [class*="text-[8.5px]"] { font-size: 12px !important; }
+.learner-page [class*="text-[9px]"],
+.learner-page [class*="text-[9.5px]"] { font-size: 12px !important; }
+.learner-page [class*="text-[10px]"] { font-size: 14px !important; }
+.learner-page [class*="text-[11px]"] { font-size: 13px !important; }
+.learner-page [class*="text-[12px]"] { font-size: 14px !important; }
+.learner-page [class*="text-[13px]"] { font-size: 15px !important; }
+.learner-page [class*="text-[14px]"] { font-size: 16px !important; }
+.learner-page [class*="text-[15px]"] { font-size: 17px !important; }
+.learner-page [class*="text-[17px]"] { font-size: 19px !important; }
+.learner-page [class*="text-[26px]"] { font-size: 22px !important; }
+
+.learner-live-class-room [class*="text-[6px]"],
+.learner-live-class-room [class*="text-[6.5px]"],
+.learner-live-class-room [class*="text-[7px]"],
+.learner-live-class-room [class*="text-[7.5px]"],
+.learner-live-class-room [class*="text-[8px]"],
+.learner-live-class-room [class*="text-[8.5px]"],
+.learner-live-class-room [class*="text-[9px]"],
+.learner-live-class-room [class*="text-[9.5px]"] { font-size: 14px !important; }
+.learner-live-class-room [class*="text-[10px]"] { font-size: 16px !important; }
+.learner-live-class-room [class*="text-[11px]"] { font-size: 15px !important; }
+.learner-live-class-room [class*="text-[12px]"] { font-size: 16px !important; }
+.learner-live-class-room [class*="text-[13px]"] { font-size: 17px !important; }
+.learner-live-class-room [class*="text-[14px]"] { font-size: 18px !important; }
+.learner-live-class-room [class*="text-[15px]"] { font-size: 19px !important; }
+.learner-live-class-room [class*="text-[17px]"] { font-size: 21px !important; }
+
+.learner-exam-rules [class*="text-[6px]"],
+.learner-exam-rules [class*="text-[6.5px]"],
+.learner-exam-rules [class*="text-[7px]"],
+.learner-exam-rules [class*="text-[7.5px]"],
+.learner-exam-rules [class*="text-[8px]"],
+.learner-exam-rules [class*="text-[8.5px]"],
+.learner-exam-rules [class*="text-[9px]"],
+.learner-exam-rules [class*="text-[9.5px]"] { font-size: 12px !important; }
+.learner-exam-rules [class*="text-[10px]"] { font-size: 14px !important; }
+.learner-exam-rules [class*="text-[11px]"] { font-size: 13px !important; }
+.learner-exam-rules [class*="text-[12px]"] { font-size: 14px !important; }
+.learner-exam-rules [class*="text-[13px]"] { font-size: 15px !important; }
+.learner-exam-rules [class*="text-[14px]"] { font-size: 16px !important; }
+.learner-exam-rules [class*="text-[15px]"] { font-size: 17px !important; }
+.learner-exam-rules [class*="text-[17px]"] { font-size: 19px !important; }
 
 .learner-page .rounded-lg,
 .learner-page .rounded-xl,
@@ -221,9 +259,9 @@ html[data-theme="dark"] .learner-page select {
 }
 
 .learner-page .bg-white,
-.learner-page .bg-[#f5f5f4],
-.learner-page .bg-[#f2f3ed],
-.learner-page .bg-[#f7f6f0] {
+.learner-page [class~="bg-[#f5f5f4]"],
+.learner-page [class~="bg-[#f2f3ed]"],
+.learner-page [class~="bg-[#f7f6f0]"] {
   background-color: #ffffff !important;
 }
 
@@ -264,9 +302,9 @@ html[data-theme="dark"] .learner-page small {
 }
 
 html[data-theme="dark"] .learner-page .bg-white,
-html[data-theme="dark"] .learner-page .bg-[#f5f5f4],
-html[data-theme="dark"] .learner-page .bg-[#f2f3ed],
-html[data-theme="dark"] .learner-page .bg-[#f7f6f0] {
+html[data-theme="dark"] .learner-page [class~="bg-[#f5f5f4]"],
+html[data-theme="dark"] .learner-page [class~="bg-[#f2f3ed]"],
+html[data-theme="dark"] .learner-page [class~="bg-[#f7f6f0]"] {
   background-color: #161b17 !important;
 }
 

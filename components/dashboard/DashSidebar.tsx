@@ -30,7 +30,7 @@ const menuItems = [
   { name: "Calendar", href: "/learner/calender", icon: CalendarDays, left: 17, marginTop: 1 },
   { name: "Tasks", href: "/learner/resource", icon: ClipboardList, left: 20, marginTop: 0, nested: [
     { name: "Assignments", href: "/learner/resource", icon: ClipboardList, left: 20 },
-    { name: "Exams", href: "/learner/resource", icon: ClipboardList, left: 20 },
+    { name: "Exams", href: "/learner/tasks/exams", icon: ClipboardList, left: 20 },
   ] },
   { name: "Attendance", href: "/learner/attendance", icon: UserCheck, left: 17, marginTop: 1 },
   { name: "Grades", href: "/learner/grades", icon: GraduationCap, left: 23, marginTop: 1 },
@@ -41,7 +41,7 @@ const menuItems = [
 
 export default function DashSidebar() {
   const pathname = usePathname();
-  const [tasksOpen, setTasksOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(() => pathname.startsWith("/learner/tasks"));
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
   return (
@@ -94,7 +94,9 @@ export default function DashSidebar() {
                       <div className="pb-1 pl-[42px] pt-[2px]">
                         {item.nested?.map((subItem) => (
                           (() => {
-                            const isSubItemActive = activeLink?.href === pathname && activeLink.name === subItem.name;
+                            const isSubItemActive = activeLink?.href === pathname
+                              ? activeLink.name === subItem.name
+                              : pathname === subItem.href || pathname.startsWith(`${subItem.href}/`);
                             return (
                               <Link
                                 key={subItem.name}

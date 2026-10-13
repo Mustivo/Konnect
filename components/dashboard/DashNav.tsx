@@ -1,8 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Search, Bell, CalendarDays } from "lucide-react";
 
 export default function DashNav() {
+  const [currentDate, setCurrentDate] = useState("Today");
+
+  useEffect(() => {
+    const updateDate = () => setCurrentDate(new Intl.DateTimeFormat("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date()));
+
+    updateDate();
+    const interval = window.setInterval(updateDate, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   return (
     <header className="flex h-16 min-w-0 items-center justify-between gap-3 pl-3 pr-3">
       <div className="relative h-9 min-w-0 max-w-[335px] flex-1">
@@ -19,15 +35,15 @@ export default function DashNav() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <button className="flex h-[30px] items-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors">
+        <button type="button" aria-label={`Current date: ${currentDate}`} className="flex h-8 min-w-[132px] items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2.5 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors">
           <CalendarDays size={13} />
-          <span>Tue, 6 Oct 2026</span>
+          <span>{currentDate}</span>
         </button>
 
-        <button className="relative flex h-[30px] w-[30px] items-center justify-center rounded-md border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] transition-colors">
-          <Bell size={14} className="text-[#40522c] dark:text-[#b4e3a8]" />
+        <button type="button" aria-label="Notifications, 2 unread" title="2 unread notifications" className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f7f2] dark:border-[#212f1f] dark:bg-[#141d13] dark:hover:bg-[#1b2819]">
+          <Bell size={15} className="text-[#40522c] dark:text-[#b4e3a8]" />
 
-          <span className="absolute left-[13px] top-[4px] flex h-[11px] w-[11px] items-center justify-center rounded-full bg-[#ef4444] text-[7px] font-bold leading-none text-white">
+          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#f2f3ed] bg-[#e5484d] px-1 text-[8px] font-bold leading-none text-white dark:border-[#111510]">
             2
           </span>
         </button>
