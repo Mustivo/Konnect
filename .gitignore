@@ -3,3 +3,23 @@ node_modules
 .env
 .env.local
 next-env.d.ts
+
+# Python & Django Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+backend/.env
+backend/.env.local
+backend/.env.*.local
+media/
+staticfiles/
+*.sqlite3-journal
+
+# Database (Keep pre-seeded SQLite for instant team onboarding)
+*.sqlite3
+!backend/db.sqlite3
