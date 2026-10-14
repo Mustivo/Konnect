@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Search, Bell, CalendarDays, Plus } from "lucide-react";
 
 type DashboardRole = "learner" | "teacher";
 
-export default function DashNav({ role = "learner" }: { role?: DashboardRole }) {
+export default function DashNav({ role = "learner", menuButton }: { role?: DashboardRole; menuButton?: ReactNode }) {
   const [currentDate, setCurrentDate] = useState("Today");
   const isTeacher = role === "teacher";
 
@@ -25,6 +26,7 @@ export default function DashNav({ role = "learner" }: { role?: DashboardRole }) 
 
   return (
     <header className={`${isTeacher ? "h-14 px-5" : "h-16 pl-3 pr-3"} flex min-w-0 items-center justify-between gap-3`}>
+      {menuButton}
       <div className="relative h-9 min-w-0 max-w-[335px] flex-1">
         <Search
           size={13}

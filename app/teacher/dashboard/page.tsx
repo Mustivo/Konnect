@@ -1,235 +1,316 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
   ArrowRight,
-  BarChart2,
   BookOpen,
+  CalendarDays,
   Check,
   ChevronDown,
-  ClipboardList,
+  Download,
   FileText,
-  LineChart,
+  MoreVertical,
   Star,
+  ThumbsUp,
   Users,
   X,
 } from "lucide-react";
 
-const stats = [
-  { label: "Active Classes", value: "3", note: "3/3 class limit", icon: BookOpen, tone: "bg-[#edf4e8] text-[#34522a]" },
-  { label: "Students", value: "83", note: "Across all classes", icon: Users, tone: "bg-[#eaf2ff] text-[#2563a8]" },
-  { label: "Pending Reviews", value: "42", note: "Assignments waiting", icon: FileText, tone: "bg-[#fce7f3] text-[#be3b75]" },
-  { label: "Approvals", value: "3", note: "New requests today", icon: Check, tone: "bg-[#fef4e8] text-[#c2781b]" },
+const assignmentStats = [
+  { label: "Received", value: "127", icon: Download, tone: "bg-[#e5efdf] text-[#47713d]" },
+  { label: "Yet to Receive", value: "58", icon: Download, tone: "bg-[#fce9dc] text-[#dc7b3e]" },
+  { label: "Pending Review", value: "42", icon: FileText, tone: "bg-[#f9e7ef] text-[#c64e83]" },
+  { label: "Reviewed", value: "25", icon: ThumbsUp, tone: "bg-[#e5efdf] text-[#47713d]" },
+  { label: "Classes Created", value: "3 / 3", icon: BookOpen, tone: "bg-[#e5f0ff] text-[#4384cb]" },
 ];
 
-const classes = [
-  { code: "MATH 101", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, time: "Mon, Wed, Fri (09:00 AM)" },
-  { code: "ALG 201", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, time: "Tue, Thu (11:00 AM)" },
-  { code: "GEOM 301", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, time: "Mon, Wed (02:00 PM)" },
-];
-
-const approvals = [
-  { name: "Oliver James", meta: "G1 / Class - A - 5 mins ago" },
-  { name: "David Peter", meta: "G1 / Class - B - 12 mins ago" },
+const initialApprovals = [
+  { name: "Oliver James", meta: "G1 / Class - A · 5 mins ago" },
+  { name: "David Peter", meta: "G1 / Class - B · 12 mins ago" },
   { name: "Lilly Paul", meta: "G1 / Class - B" },
 ];
 
-const performance = [
-  { name: "Oliver James", score: "97%", group: "G1 / Class - B" },
-  { name: "David Peter", score: "95%", group: "G1 / Class - B" },
-  { name: "Lilly Paul", score: "92%", group: "G1 / Class - B" },
+const initialNotes = [
+  { title: "Prepare Questions for Unit Test", text: "Prepare questions for unit tests", date: "05 Dec 2026" },
+  { title: "Announcements to Students", text: "Announce important updates to students", date: "01 Dec 2026" },
 ];
 
-const notes = [
-  { title: "Prepare Questions for Unit Test", detail: "Prepare questions for unit tests", date: "05 Dec 2026" },
-  { title: "Announcements to Students", detail: "Announce important updates to", date: "01 Dec 2026" },
+const activeClasses = [
+  { id: "algebra", subject: "MATH 101 · GRADE 1", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
+  { id: "geometry", subject: "ALG 201 · GRADE 1", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, schedule: "Tue, Thu", time: "11:00 AM" },
+  { id: "trigonometry", subject: "GEOM 301 · GRADE 2", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, schedule: "Mon, Wed", time: "02:00 PM" },
 ];
 
-function Avatar({ name, index }: { name: string; index: number }) {
-  const colors = ["bg-[#213b1f]", "bg-[#8a5a32]", "bg-[#24445a]"];
-  const initials = name
-    .split(" ")
-    .map((part) => part[0])
-    .join("");
-
-  return (
-    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${colors[index % colors.length]} text-xs font-bold text-white`}>
-      {initials}
-    </span>
-  );
-}
+const plannerItems = [
+  { title: "Maths Algebra Unit Formula", className: "G1 / Class - A", status: "Overdue", color: "text-[#cf5047] bg-[#fbe9e7]" },
+  { title: "Linear Functions Review", className: "G1 / Class - B", status: "Today", color: "text-[#4e7543] bg-[#e7f1e2]" },
+];
 
 export default function TeacherDashboardPage() {
+  const [approvals, setApprovals] = useState(initialApprovals);
+  const [notes, setNotes] = useState(initialNotes);
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteTitle, setNoteTitle] = useState("");
+
+  function saveNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = noteTitle.trim();
+    if (!title) return;
+
+    setNotes((current) => [
+      { title, text: title, date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) },
+      ...current,
+    ]);
+    setNoteTitle("");
+    setAddingNote(false);
+  }
+
+  function dismissApproval(name: string) {
+    setApprovals((current) => current.filter((student) => student.name !== name));
+  }
+
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-7 pb-10 pt-4 sm:space-y-8 sm:pt-5">
+      <div className="space-y-3 pb-6 pt-1">
         <header>
-          <div>
-            <p className="text-sm font-medium leading-6 text-[#707c6c]">Good afternoon,</p>
-            <h1 className="text-3xl font-bold leading-tight tracking-tight text-[#172115] dark:text-[#ecf1ea]">
-              Edna Francis
-            </h1>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#707c6c] sm:text-sm">
-              Teacher workspace - approvals, class performance, notes & tasks
-            </p>
-          </div>
+          <h1 className="text-[20px] font-bold leading-tight tracking-tight text-[#172115] dark:text-[#ecf1ea]">
+            Dashboard
+          </h1>
+          <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">
+            Overview of student approvals, class performance, notes &amp; tasks
+          </p>
         </header>
 
-        <section id="analytics" className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
-          {stats.map(({ label, value, note, icon: Icon, tone }) => (
-            <article key={label} className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-[#687564] dark:text-[#8b9987]">{label}</p>
-                  <p className="mt-2 text-3xl font-bold leading-9 tracking-tight text-[#172115] dark:text-[#ecf1ea]">{value}</p>
-                  <p className="mt-1 text-sm text-[#85917f]">{note}</p>
-                </div>
-                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${tone}`}>
-                  <Icon size={19} />
+        <section
+          id="analytics"
+          className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+        >
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">
+              Assignments &amp; Classes Overview
+            </h2>
+            <button
+              type="button"
+              className="flex h-6 items-center gap-1 rounded-full bg-[#f1f4ed] px-2 text-[7px] font-semibold text-[#43543a] dark:bg-[#20271e] dark:text-[#c5d6b8]"
+            >
+              Assignments <ChevronDown size={10} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-[#f0f2ed] sm:grid-cols-3 lg:grid-cols-5 dark:divide-[#253022]">
+            {assignmentStats.map(({ label, value, icon: Icon, tone }) => (
+              <div key={label} className="flex min-h-[74px] flex-col items-center justify-center px-2 py-1 text-center">
+                <span className={`mb-1.5 grid size-6 place-items-center rounded-full ${tone}`}>
+                  <Icon size={11} />
                 </span>
+                <strong className="text-[16px] leading-none text-[#172115] dark:text-[#ecf1ea]">{value}</strong>
+                <span className="mt-1 text-[7px] text-[#778171] dark:text-[#a4af9e]">{label}</span>
               </div>
-            </article>
-          ))}
+            ))}
+          </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-          <article id="assignments" className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] sm:p-6 dark:border-[#212f1f] dark:bg-[#141d13]">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <BarChart2 size={18} className="text-[#35522b] dark:text-[#b4e3a8]" />
-                <h2 className="text-lg font-bold text-[#172115] dark:text-[#ecf1ea]">Assignments Overview</h2>
+        <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
+          <section
+            aria-label="Student performance"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students<br />Performance</h2>
+              <span className="rounded-full bg-[#f1f4ed] px-2 py-1 text-[7px] font-semibold text-[#52634b] dark:bg-[#20271e] dark:text-[#c5d6b8]">
+                Mastery
+              </span>
+            </div>
+            <div className="space-y-2">
+              {[
+                { name: "Oliver James", className: "G1 / Class - B", score: "97%" },
+                { name: "David Peter", className: "G1 / Class - B", score: "95%" },
+                { name: "Lilly Paul", className: "G1 / Class - B", score: "92%" },
+              ].map((student, index) => (
+                <div key={student.name} className="flex items-center gap-2">
+                  <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[7px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index]}`}>
+                    {student.name.split(" ").map((part) => part[0]).join("")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[8px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p>
+                    <p className="text-[7px] text-[#7c8776] dark:text-[#9ca797]">{student.className}</p>
+                  </div>
+                  <span className="text-[8px] font-bold text-[#273423] dark:text-[#d6dfd2]">{student.score}</span>
+                  <Star size={10} className="text-[#e78648]" />
+                </div>
+              ))}
+            </div>
+            <Link href="/teacher/classes" className="mt-3 block text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
+              View All Students <span aria-hidden="true">›</span>
+            </Link>
+          </section>
+
+          <section
+            id="approvals"
+            aria-label="Students pending approval"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students<br />Pending<br className="sm:hidden" /> Approval</h2>
+              <div className="text-right">
+                <span className="rounded-full bg-[#fce9dc] px-2 py-1 text-[7px] font-semibold text-[#bc612a]">{approvals.length} Waiting</span>
+                <p className="mt-1 text-[6px] text-[#7c8776] dark:text-[#9ca797]">3/3 Classes<br />Active</p>
               </div>
-              <button type="button" className="flex h-9 items-center gap-2 rounded-lg border border-[#dce3d6] px-3 text-sm font-semibold text-[#5f6c5b] hover:bg-[#f6f8f3]">
-                This Week
-                <ChevronDown size={15} />
+            </div>
+            <div className="space-y-1.5">
+              {approvals.map((student, index) => (
+                <div key={student.name} className="flex items-center gap-1.5 rounded-full bg-[#f6f7f3] p-1 dark:bg-[#20271e]">
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>
+                    {student.name.split(" ").map((part) => part[0]).join("")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p>
+                    <p className="truncate text-[6px] text-[#7c8776] dark:text-[#9ca797]">{student.meta}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dismissApproval(student.name)}
+                    className="flex h-5 items-center gap-1 rounded-full bg-[#23351f] px-2 text-[6px] font-semibold text-white hover:bg-[#30472b]"
+                    aria-label={`Approve ${student.name}`}
+                  >
+                    <Check size={9} /> Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissApproval(student.name)}
+                    className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[#72806c] hover:bg-[#f0f3ed] dark:bg-[#161b17] dark:text-[#c5d6b8]"
+                    aria-label={`Dismiss ${student.name}`}
+                  >
+                    <X size={9} />
+                  </button>
+                </div>
+              ))}
+              {!approvals.length && <p className="py-5 text-center text-[8px] text-[#7c8776]">No pending approvals.</p>}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[7px] text-[#71806b] dark:text-[#9ca797]">
+              <span>Class capacity alert: 28/30 seats filled</span>
+              <Link href="/teacher/classes" className="font-semibold text-[#263d21] dark:text-[#c5d6b8]">View All Requests <span aria-hidden="true">›</span></Link>
+            </div>
+          </section>
+
+          <section
+            aria-label="My notes"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">
+                My Notes <span className="ml-1 rounded-full bg-[#e5efdf] px-1.5 py-0.5 text-[6px] text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">{notes.length + 8}</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAddingNote((current) => !current)}
+                className="rounded-full border border-[#e2e7dd] px-2 py-1 text-[6px] font-semibold text-[#43543a] hover:bg-[#f6f8f3] dark:border-[#303b2d] dark:text-[#c5d6b8]"
+              >
+                + Add Notes
               </button>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[
-                ["Received", "127"],
-                ["Yet to Receive", "58"],
-                ["Pending Review", "42"],
-                ["Reviewed", "25"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-[#f6f8f3] p-4 dark:bg-[#1b2819]">
-                  <p className="min-h-10 text-sm font-semibold leading-5 text-[#66735f]">{label}</p>
-                  <p className="mt-2 text-2xl font-bold leading-8 text-[#172115] dark:text-[#ecf1ea]">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 h-40 sm:h-44">
-              <svg className="h-full w-full overflow-visible" viewBox="0 0 420 140" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="teacherChartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#35522b" stopOpacity="0.18" />
-                    <stop offset="100%" stopColor="#35522b" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[24, 52, 80, 108, 132].map((y) => (
-                  <line key={y} x1="18" y1={y} x2="410" y2={y} stroke="#eef3eb" strokeWidth="1" />
-                ))}
-                <polygon points="20,132 80,96 150,100 230,68 310,74 398,34 398,132" fill="url(#teacherChartGradient)" />
-                <path d="M20 132 C62 104, 92 92, 150 100 C190 106, 206 70, 230 68 C270 66, 280 78, 310 74 C350 70, 370 44, 398 34" fill="none" stroke="#35522b" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            </div>
-          </article>
-
-          <article id="approvals" className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] sm:p-6 dark:border-[#212f1f] dark:bg-[#141d13]">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-[#172115] dark:text-[#ecf1ea]">Students Pending Approval</h2>
-              <span className="rounded-full bg-[#fef4e8] px-3 py-1.5 text-xs font-bold text-[#b45309]">3 waiting</span>
-            </div>
-
-            <div className="space-y-3">
-              {approvals.map((student, index) => (
-                <div key={student.name} className="flex items-center gap-3 rounded-xl bg-[#f6f8f3] p-3.5 dark:bg-[#1b2819]">
-                  <Avatar name={student.name} index={index} />
+            {addingNote && (
+              <form onSubmit={saveNote} className="mb-2 flex gap-1">
+                <input
+                  autoFocus
+                  value={noteTitle}
+                  onChange={(event) => setNoteTitle(event.target.value)}
+                  placeholder="Write a note..."
+                  aria-label="Note title"
+                  className="min-w-0 flex-1 rounded-md border border-[#e2e7dd] bg-[#f8f9f6] px-2 py-1.5 text-[7px] outline-none focus:border-[#8ca47e] dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]"
+                />
+                <button type="submit" className="rounded-md bg-[#23351f] px-2 text-[7px] font-semibold text-white">Save</button>
+              </form>
+            )}
+            <div className="space-y-1.5">
+              {notes.slice(0, 3).map((note) => (
+                <article key={`${note.title}-${note.date}`} className="flex items-start gap-2 rounded-xl bg-[#f6f7f3] p-2 dark:bg-[#20271e]">
+                  <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-[#e5efdf] text-[#47713d] dark:bg-[#2d3a28] dark:text-[#c5d6b8]"><FileText size={8} /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-[#172115] dark:text-[#ecf1ea]">{student.name}</p>
-                    <p className="break-words text-xs text-[#707c6c] md:truncate">{student.meta}</p>
+                    <h3 className="text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{note.title}</h3>
+                    <p className="truncate text-[6px] text-[#7c8776] dark:text-[#9ca797]">{note.text}</p>
+                    <p className="mt-1 text-[6px] text-[#84907e] dark:text-[#9ca797]">{note.date}</p>
                   </div>
-                  <button type="button" aria-label={`Approve ${student.name}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#23351f] text-white">
-                    <Check size={16} />
-                  </button>
-                  <button type="button" aria-label={`Reject ${student.name}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#dce3d6] bg-white text-[#67705f]">
-                    <X size={16} />
-                  </button>
-                </div>
+                  <button type="button" aria-label={`More options for ${note.title}`} className="text-[#889382]"><MoreVertical size={11} /></button>
+                </article>
               ))}
             </div>
-          </article>
-        </section>
+            <button type="button" className="mt-2 block w-full text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
+              View All Notes <span aria-hidden="true">›</span>
+            </button>
+          </section>
+        </div>
 
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.38fr)]">
-          <div id="classes" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold tracking-tight text-[#172115] dark:text-[#ecf1ea]">My Active Classes</h2>
-              <span className="rounded-full bg-[#23351f] px-3 py-1.5 text-xs font-semibold text-white">3 / 3 max reached</span>
+        <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(235px,1fr)]">
+          <section aria-label="My active classes">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[9px] font-bold text-[#253322] dark:text-[#e1e8dc]">
+                My Active Classes <span className="ml-1 rounded-full bg-[#e5efdf] px-1.5 py-0.5 text-[6px] text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">3 / 3 Max Limit Reached</span>
+              </h2>
+              <p className="text-[6px] text-[#7c8776] dark:text-[#9ca797]">Teachers are limited to 3 active classes max</p>
             </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
-              {classes.map((item) => (
-                <article key={item.title} className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-xs font-bold tracking-wider text-[#707c6c]">{item.code}</span>
-                    <span className="rounded-full bg-[#eaf4e6] px-2.5 py-1 text-[11px] font-bold text-[#2c6e21]">Active</span>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {activeClasses.map((item) => (
+                <article key={item.id} className="rounded-2xl border border-[#e8ebe4] bg-white p-2.5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="truncate text-[6px] font-semibold text-[#7c8776] dark:text-[#9ca797]">{item.subject}</p>
+                    <span className="rounded-full bg-[#e5efdf] px-1.5 py-0.5 text-[6px] font-semibold text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">Active</span>
                   </div>
-                  <h3 className="min-h-12 text-base font-bold leading-snug text-[#172115] dark:text-[#ecf1ea]">{item.title}</h3>
-                  <p className="mt-1 text-sm text-[#707c6c]">{item.group}</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#616d5c]">
-                    <span className="flex items-center gap-1"><Users size={12} />{item.students} students</span>
-                    <span className="flex items-center gap-1"><ClipboardList size={12} />{item.tasks} tasks</span>
+                  <h3 className="mt-1 text-[8px] font-bold leading-tight text-[#253322] dark:text-[#e1e8dc]">{item.title}</h3>
+                  <p className="mt-0.5 text-[6px] text-[#7c8776] dark:text-[#9ca797]">{item.group}</p>
+                  <div className="mt-2 flex items-center gap-3 text-[6px] text-[#52634b] dark:text-[#c5d6b8]">
+                    <span className="flex items-center gap-1"><Users size={9} />{item.students} Students</span>
+                    <span className="flex items-center gap-1"><FileText size={9} />{item.tasks} Pending Tasks</span>
                   </div>
-                  <div className="mt-5 flex items-end justify-between gap-3">
-                    <p className="text-xs leading-5 text-[#7d8979]">{item.time}</p>
-                    <button type="button" className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#23351f] px-3.5 py-2 text-xs font-semibold text-white">
-                      Manage
-                      <ArrowRight size={14} />
-                    </button>
+                  <div className="mt-2 flex items-center justify-between border-t border-[#edf0e9] pt-2 dark:border-[#2a312a]">
+                    <div className="text-[6px] text-[#7c8776] dark:text-[#9ca797]">
+                      <p>{item.schedule}</p><p>({item.time})</p>
+                    </div>
+                    <Link href="/teacher/classes" className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white hover:bg-[#30472b]">
+                      Manage Class <ArrowRight size={8} />
+                    </Link>
                   </div>
                 </article>
               ))}
             </div>
-          </div>
+          </section>
 
-          <aside className="space-y-5">
-            <article id="students" className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] sm:p-6 dark:border-[#212f1f] dark:bg-[#141d13]">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#172115] dark:text-[#ecf1ea]">Student Performance</h2>
-                <LineChart size={18} className="text-[#35522b]" />
-              </div>
-              <div className="space-y-4">
-                {performance.map((student, index) => (
-                  <div key={student.name} className="flex items-center gap-3">
-                    <Avatar name={student.name} index={index} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-[#172115] dark:text-[#ecf1ea]">{student.name}</p>
-                      <p className="text-xs text-[#707c6c]">{student.group}</p>
-                    </div>
-                    <span className="text-sm font-bold text-[#172115] dark:text-[#ecf1ea]">{student.score}</span>
-                    <Star size={15} className="text-[#f08c20]" />
+          <section
+            aria-label="My planner"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">My Planner</h2>
+              <button type="button" className="flex items-center gap-1 rounded-full bg-[#f1f4ed] px-2 py-1 text-[6px] font-semibold text-[#52634b] dark:bg-[#20271e] dark:text-[#c5d6b8]">
+                Dec 2026 <ChevronDown size={9} />
+              </button>
+            </div>
+            <p className="mt-1 text-[6px] text-[#7c8776] dark:text-[#9ca797]">Dec 12, Thursday</p>
+            <div className="mt-2 grid grid-cols-7 text-center text-[6px] text-[#7c8776] dark:text-[#9ca797]">
+              {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+                <span key={`${day}-${index}`} className="py-1">{day}</span>
+              ))}
+              {[8, 9, 10, 11, 12, 13, 14].map((day) => (
+                <span key={day} className={`mx-auto grid size-5 place-items-center rounded-full ${day === 12 ? "bg-[#23351f] font-bold text-white" : "text-[#40503a] dark:text-[#c5d6b8]"}`}>{day}</span>
+              ))}
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {plannerItems.map((item) => (
+                <article key={item.title} className="flex items-center justify-between gap-2 rounded-xl bg-[#f6f7f3] p-2 dark:bg-[#20271e]">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{item.title}</h3>
+                    <p className="text-[6px] text-[#7c8776] dark:text-[#9ca797]">{item.className}</p>
                   </div>
-                ))}
-              </div>
-            </article>
-
-            <article id="activities" className="rounded-2xl border border-[#e2e7dd] bg-white p-5 shadow-[0_2px_8px_rgba(21,32,18,0.04)] sm:p-6 dark:border-[#212f1f] dark:bg-[#141d13]">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#172115] dark:text-[#ecf1ea]">My Notes</h2>
-                <span className="rounded-full bg-[#eaf4e6] px-2.5 py-1 text-xs font-bold text-[#2c6e21]">10</span>
-              </div>
-              <div className="space-y-3">
-                {notes.map((note) => (
-                  <div key={note.title} className="rounded-xl bg-[#f6f8f3] p-4 dark:bg-[#1b2819]">
-                    <p className="text-sm font-bold text-[#172115] dark:text-[#ecf1ea]">{note.title}</p>
-                    <p className="mt-1 text-xs text-[#707c6c]">{note.detail}</p>
-                    <p className="mt-3 text-xs font-semibold text-[#9aa395]">{note.date}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </aside>
-        </section>
+                  <span className={`shrink-0 rounded-full px-1.5 py-1 text-[6px] font-semibold ${item.color}`}>{item.status}</span>
+                </article>
+              ))}
+            </div>
+            <Link href="/teacher/assignments" className="mt-2 inline-flex items-center gap-1 text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
+              <CalendarDays size={9} /> View assignments <ArrowRight size={8} />
+            </Link>
+          </section>
+        </div>
       </div>
     </DashboardShell>
   );

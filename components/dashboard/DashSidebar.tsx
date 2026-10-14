@@ -60,8 +60,8 @@ const learnerMenuItems: MenuItem[] = [
 
 const teacherMenuItems: MenuItem[] = [
   { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
-  { name: "Classes", href: "/teacher/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
-  { name: "Attendance", href: "/teacher/dashboard#attendance", icon: CalendarDays, left: 20, marginTop: 1 },
+  { name: "Classes", href: "/teacher/classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
+  { name: "Attendance", href: "/teacher/attendance", icon: CalendarDays, left: 20, marginTop: 1 },
   { name: "Students Roster", href: "/teacher/dashboard#students", icon: Users, left: 20, marginTop: 1 },
   { name: "Activities", href: "/teacher/dashboard#activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
     { name: "Assignments", href: "/teacher/assignments", icon: ClipboardList, left: 20 },
@@ -111,7 +111,10 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
             const isActive = selectedLinkName
               ? selectedLinkName === item.name || isNestedItemActive
               : isTeacher
-                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && pathname === "/teacher/assignments")
+                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") ||
+                  (item.name === "Classes" && pathname.startsWith("/teacher/classes")) ||
+                    (item.name === "Attendance" && pathname.startsWith("/teacher/attendance")) ||
+                    (item.name === "Activities" && pathname === "/teacher/assignments")
                 : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
                 (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
                 (item.name === "Live Classes" && pathname === "/learner/live_classes") ||
