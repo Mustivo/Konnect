@@ -177,6 +177,11 @@ html[data-theme="dark"] .learner-page select {
   font-size: 0.96rem;
 }
 
+html:has(.learner-page),
+body:has(.learner-page) {
+  overflow: hidden;
+}
+
 .learner-page main {
   width: 100%;
   max-width: 1200px;
@@ -184,6 +189,7 @@ html[data-theme="dark"] .learner-page select {
 }
 
 .learner-sidebar-nav {
+  overscroll-behavior: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -193,12 +199,31 @@ html[data-theme="dark"] .learner-page select {
 }
 
 .learner-main-scroll {
+  overscroll-behavior: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
 .learner-main-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.message-history-scroll {
+  scrollbar-color: #c3c9bd transparent;
+  scrollbar-width: thin;
+}
+
+.message-history-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.message-history-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: #c3c9bd;
+}
+
+.message-history-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .learner-page [class*="text-[6px]"],
