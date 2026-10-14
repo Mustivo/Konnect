@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,7 +30,7 @@ type AdmissionMessage = {
   status: "admitted" | "denied";
 };
 
-export default function LiveClassWaitingRoomPage() {
+function LiveClassWaitingRoomContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
@@ -293,4 +293,12 @@ export default function LiveClassWaitingRoomPage() {
   );
 
   return mounted ? createPortal(lobby, document.body) : null;
+}
+
+export default function LiveClassWaitingRoomPage() {
+  return (
+    <Suspense fallback={null}>
+      <LiveClassWaitingRoomContent />
+    </Suspense>
+  );
 }
