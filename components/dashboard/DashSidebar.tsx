@@ -63,14 +63,14 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Classes", href: "/teacher/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
   { name: "Attendance", href: "/teacher/dashboard#attendance", icon: CalendarDays, left: 20, marginTop: 1 },
   { name: "Students Roster", href: "/teacher/dashboard#students", icon: Users, left: 20, marginTop: 1 },
-  { name: "Activities", href: "/teacher/dashboard#activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
-    { name: "Assignments", href: "/teacher/assignments", icon: ClipboardList, left: 20 },
-    { name: "Approvals", href: "/teacher/dashboard#approvals", icon: UserCheck, left: 20 },
+  { name: "Activities", href: "/teacher/activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
+    { name: "Assignments", href: "/teacher/activities/assignments", icon: ClipboardList, left: 20 },
+    { name: "Exams", href: "/teacher/activities/exams", icon: ClipboardList, left: 20 },
   ] },
   { name: "Grades & Reports", href: "/teacher/dashboard#reports", icon: GraduationCap, left: 20, marginTop: 1 },
-  { name: "Analytics", href: "/teacher/dashboard#analytics", icon: BarChart3, left: 20, marginTop: 1 },
-  { name: "Messages", href: "/teacher/dashboard#messages", icon: MessageSquare, left: 20, marginTop: 1, badge: "2" },
-  { name: "Settings", href: "/teacher/dashboard#settings", icon: Settings, left: 20, marginTop: 1 },
+  { name: "Analytics", href: "/teacher/analytics", icon: BarChart3, left: 20, marginTop: 1 },
+  { name: "Messages", href: "/teacher/messages", icon: MessageSquare, left: 20, marginTop: 1, badge: "2" },
+  { name: "Settings", href: "/teacher/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
 export default function DashSidebar({ role = "learner" }: { role?: DashboardRole }) {
@@ -81,7 +81,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
   useEffect(() => {
-    setTasksOpen(pathname.startsWith("/learner/tasks") || (isTeacher && pathname === "/teacher/assignments"));
+    setTasksOpen(pathname.startsWith("/learner/tasks") || (isTeacher && ["/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)));
   }, [isTeacher, pathname]);
 
   const profile = isTeacher
@@ -111,7 +111,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
             const isActive = selectedLinkName
               ? selectedLinkName === item.name || isNestedItemActive
               : isTeacher
-                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && pathname === "/teacher/assignments")
+                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
                 : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
                 (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
                 (item.name === "Live Classes" && pathname === "/learner/live_classes") ||

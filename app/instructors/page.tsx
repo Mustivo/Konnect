@@ -148,9 +148,9 @@ export default function InstructionsPage() {
 
       <section
         id="teachers"
-        className="bg-[var(--background)] px-6 py-16 transition-colors duration-300 lg:py-[75px]"
+        className="bg-[var(--background)] px-3 py-16 transition-colors duration-300 sm:px-4 lg:px-6 lg:py-[75px]"
       >
-        <div className="mx-auto max-w-6xl">
+        <div className="w-full">
 
           <div className="text-left">
             <p className="mb-4 text-[12px] font-bold uppercase tracking-[2px] text-[var(--primary)]">
