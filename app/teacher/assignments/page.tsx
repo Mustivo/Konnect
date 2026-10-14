@@ -88,7 +88,7 @@ export default function TeacherAssignmentsPage() {
           <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">Practice, check understanding and keep learning on track.</p>
         </header>
 
-        <div className={`grid items-start gap-3 ${panelOpen ? "grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.95fr)]" : "grid-cols-1"}`}>
+        <div className={`grid items-start gap-3 ${panelOpen ? "grid-cols-1 md:grid-cols-[minmax(0,1.55fr)_minmax(240px,0.95fr)]" : "grid-cols-1"}`}>
           <div className="min-w-0 space-y-3">
             <section aria-label="Class activities" className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -114,7 +114,7 @@ export default function TeacherAssignmentsPage() {
             <section className="overflow-hidden rounded-lg border border-[#e0e5dd] bg-white p-3 dark:border-[#2a312a] dark:bg-[#161b17]" aria-label={`${activeKind} assignments`}>
               <div className="mb-2 flex items-start justify-between gap-2"><div><h2 className="text-[11px] font-bold text-[#1d271b] dark:text-[#ecf1ea]">{activeKind} assignments</h2><p className="text-[8px] text-[#788173] dark:text-[#9aa592]">Live practice and guided problem solving</p></div><button type="button" className="shrink-0 text-[8px] font-semibold text-[#516846] hover:underline dark:text-[#c5d6b8]">See all <span aria-hidden="true">→</span></button></div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[490px] table-fixed text-left text-[8px]">
+                <table className="w-full min-w-[360px] table-fixed text-left text-[8px]">
                   <thead><tr className="bg-[#f1f4ed] text-[7px] font-semibold text-[#75806f] dark:bg-[#20271e] dark:text-[#b1bba9]"><th className="w-[48%] rounded-l-md px-2 py-2">Assignment</th><th className="w-[18%] px-2 py-2">Due</th><th className="w-[16%] px-2 py-2">Submitted</th><th className="w-[18%] rounded-r-md px-2 py-2">Status</th></tr></thead>
                   <tbody>
                     {visibleAssignments.map((assignment) => <tr key={assignment.id} className="border-b border-[#edf0e9] last:border-0 dark:border-[#2a312a]"><td className="px-2 py-2"><p className="truncate font-semibold text-[#273124] dark:text-[#e5ebdf]">{assignment.title}</p><p className="truncate text-[7px] text-[#858e7d] dark:text-[#9ca797]">{assignment.className} · {maxMarks} marks</p></td><td className="px-2 py-2 text-[#687362] dark:text-[#b3bdab]">{assignment.due}</td><td className="px-2 py-2 text-[#687362] dark:text-[#b3bdab]">{assignment.submitted}</td><td className="px-2 py-2"><span className={`rounded-full px-1.5 py-1 text-[7px] font-semibold ${statusClass(assignment.status)}`}>{assignment.status}</span></td></tr>)}
@@ -134,7 +134,7 @@ export default function TeacherAssignmentsPage() {
             <aside className="flex items-start gap-2 rounded-lg bg-[#e7f0e2] p-3 text-[#43543a] dark:bg-[#202b1d] dark:text-[#c5d6b8]"><Info size={12} className="mt-0.5 shrink-0" /><p className="text-[7px] leading-relaxed"><strong>A helpful starting point</strong><br />Upload a question-list PDF, review each slide, then publish. You can save a draft and come back to it anytime.</p></aside>
           </div>
 
-          {panelOpen && <aside className="min-w-0 xl:sticky xl:top-2">
+          {panelOpen && <aside className="min-w-0 md:sticky md:top-2">
             <form onSubmit={publishAssignment} className="space-y-2 rounded-xl border border-[#e0e5dd] bg-white p-3 shadow-[0_4px_16px_rgba(26,39,20,0.08)] dark:border-[#2a312a] dark:bg-[#161b17]">
               <div className="flex items-start justify-between"><div><h2 className="text-[11px] font-bold text-[#20291e] dark:text-[#ecf1e9]">Create assignment</h2><p className="text-[7px] text-[#7b8574] dark:text-[#9aa592]">Prepare a new learning moment for your class.</p></div><button type="button" aria-label="Close create assignment panel" onClick={() => setPanelOpen(false)} className="grid size-6 place-items-center rounded-full text-[#56634f] hover:bg-[#f1f4ed] dark:text-[#bdc9b6] dark:hover:bg-[#252e22]"><X size={12} /></button></div>
               <div className="grid grid-cols-2 gap-2">
