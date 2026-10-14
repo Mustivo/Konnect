@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
@@ -64,7 +64,7 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Attendance", href: "/teacher/dashboard#attendance", icon: CalendarDays, left: 20, marginTop: 1 },
   { name: "Students Roster", href: "/teacher/dashboard#students", icon: Users, left: 20, marginTop: 1 },
   { name: "Activities", href: "/teacher/dashboard#activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
-    { name: "Assignments", href: "/teacher/dashboard#assignments", icon: ClipboardList, left: 20 },
+    { name: "Assignments", href: "/teacher/assignments", icon: ClipboardList, left: 20 },
     { name: "Approvals", href: "/teacher/dashboard#approvals", icon: UserCheck, left: 20 },
   ] },
   { name: "Grades & Reports", href: "/teacher/dashboard#reports", icon: GraduationCap, left: 20, marginTop: 1 },
@@ -77,8 +77,13 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
   const pathname = usePathname();
   const isTeacher = role === "teacher";
   const menuItems = isTeacher ? teacherMenuItems : learnerMenuItems;
-  const [tasksOpen, setTasksOpen] = useState(() => pathname.startsWith("/learner/tasks") || isTeacher);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
+
+  useEffect(() => {
+    setTasksOpen(pathname.startsWith("/learner/tasks"));
+  }, [pathname]);
+
   const profile = isTeacher
     ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
     : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
@@ -101,10 +106,12 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
           {menuItems.map((item) => {
             const Icon = item.icon;
             const normalizedHref = item.href.split("#")[0];
-            const isActive = activeLink?.href === pathname
-              ? activeLink.name === item.name
+            const selectedLinkName = activeLink?.href === pathname ? activeLink.name : null;
+            const isNestedItemActive = item.nested?.some((subItem) => subItem.name === selectedLinkName) ?? false;
+            const isActive = selectedLinkName
+              ? selectedLinkName === item.name || isNestedItemActive
               : isTeacher
-                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard")
+                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && pathname === "/teacher/assignments")
                 : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
                 (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
                 (item.name === "Live Classes" && pathname === "/learner/live_classes") ||
@@ -118,8 +125,14 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                   <div key={item.name} className="pt-0">
                     <button
                       type="button"
-                      onClick={() => setTasksOpen((open) => !open)}
-                      className="ml-1 flex h-10 w-[calc(100%-0.25rem)] items-center rounded-l-lg px-[18px] text-[#596052] transition-colors hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
+                      onClick={() => {
+                        setActiveLink({ name: item.name, href: normalizedHref });
+                        setTasksOpen((open) => !open);
+                      }}
+                      className={`ml-1 flex w-[calc(100%-0.25rem)] items-center px-[18px] transition-colors ${isActive
+                        ? "h-12 rounded-l-md rounded-r-none bg-[#f2f3ed] font-semibold text-[#40522c] dark:bg-[#111510] dark:text-[#e4efe0]"
+                        : "h-10 rounded-l-lg text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
+                      }`}
                       style={{ marginTop: item.marginTop }}
                     >
                       <Icon size={14} className="shrink-0" />
@@ -136,15 +149,16 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                       <div className="pb-1 pl-[42px] pt-[2px]">
                         {item.nested?.map((subItem) => (
                           (() => {
+                            const subItemPath = subItem.href.split("#")[0];
                             const isSubItemActive = activeLink?.href === pathname
                               ? activeLink.name === subItem.name
-                              : pathname === subItem.href || pathname.startsWith(`${subItem.href}/`);
+                              : pathname === subItemPath && (!isTeacher || subItemPath !== "/teacher/dashboard");
                             return (
                               <Link
                                 key={subItem.name}
                                 href={subItem.href}
                                 aria-current={isSubItemActive ? "page" : undefined}
-                                onClick={() => setActiveLink({ name: subItem.name, href: subItem.href })}
+                                onClick={() => setActiveLink({ name: subItem.name, href: subItem.href.split("#")[0] })}
                                 className={`flex h-8 items-center rounded-l-lg px-2 transition-colors ${isSubItemActive
                                   ? "bg-[#f2f3ed] font-bold text-[#40522c] dark:bg-[#111510] dark:text-[#e4efe0]"
                                   : "text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"

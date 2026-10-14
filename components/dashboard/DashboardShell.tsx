@@ -13,7 +13,7 @@ export default function DashboardShell({ children, role = "learner" }: Dashboard
 	return (
 		<div className="learner-page flex h-screen overflow-hidden bg-[#f2f3ed] dark:bg-[#111510] text-[#171d15] dark:text-[#ecf1ea] transition-colors">
 			<div className="h-screen shrink-0">
-				<DashSidebar />
+				<DashSidebar role={role} />
 			</div>
 
 			<div className="flex min-w-0 flex-1 flex-col">
