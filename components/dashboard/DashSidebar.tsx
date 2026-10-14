@@ -81,8 +81,8 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
   useEffect(() => {
-    setTasksOpen(pathname.startsWith("/learner/tasks"));
-  }, [pathname]);
+    setTasksOpen(pathname.startsWith("/learner/tasks") || (isTeacher && pathname === "/teacher/assignments"));
+  }, [isTeacher, pathname]);
 
   const profile = isTeacher
     ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
