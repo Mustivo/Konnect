@@ -1,731 +1,257 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import {
-  Search,
-  Bell,
-  CalendarDays,
-  BookOpen,
-  ClipboardList,
-  TrendingUp,
-  BarChart2,
-  ArrowRight,
-  Shield,
-  Palette,
-  Lightbulb,
-  Cpu,
-  Lock,
-  ChevronDown,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, ClipboardList, GraduationCap } from "lucide-react";
+import { apiJson, getLearnerClasses, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
+import { currentUser, getLearnerProfile } from "@/lib/api/auth";
+
+type Enrollment = {
+  id: string;
+  class_room: string;
+  class_title: string;
+  class_subject: string;
+  teacher_name: string;
+  status?: string;
+};
+
+type Submission = {
+  id: string;
+  assessment_title: string;
+  status: "IN_PROGRESS" | "SUBMITTED" | "GRADED" | string;
+  total_score: string | number | null;
+  submitted_at: string | null;
+  teacher_feedback?: string;
+};
+
+type LearnerData = {
+  name: string;
+  classes: Enrollment[];
+  submissions: Submission[];
+  learningGoals: string;
+  attendanceRate: number | null;
+};
+
+type Collection<T> = T[] | { results?: T[]; next?: string | null };
+
+async function jsonRequest<T>(request: Promise<Response>) {
+  return apiJson<T>(await request);
+}
+
+async function allPages<T>(requestPage: (query: string) => Promise<Response>) {
+  const records: T[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await requestPage(page === 1 ? "" : `?page=${page}`);
+    const result = await apiJson<Collection<T>>(response);
+    if (Array.isArray(result)) {
+      records.push(...result);
+      break;
+    }
+    records.push(...(result.results ?? []));
+    if (!result.next) break;
+  }
+  return records;
+}
+
+const initialData: LearnerData = {
+  name: "Learner",
+  classes: [],
+  submissions: [],
+  learningGoals: "",
+  attendanceRate: null,
+};
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function findAttendanceRate(value: unknown, depth = 0): number | null {
+  if (Array.isArray(value)) {
+    for (const field of value) {
+      const nestedRate = findAttendanceRate(field, depth + 1);
+      if (nestedRate !== null) return nestedRate;
+    }
+    return null;
+  }
+  const item = record(value);
+  if (!item || depth > 4) return null;
+  for (const [key, field] of Object.entries(item)) {
+    if (["attendance_rate", "attendance_percentage", "attendance_percent"].includes(key.toLowerCase())) {
+      const parsed = Number(String(field).replace("%", ""));
+      if (Number.isFinite(parsed)) return Math.round(parsed <= 1 ? parsed * 100 : parsed);
+    }
+  }
+  for (const field of Object.values(item)) {
+    const nestedRate = findAttendanceRate(field, depth + 1);
+    if (nestedRate !== null) return nestedRate;
+  }
+  return null;
+}
+
+function displayDate(value: string | null) {
+  if (!value) return "Not submitted";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Submitted" : `Submitted ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+}
+
+function scoreValue(submission: Submission) {
+  if (submission.total_score === null || submission.total_score === undefined) return null;
+  const score = Number(submission.total_score);
+  return Number.isFinite(score) ? score : null;
+}
 
 export default function LearnerDashboardPage() {
-  const todayLabel = new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).toUpperCase();
+  const router = useRouter();
+  const [data, setData] = useState(initialData);
+  const [loading, setLoading] = useState(true);
+  const [loadNotice, setLoadNotice] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function loadDashboard() {
+      if (!window.localStorage.getItem("konnect-access-token")) {
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const user = await currentUser();
+        if (user.role !== "LEARNER") {
+          router.replace(user.role === "TEACHER" ? "/teacher/dashboard" : "/admin/dashboard");
+          return;
+        }
+
+        const [classesResult, submissionsResult, progressResult, profileResult] = await Promise.allSettled([
+          allPages<Enrollment>(getLearnerClasses),
+          allPages<Submission>(getMyAssessmentSubmissions),
+          jsonRequest<unknown>(getLearnerProgressGrades()),
+          getLearnerProfile(),
+        ]);
+        if (!active) return;
+
+        const failures = [classesResult, submissionsResult, progressResult, profileResult].filter((result) => result.status === "rejected").length;
+        const classes = classesResult.status === "fulfilled" ? classesResult.value : [];
+        const submissions = submissionsResult.status === "fulfilled" ? submissionsResult.value : [];
+        const profile = profileResult.status === "fulfilled" ? profileResult.value : {};
+        const fullName = `${user.first_name} ${user.last_name}`.trim();
+
+        setData({
+          name: fullName || user.username || "Learner",
+          classes: classes.filter((item) => !item.status || item.status.toUpperCase() === "ENROLLED"),
+          submissions,
+          learningGoals: String(profile.learning_goals ?? ""),
+          attendanceRate: progressResult.status === "fulfilled" ? findAttendanceRate(progressResult.value) : null,
+        });
+        if (failures) setLoadNotice("Some learner records could not be loaded. Refresh to try again.");
+      } catch {
+        if (active) router.replace("/login");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadDashboard();
+    return () => { active = false; };
+  }, [router]);
+
+  const activeSubmissions = data.submissions.filter((submission) => submission.status === "IN_PROGRESS" || submission.status === "SUBMITTED");
+  const gradedSubmissions = data.submissions.filter((submission) => submission.status === "GRADED");
+  const inProgressSubmissions = data.submissions.filter((submission) => submission.status === "IN_PROGRESS");
+  const gradedScores = gradedSubmissions.map(scoreValue).filter((score): score is number => score !== null);
+  const averageScore = gradedScores.length ? gradedScores.reduce((sum, score) => sum + score, 0) / gradedScores.length : null;
+  const totalSubmissions = data.submissions.length;
+  const gradedShare = totalSubmissions ? Math.round((gradedSubmissions.length / totalSubmissions) * 100) : 0;
+  const submittedShare = totalSubmissions ? Math.round((data.submissions.filter((submission) => submission.status === "SUBMITTED").length / totalSubmissions) * 100) : 0;
+  const inProgressShare = totalSubmissions ? Math.round((inProgressSubmissions.length / totalSubmissions) * 100) : 0;
+  const todayLabel = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-6 pt-3 pb-8">
-      {/* ========================================================= */}
-      {/* 1. TOP HEADER: GREETING & QUICK ACTIONS                  */}
-      {/* ========================================================= */}
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <div className="space-y-5 py-3 pb-8">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[12px] font-medium text-[#707c6c]">Good afternoon,</p>
-          <h1 className="text-2xl font-bold tracking-tight text-[#172115] flex items-center gap-1.5">
-            Gabriella Igabe <span className="text-xl">👋</span>
-          </h1>
-          <p className="text-[9.5px] font-bold tracking-wider uppercase text-[#707c6c] mt-0.5">
-            {todayLabel}
-          </p>
+          <p className="text-[11px] font-medium text-[#707c6c]">Your learning dashboard</p>
+          <h1 className="mt-1 text-2xl font-bold text-[#172115] dark:text-[#ecf1ea]">Welcome, {data.name}</h1>
+          <p className="mt-1 text-[9.5px] font-semibold uppercase text-[#707c6c] dark:text-[#a6aea0]">{todayLabel}</p>
         </div>
+        <Link href="/learner/settings?section=profile" className="inline-flex min-h-9 items-center gap-1 rounded border border-[#d5ddce] bg-white px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f6f8f3] dark:border-[#303b2d] dark:bg-[#1b211a] dark:text-[#d5e3cb]">
+          Edit profile <ArrowRight size={12} />
+        </Link>
       </header>
 
-      {/* ========================================================= */}
-      {/* 2. STATS & PROGRESS ROW (4 CARDS)                         */}
-      {/* ========================================================= */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {/* CARD 1: Quick Stats 2x2 */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Courses Enrolled */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-[#707c6c]">
-                Courses Enrolled
-              </span>
-              <div className="flex items-center justify-between pr-2">
-                <span className="text-2xl font-bold tracking-tight text-[#172115]">
-                  4
-                </span>
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#edf4e8] text-[#34522a]">
-                  <BookOpen size={14} />
-                </span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">Active classes</p>
-            </div>
+      {loadNotice && <p role="status" className="rounded border border-[#ead9b7] bg-[#fbf7ed] px-3 py-2 text-[10px] text-[#705a30]">{loadNotice}</p>}
 
-            {/* Classes Today */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-[#707c6c]">
-                Classes Today
-              </span>
-              <div className="flex items-center justify-between pr-2">
-                <span className="text-2xl font-bold tracking-tight text-[#172115]">
-                  3
-                </span>
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#edf4e8] text-[#34522a]">
-                  <CalendarDays size={14} />
-                </span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">Upcoming</p>
-            </div>
+      <section aria-label="Your learning summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Summary label="Enrolled classes" value={loading ? "—" : String(data.classes.length)} detail="Your active enrollments" icon={<BookOpen size={15} />} />
+        <Summary label="Assessment records" value={loading ? "—" : String(data.submissions.length)} detail="Submissions on your account" icon={<ClipboardList size={15} />} />
+        <Summary label="Needs attention" value={loading ? "—" : String(activeSubmissions.length)} detail="In progress or awaiting review" icon={<GraduationCap size={15} />} />
+        <Summary label="Attendance" value={loading ? "—" : data.attendanceRate === null ? "—" : `${data.attendanceRate}%`} detail="From your progress record" icon={<ChartNoAxesColumnIncreasing size={15} />} />
+      </section>
 
-            {/* Assignments Due */}
-            <div className="space-y-1 pt-2">
-              <span className="text-[11px] font-medium text-[#707c6c]">
-                Assignments Due
-              </span>
-              <div className="flex items-center justify-between pr-2">
-                <span className="text-2xl font-bold tracking-tight text-[#172115]">
-                  1
-                </span>
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#fef4e8] text-[#c2781b]">
-                  <ClipboardList size={14} />
-                </span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">Pending</p>
-            </div>
-
-            {/* Attendance */}
-            <div className="space-y-1 pt-2">
-              <span className="text-[11px] font-medium text-[#707c6c]">
-                Attendance
-              </span>
-              <div className="flex items-center justify-between pr-2">
-                <span className="text-2xl font-bold tracking-tight text-[#172115]">
-                  96%
-                </span>
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#edf4e8] text-[#34522a]">
-                  <TrendingUp size={14} />
-                </span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">This Month</p>
-            </div>
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+        <div className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">My classes</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Classes linked to your learner account.</p></div>
+            <Link href="/learner/courses" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">All classes</Link>
+          </div>
+          <div className="mt-3 divide-y divide-[#edf0e9] dark:divide-white/10">
+            {loading ? <p className="py-4 text-[10px] text-[#7a8575]">Loading your classes…</p> : data.classes.length ? data.classes.slice(0, 5).map((item) => (
+              <article key={item.id} className="flex items-center justify-between gap-3 py-3 first:pt-1">
+                <div className="min-w-0"><h3 className="truncate text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{item.class_title}</h3><p className="mt-1 truncate text-[8px] text-[#798374] dark:text-[#9aa592]">{item.class_subject || "Class"}{item.teacher_name ? ` · ${item.teacher_name}` : ""}</p></div>
+                <span className="shrink-0 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">Enrolled</span>
+              </article>
+            )) : <p className="py-4 text-[10px] text-[#7a8575]">No enrolled classes are linked to this account yet.</p>}
           </div>
         </div>
 
-        {/* CARD 2: Learning Progress */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-[#172115]">Learning Progress</h2>
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[9.5px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
-            >
-              <span>This Week</span>
-              <ChevronDown size={11} />
-            </button>
-          </div>
-
-          {/* Donut and Legend */}
-          <div className="my-2 flex items-center justify-between gap-3">
-            {/* Circular Gauge */}
-            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
-              <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
-                {/* Background ring */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke="#e6ede2"
-                  strokeWidth="8"
-                />
-                {/* Not started (8%) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke="#d7dfd3"
-                  strokeWidth="8"
-                  strokeDasharray="251.3"
-                  strokeDashoffset="0"
-                />
-                {/* In Progress (20%) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke="#f08c20"
-                  strokeWidth="8"
-                  strokeDasharray="50.2 201.1"
-                  strokeDashoffset="-181"
-                />
-                {/* Completed (72%) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke="#2b4724"
-                  strokeWidth="8"
-                  strokeDasharray="181 70.3"
-                  strokeDashoffset="0"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold text-[#172115] leading-none">
-                  72%
-                </span>
-                <span className="text-[8.5px] font-medium text-[#7d8979] mt-0.5">
-                  Overall Progress
-                </span>
-              </div>
+        <div className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
+          <div className="flex items-center gap-2"><ChartNoAxesColumnIncreasing size={15} className="text-[#405b35]" /><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">Assessment progress</h2></div>
+          <p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Based on your submitted assessment records.</p>
+          {loading ? <p className="mt-5 text-[10px] text-[#7a8575]">Loading your progress…</p> : totalSubmissions ? <>
+              <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-[#edf0e9] dark:bg-[#2a3328]" aria-label={`${gradedShare}% graded, ${submittedShare}% submitted, ${inProgressShare}% in progress`}>
+              <span className="bg-[#36532e]" style={{ width: `${gradedShare}%` }} />
+              <span className="bg-[#b8a067]" style={{ width: `${submittedShare}%` }} />
+              <span className="bg-[#8ba2bb]" style={{ width: `${inProgressShare}%` }} />
             </div>
-
-            {/* Legend */}
-            <div className="flex-1 space-y-1.5 text-[10.5px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-[#2b4724]" />
-                  <span className="text-[#647160]">Completed</span>
-                </div>
-                <span className="font-bold text-[#172115]">72%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-[#f08c20]" />
-                  <span className="text-[#647160]">In Progress</span>
-                </div>
-                <span className="font-bold text-[#172115]">20%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-[#d7dfd3]" />
-                  <span className="text-[#647160]">Not Started</span>
-                </div>
-                <span className="font-bold text-[#172115]">8%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sub Stats Row */}
-          <div className="flex items-center justify-between pt-1 border-t border-[#f0f4ed] text-[9.5px]">
-            <div>
-              <span className="text-[#7d8979]">Attendance </span>
-              <span className="font-bold text-[#172115]">96%</span>
-            </div>
-            <div>
-              <span className="text-[#7d8979]">Avg Grade </span>
-              <span className="font-bold text-[#172115]">89%</span>
-            </div>
-          </div>
-
-          {/* Bottom Motivation */}
-          <p className="mt-1 text-[9.5px] font-medium text-[#2b4724]">
-            You&apos;re showing up. Keep it going. ↗
-          </p>
-        </div>
-
-        {/* CARD 3: Study Goals */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-[#172115]">Study Goals</h2>
-            <Link
-              href="/learner/resource"
-              className="text-[9.5px] font-bold text-[#172115] hover:underline"
-            >
-              View All →
-            </Link>
-          </div>
-
-          {/* Goals */}
-          <div className="space-y-2.5 my-1">
-            {/* Goal 1 */}
-            <div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-[#172115]">
-                  Complete Linear Functions Module
-                </span>
-                <span className="font-bold text-[#172115]">72%</span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">Target: 8 Oct 2026</p>
-              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#e8eee3]">
-                <div className="h-full rounded-full bg-[#2b4724] w-[72%]" />
-              </div>
-            </div>
-
-            {/* Goal 2 */}
-            <div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-[#172115]">
-                  Submit All Pending Assignments
-                </span>
-                <span className="font-bold text-[#172115]">30%</span>
-              </div>
-              <p className="text-[9.5px] text-[#8e9a8a]">Target: 15 Oct 2026</p>
-              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#e8eee3]">
-                <div className="h-full rounded-full bg-[#2b4724] w-[30%]" />
-              </div>
-            </div>
-          </div>
-
-          {/* One thing to focus on Banner */}
-          <div className="flex items-center justify-between gap-2 rounded-xl border border-[#f3e4ca] bg-[#fcf5e9] p-2.5">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f6e5c8] text-[#9c6314]">
-                <ClipboardList size={14} />
-              </div>
-              <div>
-                <p className="text-[10.5px] font-bold text-[#422e11] leading-tight">
-                  One thing to focus on
-                </p>
-                <p className="text-[9px] text-[#7d6133] mt-0.5">
-                  Linear functions practice · Due 8 Oct, 18:00
-                </p>
-              </div>
-            </div>
-            <ArrowRight size={13} className="shrink-0 text-[#7d6133]" />
-          </div>
-        </div>
-
-        {/* CARD 4: Performance Overview */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <BarChart2 size={13} className="text-[#35522b]" />
-              <h2 className="text-xs font-bold text-[#172115]">Performance Overview</h2>
-            </div>
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded-md border border-[#dce3d6] px-2 py-0.5 text-[9.5px] font-medium text-[#5f6c5b] hover:bg-[#f6f8f3]"
-            >
-              <span>This Month</span>
-              <ChevronDown size={11} />
-            </button>
-          </div>
-
-          {/* Line Chart */}
-          <div className="relative mt-2 h-36 w-full">
-            <svg
-              className="h-full w-full overflow-visible"
-              viewBox="0 0 300 120"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#35522b" stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="#35522b" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Y Axis Grid lines */}
-              <line x1="30" y1="15" x2="295" y2="15" stroke="#f0f3ed" strokeWidth="1" />
-              <line x1="30" y1="40" x2="295" y2="40" stroke="#f0f3ed" strokeWidth="1" />
-              <line x1="30" y1="65" x2="295" y2="65" stroke="#f0f3ed" strokeWidth="1" />
-              <line x1="30" y1="90" x2="295" y2="90" stroke="#f0f3ed" strokeWidth="1" />
-              <line x1="30" y1="110" x2="295" y2="110" stroke="#f0f3ed" strokeWidth="1" />
-
-              {/* Y Axis Labels */}
-              <text x="12" y="18" fontSize="8" fill="#9da697" textAnchor="start">100</text>
-              <text x="12" y="43" fontSize="8" fill="#9da697" textAnchor="start">75</text>
-              <text x="12" y="68" fontSize="8" fill="#9da697" textAnchor="start">50</text>
-              <text x="12" y="93" fontSize="8" fill="#9da697" textAnchor="start">25</text>
-              <text x="16" y="113" fontSize="8" fill="#9da697" textAnchor="start">0</text>
-
-              {/* Shaded Area */}
-              <polygon
-                points="35,110 50,96 100,74 150,71 200,60 250,52 285,24 285,110"
-                fill="url(#chartGradient)"
-              />
-
-              {/* Trend Curve */}
-              <path
-                d="M 35 110 C 60 92, 80 75, 100 74 C 125 73, 140 71, 160 70 C 185 68, 205 60, 225 56 C 245 52, 265 42, 285 24"
-                fill="none"
-                stroke="#35522b"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-
-              {/* Data Dots */}
-              <circle cx="100" cy="74" r="2.5" fill="#fff" stroke="#35522b" strokeWidth="1.5" />
-              <circle cx="160" cy="70" r="2.5" fill="#fff" stroke="#35522b" strokeWidth="1.5" />
-              <circle cx="225" cy="56" r="2.5" fill="#fff" stroke="#35522b" strokeWidth="1.5" />
-              <circle cx="285" cy="24" r="3" fill="#fff" stroke="#35522b" strokeWidth="2" />
-
-              {/* Badge "93" at top right */}
-              <g transform="translate(268, 8)">
-                <rect width="24" height="15" rx="3.5" fill="#243d1f" />
-                <text x="12" y="11" fill="#ffffff" fontSize="8.5" fontWeight="bold" textAnchor="middle">
-                  93
-                </text>
-              </g>
-            </svg>
-          </div>
-
-          {/* X Axis Dates */}
-          <div className="flex justify-between pl-7 pr-2 text-[8px] font-medium text-[#9da697]">
-            <span>1 Oct</span>
-            <span>8 Oct</span>
-            <span>15 Oct</span>
-            <span>22 Oct</span>
-            <span>29 Oct</span>
-          </div>
+            <dl className="mt-4 space-y-2 text-[9px]">
+              <div className="flex justify-between"><dt className="text-[#687463] dark:text-[#a6aea0]">Graded</dt><dd className="font-semibold">{gradedSubmissions.length}</dd></div>
+              <div className="flex justify-between"><dt className="text-[#687463] dark:text-[#a6aea0]">Submitted</dt><dd className="font-semibold">{data.submissions.filter((submission) => submission.status === "SUBMITTED").length}</dd></div>
+              <div className="flex justify-between"><dt className="text-[#687463] dark:text-[#a6aea0]">In progress</dt><dd className="font-semibold">{inProgressSubmissions.length}</dd></div>
+              <div className="flex justify-between border-t border-[#edf0e9] pt-2 dark:border-white/10"><dt className="text-[#687463] dark:text-[#a6aea0]">Average graded score</dt><dd className="font-semibold">{averageScore === null ? "—" : averageScore.toFixed(1)}</dd></div>
+            </dl>
+          </> : <p className="mt-5 text-[10px] text-[#7a8575]">There are no assessment records to summarize yet.</p>}
         </div>
       </section>
 
-      {/* ========================================================= */}
-      {/* 3. AVAILABLE COURSES SECTION                              */}
-      {/* ========================================================= */}
-      <section className="space-y-3 pt-2">
-        <h2 className="text-base font-bold tracking-tight text-[#172115]">
-          Available courses
-        </h2>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* COURSE 1: Cybersecurity Fundamentals */}
-          <article className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e5e9df] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:shadow-md">
-            <div>
-              {/* Image banner */}
-              <div className="relative h-[135px] w-full overflow-hidden bg-slate-900">
-                <Image
-                  src="/courses/cybersecurity.jpg"
-                  alt="Cybersecurity Fundamentals"
-                  fill
-                  className="object-cover"
-                />
-                <span className="absolute left-2.5 top-2.5 rounded-full bg-[#0d1726]/85 px-2.5 py-0.5 text-[8.5px] font-bold tracking-wider text-white shadow-sm">
-                  SECURITY
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="space-y-1.5 p-3.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-[#e0f2fe] text-[#0284c7]">
-                    <Lock size={11} />
-                  </span>
-                  <span className="text-[9.5px] font-bold tracking-wider text-[#0284c7]">
-                    CYBERSECURITY · SEC 301
-                  </span>
-                </div>
-
-                <h3 className="text-[13.5px] font-bold leading-snug text-[#172115]">
-                  Cybersecurity Fundamentals
-                </h3>
-
-                <p className="line-clamp-2 text-[10.5px] leading-relaxed text-[#616d5c]">
-                  Network security, ethical hacking basics, threat analysis & modern defence strategies.
-                </p>
-
-                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
-                  <span>Marcus Adeyemi · 10 live lessons</span>
-                  <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[9px] font-semibold text-[#0284c7]">
-                    Intermediate
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 pt-0">
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-1 rounded-xl border border-[#d2dacb] py-2 text-[11px] font-bold text-[#172115] transition hover:border-[#172115] hover:bg-[#f6f8f3]"
-              >
-                <span>View course</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </article>
-
-          {/* COURSE 2: Graphic Design — Visual Storytelling */}
-          <article className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e5e9df] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:shadow-md">
-            <div>
-              {/* Image banner */}
-              <div className="relative h-[135px] w-full overflow-hidden bg-rose-900">
-                <Image
-                  src="/courses/graphic-design.jpg"
-                  alt="Graphic Design — Visual Storytelling"
-                  fill
-                  className="object-cover"
-                />
-                <span className="absolute left-2.5 top-2.5 rounded-full bg-[#db2777]/85 px-2.5 py-0.5 text-[8.5px] font-bold tracking-wider text-white shadow-sm">
-                  DESIGN
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="space-y-1.5 p-3.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-[#fce7f3] text-[#db2777]">
-                    <Palette size={11} />
-                  </span>
-                  <span className="text-[9.5px] font-bold tracking-wider text-[#db2777]">
-                    GRAPHIC DESIGN · GD 201
-                  </span>
-                </div>
-
-                <h3 className="text-[13.5px] font-bold leading-snug text-[#172115]">
-                  Graphic Design — Visual Storytelling
-                </h3>
-
-                <p className="line-clamp-2 text-[10.5px] leading-relaxed text-[#616d5c]">
-                  Typography, colour theory, brand identity & Adobe Illustrator for modern graphic designers.
-                </p>
-
-                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
-                  <span>Nadia Fernandez · 10 live lessons</span>
-                  <span className="rounded-full bg-[#fce7f3] px-2 py-0.5 text-[9px] font-semibold text-[#db2777]">
-                    Beginner
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 pt-0">
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-1 rounded-xl border border-[#d2dacb] py-2 text-[11px] font-bold text-[#172115] transition hover:border-[#172115] hover:bg-[#f6f8f3]"
-              >
-                <span>View course</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </article>
-
-          {/* COURSE 3: Soft Skills for the Digital Age */}
-          <article className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e5e9df] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:shadow-md">
-            <div>
-              {/* Image banner */}
-              <div className="relative h-[135px] w-full overflow-hidden bg-amber-900">
-                <Image
-                  src="/courses/soft-skills.jpg"
-                  alt="Soft Skills for the Digital Age"
-                  fill
-                  className="object-cover"
-                />
-                <span className="absolute left-2.5 top-2.5 rounded-full bg-[#d97706]/85 px-2.5 py-0.5 text-[8.5px] font-bold tracking-wider text-white shadow-sm">
-                  PERSONAL GROWTH
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="space-y-1.5 p-3.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-[#fef3c7] text-[#d97706]">
-                    <Lightbulb size={11} />
-                  </span>
-                  <span className="text-[9.5px] font-bold tracking-wider text-[#d97706]">
-                    SOFT SKILLS · SS 101
-                  </span>
-                </div>
-
-                <h3 className="text-[13.5px] font-bold leading-snug text-[#172115]">
-                  Soft Skills for the Digital Age
-                </h3>
-
-                <p className="line-clamp-2 text-[10.5px] leading-relaxed text-[#616d5c]">
-                  Communication, leadership, critical thinking & emotional intelligence for modern professionals.
-                </p>
-
-                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
-                  <span>Prof. James Osei · 8 live lessons</span>
-                  <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[9px] font-semibold text-[#b45309]">
-                    All Levels
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 pt-0">
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-1 rounded-xl border border-[#d2dacb] py-2 text-[11px] font-bold text-[#172115] transition hover:border-[#172115] hover:bg-[#f6f8f3]"
-              >
-                <span>View course</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </article>
-
-          {/* COURSE 4: Machine Learning — Foundations & Practice */}
-          <article className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e5e9df] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:shadow-md">
-            <div>
-              {/* Image banner */}
-              <div className="relative h-[135px] w-full overflow-hidden bg-indigo-950">
-                <Image
-                  src="/courses/machine-learning.jpg"
-                  alt="Machine Learning — Foundations & Practice"
-                  fill
-                  className="object-cover"
-                />
-                <span className="absolute left-2.5 top-2.5 rounded-full bg-[#4338ca]/85 px-2.5 py-0.5 text-[8.5px] font-bold tracking-wider text-white shadow-sm">
-                  DATA & AI
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="space-y-1.5 p-3.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-[#ede9fe] text-[#4f46e5]">
-                    <Cpu size={11} />
-                  </span>
-                  <span className="text-[9.5px] font-bold tracking-wider text-[#4f46e5]">
-                    MACHINE LEARNING · ML 401
-                  </span>
-                </div>
-
-                <h3 className="text-[13.5px] font-bold leading-snug text-[#172115]">
-                  Machine Learning — Foundations & Practice
-                </h3>
-
-                <p className="line-clamp-2 text-[10.5px] leading-relaxed text-[#616d5c]">
-                  Supervised & unsupervised learning, model evaluation, Python scikit-learn & real datasets.
-                </p>
-
-                <div className="flex items-center justify-between pt-1 text-[9.5px] text-[#616d5c]">
-                  <span>Dr. Priya Nair · 14 live lessons</span>
-                  <span className="rounded-full bg-[#ede9fe] px-2 py-0.5 text-[9px] font-semibold text-[#6d28d9]">
-                    Advanced
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 pt-0">
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-1 rounded-xl border border-[#d2dacb] py-2 text-[11px] font-bold text-[#172115] transition hover:border-[#172115] hover:bg-[#f6f8f3]"
-              >
-                <span>View course</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      {/* ========================================================= */}
-      {/* 4. REMINDERS SECTION                                      */}
-      {/* ========================================================= */}
-      <section className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold tracking-tight text-[#172115]">
-            Reminders
-          </h2>
-          <span className="text-[11px] font-medium text-[#707c6c]">3 reminders</span>
+      <section className="grid gap-3 xl:grid-cols-2">
+        <div className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">Recent assessments</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Your submissions and review status.</p></div><Link href="/learner/grades" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">View grades</Link></div>
+          <div className="mt-3 divide-y divide-[#edf0e9] dark:divide-white/10">
+            {loading ? <p className="py-4 text-[10px] text-[#7a8575]">Loading your assessment records…</p> : data.submissions.length ? data.submissions.slice(0, 5).map((submission) => (
+              <article key={submission.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-1">
+                <div className="min-w-0"><h3 className="truncate text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{submission.assessment_title}</h3><p className="mt-1 text-[8px] text-[#798374] dark:text-[#9aa592]">{displayDate(submission.submitted_at)}</p></div>
+                <div className="shrink-0 text-right"><p className="text-[8px] font-semibold text-[#405b35] dark:text-[#c5d6bc]">{submission.status.replaceAll("_", " ")}</p>{scoreValue(submission) !== null && <p className="mt-1 text-[8px] text-[#798374]">Score {scoreValue(submission)}</p>}</div>
+              </article>
+            )) : <p className="py-4 text-[10px] text-[#7a8575]">No assessment submissions are linked to this account yet.</p>}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* REMINDER 1: Django */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-[#d2e3ca] bg-[#edf4e8] px-2 py-0.5 text-[9px] font-bold text-[#2c5222]">
-                    DJANGO
-                  </span>
-                  <span className="text-[11px] text-[#6e7b69]">Daniel Brooks</span>
-                </div>
-                <span className="rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#2c6e21]">
-                  Next live lesson
-                </span>
-              </div>
-
-              <h3 className="text-xs font-bold text-[#172115] pt-1">
-                REST APIs with Django REST Framework
-              </h3>
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
-                Wed, 7 Oct · 10:00–11:30 BST
-              </span>
-              <button
-                type="button"
-                className="rounded-lg bg-[#23351f] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#182615]"
-              >
-                View lesson
-              </button>
-            </div>
-          </div>
-
-          {/* REMINDER 2: Mathematics */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-[#ebdcc7] bg-[#fbf7f0] px-2 py-0.5 text-[9px] font-bold text-[#715428]">
-                    MATHEMATICS
-                  </span>
-                  <span className="text-[11px] text-[#6e7b69]">Dr. Elena Ruiz</span>
-                </div>
-                <span className="rounded-full border border-[#fcd9ad] bg-[#fef4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#b45309]">
-                  Assignment deadline
-                </span>
-              </div>
-
-              <h3 className="text-xs font-bold text-[#172115] pt-1">
-                Linear functions practice
-              </h3>
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
-                Thu, 8 Oct · 18:00 BST
-              </span>
-              <button
-                type="button"
-                className="rounded-lg border border-[#d0d7ca] bg-white px-3.5 py-1.5 text-[11px] font-semibold text-[#172115] shadow-sm transition hover:bg-[#f6f8f3]"
-              >
-                Continue work
-              </button>
-            </div>
-          </div>
-
-          {/* REMINDER 3: UI/UX Design */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-[#d2e4dd] bg-[#f1f6f4] px-2 py-0.5 text-[9px] font-bold text-[#2c5b4d]">
-                    UI/UX DESIGN
-                  </span>
-                  <span className="text-[11px] text-[#6e7b69]">Amara Okafor</span>
-                </div>
-                <span className="rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#2c6e21]">
-                  Available now
-                </span>
-              </div>
-
-              <h3 className="text-xs font-bold text-[#172115] pt-1">
-                Design systems fundamentals
-              </h3>
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
-                Closes 6 Oct · 17:30 BST
-              </span>
-              <button
-                type="button"
-                className="rounded-lg bg-[#23351f] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#182615]"
-              >
-                Join exam
-              </button>
-            </div>
-          </div>
+        <div className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">Your learning goals</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Saved on your learner profile.</p></div><Link href="/learner/settings?section=account" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">Edit goals</Link></div>
+          {loading ? <p className="mt-4 text-[10px] text-[#7a8575]">Loading your learner profile…</p> : data.learningGoals ? <p className="mt-4 whitespace-pre-wrap text-[10px] leading-5 text-[#495344] dark:text-[#d6dfd0]">{data.learningGoals}</p> : <p className="mt-4 text-[10px] text-[#7a8575] dark:text-[#a6aea0]">No learning goals added yet. Add your goals to your learner profile to see them here.</p>}
         </div>
       </section>
     </div>
+  );
+}
+
+function Summary({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: React.ReactNode }) {
+  return (
+    <article className="rounded-lg border border-[#e2e7dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
+      <div className="flex items-start justify-between gap-2"><div><p className="text-[9px] font-medium text-[#707c6c] dark:text-[#a6aea0]">{label}</p><p className="mt-1.5 text-xl font-bold text-[#172115] dark:text-[#ecf1ea]">{value}</p></div><span className="grid size-8 place-items-center rounded bg-[#edf4e8] text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">{icon}</span></div>
+      <p className="mt-1 text-[8px] text-[#899085] dark:text-[#929a8d]">{detail}</p>
+    </article>
   );
 }

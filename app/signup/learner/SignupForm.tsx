@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import RoleSelector from "../RoleSelector";
 import { register } from "@/lib/api/auth";
@@ -11,6 +12,7 @@ type LearnerSignupProps = {
 };
 
 export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +38,7 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
         password_confirm: passwordConfirm,
         role: "LEARNER",
       });
-      setNotice("Your account was created. You can now log in.");
+      router.replace("/login?registered=1");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "We couldn’t create your account. Please check your details.");
     } finally {

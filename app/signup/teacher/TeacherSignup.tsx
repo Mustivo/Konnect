@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import AccountStep from "./steps/AccountStep";
 import ProfileStep from "./steps/ProfileStep";
 import DocumentsStep from "./steps/DocumentsStep";
@@ -40,6 +41,7 @@ const stepDescriptions = [
 ];
 
 export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps) {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
@@ -111,8 +113,9 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
       if (certificate instanceof File && certificate.size > 0) profile.set("verification_document", certificate);
 
       await updateTeacherProfile(profile);
-      setVerifiedAt(new Date());
-      setStep(6);
+      localStorage.removeItem("konnect-access-token");
+      localStorage.removeItem("konnect-refresh-token");
+      router.replace("/login?registered=1");
     } catch (error) {
       const message = apiErrorMessage(error instanceof Error && "payload" in error ? error.payload : error, "Please review your details and try again.");
       setNotice(accountCreated ? `Your account was created, but the teacher profile could not be submitted: ${message}` : message);

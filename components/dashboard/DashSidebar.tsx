@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import { currentUser, logout, type ApiUser } from "@/lib/api/auth";
 import {
   LayoutGrid,
   BookOpen,
@@ -18,6 +19,8 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  LogOut,
+  UserRound,
   BarChart3,
   Users,
 } from "lucide-react";
@@ -80,26 +83,64 @@ const adminMenuItems: MenuItem[] = [
   { name: "Classes", href: "/admin/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "62" },
   { name: "Reports & Permissions", href: "/admin/dashboard#reports", icon: BarChart3, left: 20, marginTop: 1 },
   { name: "Analytics", href: "/admin/dashboard#analytics", icon: BarChart3, left: 20, marginTop: 1 },
-  { name: "Settings", href: "/admin/dashboard#settings", icon: Settings, left: 20, marginTop: 1 },
+  { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
 export default function DashSidebar({ role = "learner" }: { role?: DashboardRole }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isTeacher = role === "teacher";
   const isAdmin = role === "admin";
   const menuItems = isAdmin ? adminMenuItems : isTeacher ? teacherMenuItems : learnerMenuItems;
   const [tasksOpen, setTasksOpen] = useState(false);
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const syncUser = () => {
+      if (!window.localStorage.getItem("konnect-access-token")) return;
+      currentUser().then(setUser).catch(() => setUser(null));
+    };
+    const handleUserUpdated = (event: Event) => {
+      const updatedUser = (event as CustomEvent<ApiUser>).detail;
+      if (updatedUser) setUser(updatedUser);
+      else syncUser();
+    };
+    syncUser();
+    window.addEventListener("konnect-user-updated", handleUserUpdated);
+    return () => window.removeEventListener("konnect-user-updated", handleUserUpdated);
+  }, []);
 
   useEffect(() => {
     setTasksOpen(pathname.startsWith("/learner/tasks") || (isTeacher && ["/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)));
+    setAccountMenuOpen(false);
   }, [isTeacher, pathname]);
 
-  const profile = isAdmin
-    ? { initials: "AM", name: "Admin Manager", meta: "Platform admin" }
-    : isTeacher
-      ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
-      : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
+  const displayName = user ? `${user.first_name} ${user.last_name}`.trim() || user.username : isAdmin ? "Admin" : isTeacher ? "Teacher" : "Learner";
+  const profile = {
+    initials: displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "K",
+    name: displayName,
+    meta: user?.email ?? (user ? user.role.toLowerCase() : "Account"),
+  };
+  const profileHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=profile";
+  const settingsHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=account";
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    const refreshToken = window.localStorage.getItem("konnect-refresh-token");
+    try {
+      if (refreshToken) await logout(refreshToken);
+    } catch {
+      // Clear the local session even if the API is temporarily unavailable.
+    } finally {
+      window.localStorage.removeItem("konnect-access-token");
+      window.localStorage.removeItem("konnect-refresh-token");
+      router.replace("/login");
+    }
+  }
 
   return (
     <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-none bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
@@ -222,21 +263,28 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
         </div>
       </nav>
 
-      <div className="mt-auto flex h-[77px] shrink-0 items-center border-t border-[#dae3d0] pl-4 pr-[15px] dark:border-[#212f1f] transition-colors">
-        <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#eaf0e3] text-[10px] font-semibold text-[#3a4a30] dark:bg-[#1e2d1d] dark:text-[#aee09f]">
-          {profile.initials}
-        </div>
-
-        <div className="ml-2.5 flex-1 leading-none">
-          <p className="text-[11px] font-semibold text-[#171d15] dark:text-[#ecf1ea]">
-            {profile.name}
-          </p>
-          <p className="mt-[7px] text-[9.5px] text-[#67705f] dark:text-[#849480]">
-            {profile.meta}
-          </p>
-        </div>
-
-        <ChevronDown size={14} className="text-[#444c3f] dark:text-[#849480]" />
+      <div className="relative mt-auto shrink-0 border-t border-[#dae3d0] p-3 dark:border-[#212f1f]">
+        {accountMenuOpen && <div id="dashboard-account-menu" className="absolute bottom-[calc(100%-4px)] left-3 right-3 z-30 rounded-md border border-[#d5dfca] bg-white p-1.5 shadow-lg dark:border-[#303b2d] dark:bg-[#1b2419]">
+          <Link href={profileHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "profile" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[11px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
+            <UserRound size={13} /> View profile
+          </Link>
+          <Link href={settingsHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "account" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[11px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
+            <Settings size={13} /> Account settings
+          </Link>
+          <button type="button" disabled={loggingOut} onClick={handleLogout} className="flex min-h-9 w-full items-center gap-2 rounded px-2 text-left text-[11px] font-medium text-[#9c3434] hover:bg-[#fbefed] disabled:opacity-60 dark:hover:bg-[#35211f]">
+            <LogOut size={13} /> {loggingOut ? "Signing out…" : "Log out"}
+          </button>
+        </div>}
+        <button type="button" aria-expanded={accountMenuOpen} aria-controls="dashboard-account-menu" onClick={() => setAccountMenuOpen((open) => !open)} className="flex min-h-[48px] w-full items-center rounded px-1 text-left hover:bg-black/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43] dark:hover:bg-white/[0.05]">
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#eaf0e3] text-[10px] font-semibold text-[#3a4a30] dark:bg-[#1e2d1d] dark:text-[#aee09f]">
+            {profile.initials}
+          </span>
+          <span className="ml-2.5 min-w-0 flex-1 leading-none">
+            <span className="block truncate text-[11px] font-semibold text-[#171d15] dark:text-[#ecf1ea]">{profile.name}</span>
+            <span className="mt-[7px] block truncate text-[9.5px] text-[#67705f] dark:text-[#849480]">{profile.meta}</span>
+          </span>
+          <ChevronDown size={14} className={`shrink-0 text-[#444c3f] transition-transform dark:text-[#849480] ${accountMenuOpen ? "rotate-180" : ""}`} />
+        </button>
       </div>
     </aside>
   );

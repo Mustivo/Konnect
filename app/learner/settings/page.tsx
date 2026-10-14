@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { currentUser, getLearnerProfile, updateCurrentUser, updateLearnerProfile } from "@/lib/api/auth";
 import {
   Bell,
   Check,
@@ -18,6 +19,7 @@ type NoticePreference = { inApp: boolean; email: boolean };
 type Settings = {
   displayName: string;
   email: string;
+  phoneNumber: string;
   timezone: string;
   language: string;
   about: string;
@@ -25,11 +27,29 @@ type Settings = {
   photo: string;
   notifications: Record<NoticeKey, NoticePreference>;
 };
+type LearnerProfileDetails = {
+  date_of_birth: string;
+  grade_level: string;
+  learning_goals: string;
+  interests: string;
+  parent_guardian_name: string;
+  parent_guardian_phone: string;
+};
+
+const emptyLearnerProfile: LearnerProfileDetails = {
+  date_of_birth: "",
+  grade_level: "",
+  learning_goals: "",
+  interests: "",
+  parent_guardian_name: "",
+  parent_guardian_phone: "",
+};
 
 const preferenceKey = "konnect-learner-settings";
 const defaultSettings: Settings = {
   displayName: "Gabriella Igabe",
   email: "gabriella.igabe@example.com",
+  phoneNumber: "",
   timezone: "Europe/London",
   language: "English",
   about: "Learning to build thoughtful digital experiences — from frontend code to accessible interfaces.",
@@ -91,12 +111,31 @@ function initials(name: string) {
 
 export default function LearnerSettingsPage() {
   const [settings, setSettings] = useState<Settings>(freshDefaults);
+  const [learnerProfile, setLearnerProfile] = useState<LearnerProfileDetails>(emptyLearnerProfile);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const photoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSettings(readSettings());
+    if (window.localStorage.getItem("konnect-access-token")) {
+      currentUser().then((user) => {
+        const displayName = `${user.first_name} ${user.last_name}`.trim();
+        setSettings((current) => ({ ...current, displayName: displayName || user.username, email: user.email, phoneNumber: user.phone_number ?? "" }));
+      }).catch(() => undefined);
+      getLearnerProfile().then((profile) => {
+        setLearnerProfile({
+          date_of_birth: String(profile.date_of_birth ?? ""),
+          grade_level: String(profile.grade_level ?? ""),
+          learning_goals: String(profile.learning_goals ?? ""),
+          interests: String(profile.interests ?? ""),
+          parent_guardian_name: String(profile.parent_guardian_name ?? ""),
+          parent_guardian_phone: String(profile.parent_guardian_phone ?? ""),
+        });
+      }).catch(() => undefined);
+    }
 
     function setSectionFromUrl(section: string | null) {
       if (settingSections.some((item) => item.id === section)) {
@@ -160,22 +199,52 @@ export default function LearnerSettingsPage() {
     reader.readAsDataURL(file);
   }
 
-  function saveSettings() {
+  async function saveSettings() {
+    setSaving(true);
+    setSaveMessage("");
     try {
+      if (activeSection === "account") {
+        const [firstName = "", ...lastNameParts] = settings.displayName.trim().split(/\s+/);
+        await updateCurrentUser({ first_name: firstName, last_name: lastNameParts.join(" "), email: settings.email, phone_number: settings.phoneNumber });
+        await updateLearnerProfile({ ...learnerProfile, date_of_birth: learnerProfile.date_of_birth || null });
+      }
       localStorage.setItem(preferenceKey, JSON.stringify(settings));
       localStorage.setItem("konnect-theme", settings.theme);
       document.documentElement.setAttribute("data-theme", settings.theme);
       setSaved(true);
-    } catch {
+      setSaveMessage("Your changes have been saved.");
+    } catch (error) {
       setSaved(false);
+      setSaveMessage(error instanceof Error ? error.message : "Your changes could not be saved.");
+    } finally {
+      setSaving(false);
     }
   }
 
   function cancelChanges() {
     const restored = readSettings();
     setSettings(restored);
+    if (window.localStorage.getItem("konnect-access-token")) {
+      currentUser().then((user) => {
+        const displayName = `${user.first_name} ${user.last_name}`.trim();
+        setSettings((current) => ({ ...current, displayName: displayName || user.username, email: user.email, phoneNumber: user.phone_number ?? "" }));
+      }).catch(() => undefined);
+      getLearnerProfile().then((profile) => {
+        setLearnerProfile({
+          date_of_birth: String(profile.date_of_birth ?? ""),
+          grade_level: String(profile.grade_level ?? ""),
+          learning_goals: String(profile.learning_goals ?? ""),
+          interests: String(profile.interests ?? ""),
+          parent_guardian_name: String(profile.parent_guardian_name ?? ""),
+          parent_guardian_phone: String(profile.parent_guardian_phone ?? ""),
+        });
+      }).catch(() => setLearnerProfile(emptyLearnerProfile));
+    } else {
+      setLearnerProfile(emptyLearnerProfile);
+    }
     document.documentElement.setAttribute("data-theme", restored.theme);
     setSaved(false);
+    setSaveMessage("");
   }
 
   return (
@@ -228,7 +297,7 @@ export default function LearnerSettingsPage() {
               </div>
               <div className="mt-2.5 border-t border-[#edf0e9] pt-2.5 dark:border-white/10">
                 <p className="text-[8px] font-semibold">About me</p>
-                <p className="mt-1 text-[9px] leading-relaxed text-[#737b70] dark:text-[#a6aea0]">{settings.about || "No profile description added yet."}</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-[#737b70] dark:text-[#a6aea0]">{learnerProfile.learning_goals || "No learning goals added yet."}</p>
               </div>
             </section>
 
@@ -253,6 +322,9 @@ export default function LearnerSettingsPage() {
                 <label className="block text-[8px] font-semibold">Email address
                   <input type="email" value={settings.email} onChange={(event) => update("email", event.target.value)} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
                 </label>
+                <label className="block text-[8px] font-semibold">Phone number
+                  <input type="tel" value={settings.phoneNumber} onChange={(event) => update("phoneNumber", event.target.value)} maxLength={30} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
+                </label>
                 <label className="block text-[8px] font-semibold">Timezone
                   <select value={settings.timezone} onChange={(event) => update("timezone", event.target.value)} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]">
                     {timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}
@@ -265,8 +337,15 @@ export default function LearnerSettingsPage() {
                 </label>
               </div>
               <label className="mt-2.5 block text-[8px] font-semibold">About me
-                <textarea value={settings.about} onChange={(event) => update("about", event.target.value)} rows={2} className="mt-1 block min-h-[42px] w-full resize-y rounded-md border border-[#e0e5dc] bg-white px-2 py-1.5 text-[9px] font-normal leading-[1.4] outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
+                <textarea value={learnerProfile.learning_goals} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, learning_goals: event.target.value }))} rows={2} className="mt-1 block min-h-[42px] w-full resize-y rounded-md border border-[#e0e5dc] bg-white px-2 py-1.5 text-[9px] font-normal leading-[1.4] outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
               </label>
+              <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                <label className="block text-[8px] font-semibold">Grade level<input value={learnerProfile.grade_level} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, grade_level: event.target.value }))} maxLength={50} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" /></label>
+                <label className="block text-[8px] font-semibold">Date of birth<input type="date" value={learnerProfile.date_of_birth} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, date_of_birth: event.target.value }))} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" /></label>
+                <label className="block text-[8px] font-semibold sm:col-span-2">Interests<input value={learnerProfile.interests} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, interests: event.target.value }))} maxLength={255} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" /></label>
+                <label className="block text-[8px] font-semibold">Parent/guardian name<input value={learnerProfile.parent_guardian_name} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, parent_guardian_name: event.target.value }))} maxLength={150} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" /></label>
+                <label className="block text-[8px] font-semibold">Parent/guardian phone<input type="tel" value={learnerProfile.parent_guardian_phone} onChange={(event) => setLearnerProfile((profile) => ({ ...profile, parent_guardian_phone: event.target.value }))} maxLength={30} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" /></label>
+              </div>
               <p className="mt-2 text-[7px] text-[#899085] dark:text-[#929a8d]">Lesson times follow your timezone. {settings.timezone} currently uses BST.</p>
               <div className="my-3 border-t border-[#edf0e9] dark:border-white/10" />
               <h3 className="text-[9px] font-bold">Security</h3>
@@ -324,10 +403,10 @@ export default function LearnerSettingsPage() {
         </div>
 
         <footer className="mt-3 flex flex-col gap-2 rounded-lg border border-[#e0e5dd] bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-[#1b211a]/70 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-1.5 text-[8px] text-[#75806e] dark:text-[#a6aea0]"><Check size={12} /><span aria-live="polite">{saved ? "Your settings are saved." : "Your changes apply when you save. You can update these preferences at any time."}</span></div>
+          <div className="flex items-center gap-1.5 text-[8px] text-[#75806e] dark:text-[#a6aea0]"><Check size={12} /><span aria-live="polite">{saveMessage || (saved ? "Your settings are saved." : "Your changes apply when you save. You can update these preferences at any time.")}</span></div>
           <div className="flex justify-end gap-1.5">
             <button type="button" onClick={cancelChanges} className="rounded-md border border-[#e0e5dc] bg-white px-3 py-1.5 text-[8px] font-semibold text-[#596d4e] hover:bg-[#f2f5ef] dark:border-white/10 dark:bg-[#151a14] dark:text-[#d5e3cb] dark:hover:bg-[#252d23]">Cancel</button>
-            <button type="button" onClick={saveSettings} className="rounded-md bg-[#293e27] px-3 py-1.5 text-[8px] font-semibold text-white hover:bg-[#385235]">Save changes</button>
+            <button type="button" disabled={saving} onClick={saveSettings} className="rounded-md bg-[#293e27] px-3 py-1.5 text-[8px] font-semibold text-white hover:bg-[#385235] disabled:opacity-60">{saving ? "Saving…" : "Save changes"}</button>
           </div>
         </footer>
       </div>

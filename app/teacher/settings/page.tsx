@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import { currentUser, getTeacherProfile, updateCurrentUser, updateTeacherProfile } from "@/lib/api/auth";
 import { Bell, Check, Globe2, Info, ShieldCheck, UserRound } from "lucide-react";
 
 type SettingsTab = "profile" | "notifications" | "classes" | "security";
@@ -10,9 +11,10 @@ type TeacherSettings = {
   firstName: string;
   lastName: string;
   email: string;
-  role: string;
-  school: string;
+  phoneNumber: string;
   bio: string;
+  qualifications: string;
+  expertiseSubjects: string;
   language: string;
   timezone: string;
   photo: string;
@@ -28,9 +30,10 @@ const defaults: TeacherSettings = {
   firstName: "Edna",
   lastName: "Francis",
   email: "edna.francis@maplewood.school.edu",
-  role: "Lead Mathematics Teacher",
-  school: "Maplewood Secondary School",
+  phoneNumber: "",
   bio: "Helping students build confidence in mathematics, one clear step at a time.",
+  qualifications: "",
+  expertiseSubjects: "",
   language: "English (UK)",
   timezone: "London · GMT+1",
   photo: "",
@@ -71,7 +74,22 @@ export default function TeacherSettingsPage() {
   const [notice, setNotice] = useState("");
   const photoInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setSettings(readSettings()), []);
+  useEffect(() => {
+    setSettings(readSettings());
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    currentUser().then((user) => {
+      const [firstName, ...lastNameParts] = `${user.first_name} ${user.last_name}`.trim().split(/\s+/);
+      setSettings((current) => ({ ...current, firstName: firstName || user.username, lastName: lastNameParts.join(" "), email: user.email, phoneNumber: user.phone_number ?? "" }));
+    }).catch(() => undefined);
+    getTeacherProfile().then((profile) => {
+      setSettings((current) => ({
+        ...current,
+        bio: String(profile.bio ?? ""),
+        qualifications: String(profile.qualifications ?? ""),
+        expertiseSubjects: String(profile.expertise_subjects ?? ""),
+      }));
+    }).catch(() => undefined);
+  }, []);
 
   function update<K extends keyof TeacherSettings>(key: K, value: TeacherSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -86,12 +104,21 @@ export default function TeacherSettingsPage() {
     reader.readAsDataURL(file);
   }
 
-  function save() {
+  async function save() {
+    setNotice("");
     try {
+      if (activeTab === "profile") {
+        await updateCurrentUser({ first_name: settings.firstName, last_name: settings.lastName, email: settings.email, phone_number: settings.phoneNumber });
+        await updateTeacherProfile({
+          bio: settings.bio,
+          qualifications: settings.qualifications,
+          expertise_subjects: settings.expertiseSubjects,
+        });
+      }
       localStorage.setItem(storageKey, JSON.stringify(settings));
       setNotice("Your settings have been saved.");
-    } catch {
-      setNotice("Settings could not be saved in this browser.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Your settings could not be saved.");
     }
   }
 
@@ -130,8 +157,9 @@ export default function TeacherSettingsPage() {
                 <Field label="First name" value={settings.firstName} onChange={(value) => update("firstName", value)} />
                 <Field label="Last name" value={settings.lastName} onChange={(value) => update("lastName", value)} />
                 <div className="sm:col-span-2"><Field label="Email address" type="email" value={settings.email} onChange={(value) => update("email", value)} /></div>
-                <Field label="Role" value={settings.role} onChange={(value) => update("role", value)} />
-                <Field label="School" value={settings.school} onChange={(value) => update("school", value)} />
+                <div className="sm:col-span-2"><Field label="Phone number" type="tel" value={settings.phoneNumber} onChange={(value) => update("phoneNumber", value)} /></div>
+                <Field label="Qualifications" value={settings.qualifications} onChange={(value) => update("qualifications", value)} />
+                <Field label="Teaching subjects" value={settings.expertiseSubjects} onChange={(value) => update("expertiseSubjects", value)} />
                 <div className="sm:col-span-2"><Field label="Bio" value={settings.bio} onChange={(value) => update("bio", value)} /></div>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[#edf0e9] pt-3 dark:border-[#2a312a]"><span role="status" className="mr-auto text-[7px] text-[#63745b]">{notice}</span><button type="button" onClick={cancel} className="rounded-full bg-[#f1f4ed] px-3 py-1.5 text-[7px] font-semibold text-[#485443] hover:bg-[#e5ecdf] dark:bg-[#252e22] dark:text-[#d1ddc7]">Cancel</button><button type="button" onClick={save} className="inline-flex items-center gap-1 rounded-full bg-[#233c20] px-3 py-1.5 text-[7px] font-semibold text-white hover:bg-[#304d2b]"><Check size={10} /> Save changes</button></div>
@@ -141,7 +169,7 @@ export default function TeacherSettingsPage() {
           </div>
 
           <aside className="space-y-3">
-            <section className="rounded-xl border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]"><h2 className="text-[11px] font-bold text-[#273124] dark:text-[#e5ebdf]">Your teaching account</h2><span className="mt-2 inline-flex rounded-full bg-[#e5f0df] px-2 py-1 text-[7px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">Verified teacher</span><h3 className="mt-3 text-[13px] font-bold text-[#172115] dark:text-[#ecf1ea]">{settings.firstName} {settings.lastName}</h3><p className="mt-1 text-[8px] text-[#7a8575] dark:text-[#9aa592]">{settings.role}</p><p className="mt-3 text-[8px] text-[#7a8575] dark:text-[#9aa592]">{settings.school}</p><dl className="mt-3 space-y-2 text-[8px]"><div className="flex justify-between gap-2"><dt className="text-[#7a8575] dark:text-[#9aa592]">Active classes</dt><dd className="font-bold text-[#273124] dark:text-[#e5ebdf]">3/3</dd></div><div className="flex justify-between gap-2"><dt className="text-[#7a8575] dark:text-[#9aa592]">Students</dt><dd className="font-bold text-[#273124] dark:text-[#e5ebdf]">83</dd></div><div className="flex justify-between gap-2"><dt className="text-[#7a8575] dark:text-[#9aa592]">Member since</dt><dd className="font-bold text-[#273124] dark:text-[#e5ebdf]">Aug 2026</dd></div></dl></section>
+            <section className="rounded-xl border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]"><h2 className="text-[11px] font-bold text-[#273124] dark:text-[#e5ebdf]">Your teaching account</h2><span className="mt-2 inline-flex rounded-full bg-[#e5f0df] px-2 py-1 text-[7px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">Teacher</span><h3 className="mt-3 text-[13px] font-bold text-[#172115] dark:text-[#ecf1ea]">{settings.firstName} {settings.lastName}</h3><p className="mt-1 text-[8px] text-[#7a8575] dark:text-[#9aa592]">{settings.expertiseSubjects || "Add your teaching subjects"}</p><p className="mt-3 text-[8px] text-[#7a8575] dark:text-[#9aa592]">{settings.qualifications || "Add your qualifications"}</p></section>
             <aside className="flex items-start gap-2 rounded-lg bg-[#e6f0e1] p-3 text-[#40533a] dark:bg-[#202b1d] dark:text-[#c5d6b8]"><Info size={12} className="mt-0.5 shrink-0" /><div><p className="text-[8px] font-bold">A profile your students know</p><p className="mt-1 text-[7px] leading-relaxed">Use a familiar name and photo so students can easily recognize you in class and messages.</p></div></aside>
             <section className="rounded-xl border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]"><h2 className="text-[10px] font-bold text-[#273124] dark:text-[#e5ebdf]">Your information, protected</h2><p className="mt-2 text-[7px] leading-relaxed text-[#7a8575] dark:text-[#9aa592]">Your email address and security settings are private. Students only see your name, photo, role and bio.</p><Link href="/about" className="mt-3 inline-flex rounded-full bg-[#f1f4ed] px-3 py-1.5 text-[7px] font-semibold text-[#485443] hover:bg-[#e5ecdf] dark:bg-[#252e22] dark:text-[#d1ddc7]">View privacy policy</Link></section>
           </aside>

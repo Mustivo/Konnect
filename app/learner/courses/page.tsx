@@ -1,550 +1,198 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiJson, browseClasses, enrollInClass, getLearnerClasses } from "@/lib/api";
-import {
-  Check,
-  Code2,
-  Sparkles,
-  Terminal,
-  Lock,
-  Palette,
-  Lightbulb,
-  Cpu,
-  ChevronDown,
-} from "lucide-react";
+import { BookOpen, Check, ChevronDown } from "lucide-react";
 
-interface Course {
+type ApiClass = {
   id: string;
   title: string;
-  subtitle: string;
-  category: string;
-  codeTag: string;
-  badge: string;
-  badgeBg: string;
-  iconType: "react" | "uiux" | "django" | "math" | "security" | "design" | "softskills" | "ml";
-  iconBg: string;
-  iconColor: string;
-  codeColor: string;
-  instructor: string;
-  lessons: number;
-  level: string;
-  levelBg: string;
-  levelColor: string;
-  enrolled: boolean;
-  progress?: number;
-  progressColor?: string;
-  progressTextColor?: string;
-  image: string;
+  description?: string;
+  subject?: string;
+  teacher_name?: string;
+  banner_image?: string | null;
+};
+
+type ApiEnrollment = {
+  id: string;
+  class_room: string;
+  class_title: string;
+  class_subject: string;
+  teacher_name: string;
+  status: "PENDING" | "ENROLLED" | "DROPPED" | "COMPLETED" | string;
+};
+
+type ApiCollection<T> = T[] | { results?: T[]; next?: string | null };
+type Course = ApiClass & { enrollmentStatus: ApiEnrollment["status"] | null };
+
+const statusLabel: Record<string, string> = {
+  PENDING: "Pending approval",
+  ENROLLED: "Enrolled",
+  COMPLETED: "Completed",
+  DROPPED: "Available",
+};
+
+async function getAllPages<T>(requestPage: (query?: string) => Promise<Response>) {
+  const records: T[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await requestPage(page === 1 ? "" : `?page=${page}`);
+    const result = await apiJson<ApiCollection<T>>(response);
+    if (Array.isArray(result)) {
+      records.push(...result);
+      break;
+    }
+    records.push(...(result.results ?? []));
+    if (!result.next) break;
+  }
+  return records;
 }
-
-type ApiClass = { id: string; title: string; description?: string; subject?: string; teacher_name?: string; enrolled_count?: string | number; max_students?: number };
-type ApiClassCollection = ApiClass[] | { results?: ApiClass[] };
-
-function listFromApi(value: ApiClassCollection) {
-  return Array.isArray(value) ? value : value.results ?? [];
-}
-
-const allCourses: Course[] = [
-  // ENROLLED COURSES
-  {
-    id: "react",
-    title: "React.js — Modern Frontend Development",
-    subtitle: "Build dynamic UIs with hooks, state management & React Router. Industry-standard frontend skills.",
-    category: "Development",
-    codeTag: "REACT.JS · WEB DEV",
-    badge: "WEB DEV",
-    badgeBg: "bg-[#0ea5e9]",
-    iconType: "react",
-    iconBg: "bg-[#f3e8ff] dark:bg-[#281b36]",
-    iconColor: "text-[#9333ea] dark:text-[#c084fc]",
-    codeColor: "text-[#0284c7] dark:text-[#38bdf8]",
-    instructor: "Sarah Mitchell",
-    lessons: 14,
-    level: "Intermediate",
-    levelBg: "bg-[#f1f5f9] dark:bg-[#1a242f]",
-    levelColor: "text-[#475569] dark:text-[#94a3b8]",
-    enrolled: true,
-    progress: 67,
-    progressColor: "bg-[#0284c7]",
-    progressTextColor: "text-[#0284c7] dark:text-[#38bdf8]",
-    image: "/courses/react.jpg",
-  },
-  {
-    id: "uiux",
-    title: "UI/UX Design — Wireframes to Prototypes",
-    subtitle: "Master Figma, user research, design systems & usability testing from scratch.",
-    category: "Design",
-    codeTag: "UI/UX DESIGN · DESIGN",
-    badge: "DESIGN",
-    badgeBg: "bg-[#7c3aed]",
-    iconType: "uiux",
-    iconBg: "bg-[#f5f3ff] dark:bg-[#261839]",
-    iconColor: "text-[#7c3aed] dark:text-[#a855f7]",
-    codeColor: "text-[#7c3aed] dark:text-[#a855f7]",
-    instructor: "Amara Okafor",
-    lessons: 12,
-    level: "Beginner",
-    levelBg: "bg-[#fdf2f8] dark:bg-[#2d1727]",
-    levelColor: "text-[#db2777] dark:text-[#f472b6]",
-    enrolled: true,
-    progress: 58,
-    progressColor: "bg-[#7c3aed]",
-    progressTextColor: "text-[#7c3aed] dark:text-[#c084fc]",
-    image: "/courses/uiux-design.jpg",
-  },
-  {
-    id: "django",
-    title: "Django — Full-Stack Web Applications",
-    subtitle: "Build REST APIs, MVC architecture, authentication & deploy production-ready apps.",
-    category: "Development",
-    codeTag: "DJANGO · BACKEND DEV",
-    badge: "BACKEND DEV",
-    badgeBg: "bg-[#15803d]",
-    iconType: "django",
-    iconBg: "bg-[#f0fdf4] dark:bg-[#15291b]",
-    iconColor: "text-[#16a34a] dark:text-[#4ade80]",
-    codeColor: "text-[#16a34a] dark:text-[#4ade80]",
-    instructor: "Daniel Brooks",
-    lessons: 16,
-    level: "Intermediate",
-    levelBg: "bg-[#f0fdf4] dark:bg-[#15291b]",
-    levelColor: "text-[#16a34a] dark:text-[#4ade80]",
-    enrolled: true,
-    progress: 34,
-    progressColor: "bg-[#16a34a]",
-    progressTextColor: "text-[#16a34a] dark:text-[#4ade80]",
-    image: "/courses/django.jpg",
-  },
-  {
-    id: "math",
-    title: "Mathematics for Everyday Life",
-    subtitle: "Linear functions, probability, statistics & applied problem solving in real-world contexts.",
-    category: "Mathematics",
-    codeTag: "MATHEMATICS · MTH 201",
-    badge: "MATHEMATICS",
-    badgeBg: "bg-[#ea580c]",
-    iconType: "math",
-    iconBg: "bg-[#fff7ed] dark:bg-[#2d1c15]",
-    iconColor: "text-[#ea580c] dark:text-[#fb923c]",
-    codeColor: "text-[#ea580c] dark:text-[#fb923c]",
-    instructor: "Dr. Elena Ruiz",
-    lessons: 12,
-    level: "Beginner",
-    levelBg: "bg-[#fff7ed] dark:bg-[#2d1c15]",
-    levelColor: "text-[#ea580c] dark:text-[#fb923c]",
-    enrolled: true,
-    progress: 75,
-    progressColor: "bg-[#ea580c]",
-    progressTextColor: "text-[#ea580c] dark:text-[#fb923c]",
-    image: "/courses/mathematics.jpg",
-  },
-
-  // AVAILABLE / UNENROLLED COURSES
-  {
-    id: "security",
-    title: "Cybersecurity Fundamentals",
-    subtitle: "Network security, ethical hacking basics, threat analysis & modern defence strategies.",
-    category: "Security",
-    codeTag: "CYBERSECURITY · SEC 301",
-    badge: "SECURITY",
-    badgeBg: "bg-[#0d1726]",
-    iconType: "security",
-    iconBg: "bg-[#e0f2fe] dark:bg-[#162737]",
-    iconColor: "text-[#0284c7] dark:text-[#38bdf8]",
-    codeColor: "text-[#0284c7] dark:text-[#38bdf8]",
-    instructor: "Marcus Adeyemi",
-    lessons: 10,
-    level: "Intermediate",
-    levelBg: "bg-[#e0f2fe] dark:bg-[#162737]",
-    levelColor: "text-[#0284c7] dark:text-[#38bdf8]",
-    enrolled: false,
-    image: "/courses/cybersecurity.jpg",
-  },
-  {
-    id: "design",
-    title: "Graphic Design — Visual Storytelling",
-    subtitle: "Typography, colour theory, brand identity & Adobe Illustrator for modern graphic designers.",
-    category: "Design",
-    codeTag: "GRAPHIC DESIGN · GD 201",
-    badge: "DESIGN",
-    badgeBg: "bg-[#db2777]",
-    iconType: "design",
-    iconBg: "bg-[#fce7f3] dark:bg-[#2e1728]",
-    iconColor: "text-[#db2777] dark:text-[#f472b6]",
-    codeColor: "text-[#db2777] dark:text-[#f472b6]",
-    instructor: "Nadia Fernandez",
-    lessons: 10,
-    level: "Beginner",
-    levelBg: "bg-[#fce7f3] dark:bg-[#2e1728]",
-    levelColor: "text-[#db2777] dark:text-[#f472b6]",
-    enrolled: false,
-    image: "/courses/graphic-design.jpg",
-  },
-  {
-    id: "softskills",
-    title: "Soft Skills for the Digital Age",
-    subtitle: "Communication, leadership, critical thinking & emotional intelligence for modern professionals.",
-    category: "Personal Growth",
-    codeTag: "SOFT SKILLS · SS 101",
-    badge: "PERSONAL GROWTH",
-    badgeBg: "bg-[#d97706]",
-    iconType: "softskills",
-    iconBg: "bg-[#fef3c7] dark:bg-[#2d2212]",
-    iconColor: "text-[#d97706] dark:text-[#fbbf24]",
-    codeColor: "text-[#d97706] dark:text-[#fbbf24]",
-    instructor: "Prof. James Osei",
-    lessons: 8,
-    level: "All Levels",
-    levelBg: "bg-[#fef3c7] dark:bg-[#2d2212]",
-    levelColor: "text-[#b45309] dark:text-[#fbbf24]",
-    enrolled: false,
-    image: "/courses/soft-skills.jpg",
-  },
-  {
-    id: "ml",
-    title: "Machine Learning — Foundations & Practice",
-    subtitle: "Supervised & unsupervised learning, model evaluation, Python scikit-learn & real datasets.",
-    category: "Data & AI",
-    codeTag: "MACHINE LEARNING · ML 401",
-    badge: "DATA & AI",
-    badgeBg: "bg-[#4338ca]",
-    iconType: "ml",
-    iconBg: "bg-[#ede9fe] dark:bg-[#201d3a]",
-    iconColor: "text-[#4f46e5] dark:text-[#818cf8]",
-    codeColor: "text-[#4f46e5] dark:text-[#818cf8]",
-    instructor: "Dr. Priya Nair",
-    lessons: 14,
-    level: "Advanced",
-    levelBg: "bg-[#ede9fe] dark:bg-[#201d3a]",
-    levelColor: "text-[#6d28d9] dark:text-[#818cf8]",
-    enrolled: false,
-    image: "/courses/machine-learning.jpg",
-  },
-];
-
-const statusTabs = ["All Courses", "Enrolled · 4", "Completed · 0"];
-const categories = [
-  "All Categories",
-  "Development",
-  "Design",
-  "Security",
-  "Data & AI",
-  "Personal Growth",
-  "Mathematics",
-];
 
 export default function LearnerCoursesPage() {
-  const [selectedStatus, setSelectedStatus] = useState("All Courses");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [courses, setCourses] = useState(allCourses);
+  const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("All courses");
+  const [selectedCategory, setSelectedCategory] = useState("All subjects");
+  const [loading, setLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
-  const [apiNotice, setApiNotice] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!window.localStorage.getItem("konnect-access-token")) return;
-    let cancelled = false;
-
+    let active = true;
     async function loadCourses() {
+      if (!window.localStorage.getItem("konnect-access-token")) {
+        router.replace("/login");
+        return;
+      }
       try {
-        const [browseResponse, enrolledResponse] = await Promise.all([browseClasses(), getLearnerClasses()]);
-        const [browseData, enrolledData] = await Promise.all([
-          apiJson<ApiClassCollection>(browseResponse),
-          apiJson<ApiClassCollection>(enrolledResponse),
+        const [catalog, enrollments] = await Promise.all([
+          getAllPages<ApiClass>(browseClasses),
+          getAllPages<ApiEnrollment>(getLearnerClasses),
         ]);
-        const enrolledClasses = listFromApi(enrolledData);
-        const enrolledIds = new Set(enrolledClasses.map((course) => course.id));
-        const apiClasses = [...listFromApi(browseData), ...enrolledClasses];
-        const uniqueClasses = [...new Map(apiClasses.map((course) => [course.id, course])).values()];
+        if (!active) return;
 
-        if (!cancelled && uniqueClasses.length) {
-          setCourses(uniqueClasses.map((course, index) => {
-            const category = course.subject || "Development";
-            const reference = allCourses.find((item) => item.category.toLowerCase() === category.toLowerCase()) ?? allCourses[index % allCourses.length];
-            return {
-              ...reference,
-              id: course.id,
-              title: course.title,
-              subtitle: course.description || reference.subtitle,
-              category,
-              codeTag: `${category.toUpperCase()} · CLASS`,
-              badge: category.toUpperCase(),
-              instructor: course.teacher_name || "Konnect instructor",
-              enrolled: enrolledIds.has(course.id),
-            };
-          }));
+        const enrollmentsByClass = new Map(enrollments.map((enrollment) => [enrollment.class_room, enrollment]));
+        const classesById = new Map(catalog.map((course) => [course.id, course]));
+        for (const enrollment of enrollments) {
+          if (!classesById.has(enrollment.class_room) && enrollment.status !== "DROPPED") {
+            classesById.set(enrollment.class_room, {
+              id: enrollment.class_room,
+              title: enrollment.class_title,
+              subject: enrollment.class_subject,
+              teacher_name: enrollment.teacher_name,
+              banner_image: null,
+            });
+          }
         }
-      } catch {
-        if (!cancelled) setApiNotice("Live course data is temporarily unavailable. Showing the course preview.");
+
+        setCourses([...classesById.values()].map((course) => ({
+          ...course,
+          enrollmentStatus: enrollmentsByClass.get(course.id)?.status ?? null,
+        })));
+      } catch (error) {
+        if (active) setNotice(error instanceof Error ? error.message : "Courses could not be loaded. Please try again.");
+      } finally {
+        if (active) setLoading(false);
       }
     }
 
     void loadCourses();
-    return () => { cancelled = true; };
-  }, []);
+    return () => { active = false; };
+  }, [router]);
 
-  const enrolledCount = courses.filter((course) => course.enrolled).length;
-  const statusTabs = ["All Courses", `Enrolled · ${enrolledCount}`, "Completed · 0"];
+  const enrolledCount = courses.filter((course) => course.enrollmentStatus === "ENROLLED").length;
+  const completedCount = courses.filter((course) => course.enrollmentStatus === "COMPLETED").length;
+  const categories = useMemo(() => ["All subjects", ...new Set(courses.map((course) => course.subject).filter((subject): subject is string => Boolean(subject)))], [courses]);
   const filteredCourses = courses.filter((course) => {
-    if (selectedStatus.startsWith("Enrolled") && !course.enrolled) return false;
-    if (selectedStatus === "Completed · 0") return false;
-
-    if (selectedCategory !== "All Categories" && course.category !== selectedCategory) {
-      return false;
-    }
-
+    if (selectedStatus === "Enrolled" && course.enrollmentStatus !== "ENROLLED") return false;
+    if (selectedStatus === "Completed" && course.enrollmentStatus !== "COMPLETED") return false;
+    if (selectedCategory !== "All subjects" && course.subject !== selectedCategory) return false;
     return true;
   });
 
-  const renderIcon = (type: Course["iconType"]) => {
-    switch (type) {
-      case "react":
-        return <Code2 size={11} />;
-      case "uiux":
-        return <Sparkles size={11} />;
-      case "django":
-        return <Terminal size={11} />;
-      case "math":
-        return <span className="font-bold text-[10px] leading-none">Σ</span>;
-      case "security":
-        return <Lock size={11} />;
-      case "design":
-        return <Palette size={11} />;
-      case "softskills":
-        return <Lightbulb size={11} />;
-      case "ml":
-        return <Cpu size={11} />;
+  async function enroll(courseId: string) {
+    setEnrollingId(courseId);
+    setNotice("");
+    try {
+      await apiJson(await enrollInClass(courseId));
+      const enrollments = await getAllPages<ApiEnrollment>(getLearnerClasses);
+      const savedEnrollment = enrollments.find((enrollment) => enrollment.class_room === courseId);
+      if (!savedEnrollment) {
+        setNotice("The request was sent, but it is not in your enrollment records yet. Refresh to check its status.");
+        return;
+      }
+      setCourses((current) => current.map((course) => course.id === courseId
+        ? { ...course, enrollmentStatus: savedEnrollment.status }
+        : course));
+      setNotice(`Course status: ${statusLabel[savedEnrollment.status] ?? savedEnrollment.status.toLowerCase()}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not enroll in this course. Please try again.");
+    } finally {
+      setEnrollingId(null);
     }
-  };
+  }
 
   return (
-    <div className="learner-courses-page py-3">
-      {/* Title */}
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b655a] dark:text-[#8c9c89]">
-          YOUR LEARNING SPACE
-        </p>
+    <div className="py-3">
+      <header>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b655a] dark:text-[#8c9c89]">Your learning space</p>
+        <h1 className="mt-0.5 text-[20px] font-bold text-[#171d15] dark:text-[#f0f4ee]">My Courses</h1>
+        <p className="mt-1 text-[9px] text-[#687463] dark:text-[#9aa592]">Courses and enrollment status from your Konnect account.</p>
+      </header>
 
-        <h1 className="mt-0.5 text-[20px] font-bold text-[#171d15] dark:text-[#f0f4ee]">
-          My Courses
-        </h1>
-      </div>
+      {notice && <p role="status" className="mt-3 rounded border border-[#e2e7dd] bg-white px-3 py-2 text-[10px] text-[#52644a] dark:border-white/10 dark:bg-[#1b211a] dark:text-[#c5d6bc]">{notice}</p>}
 
-      {apiNotice && <p role="status" className="mt-2 text-[9px] text-[#788173]">{apiNotice}</p>}
-
-      {/* Status tabs */}
-      <div className="mt-4 flex flex-wrap items-center gap-1.5">
-        {statusTabs.map((tab) => {
-          const isActive = selectedStatus === tab;
-          return (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setSelectedStatus(tab)}
-              className={`rounded-md border px-2.5 py-1 text-[11px] font-medium transition ${
-                isActive
-                  ? "border-[#1b2d1a] bg-[#1b2d1a] text-white dark:border-[#2f492b] dark:bg-[#253922] dark:text-[#b4e3a8] shadow-sm"
-                  : "border-[#dfe5da] bg-white text-[#3b453d] hover:bg-[#f3f6ef] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#8c9c89] dark:hover:bg-[#1b2819]"
-              }`}
-            >
-              {tab}
-            </button>
-          );
+      <div className="mt-4 flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter courses by enrollment status">
+        {[["All courses", courses.length], ["Enrolled", enrolledCount], ["Completed", completedCount]].map(([label, count]) => {
+          const value = String(label);
+          return <button key={value} type="button" onClick={() => setSelectedStatus(value)} aria-pressed={selectedStatus === value} className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${selectedStatus === value ? "border-[#1b2d1a] bg-[#1b2d1a] text-white dark:border-[#2f492b] dark:bg-[#253922]" : "border-[#dfe5da] bg-white text-[#3b453d] hover:bg-[#f3f6ef] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#c5d6bc]"}`}>{value} ({count})</button>;
         })}
       </div>
 
-      {/* Category pills */}
-      <div className="mt-2 flex flex-wrap items-center gap-1">
-        {categories.map((category) => {
-          const isActive = selectedCategory === category;
-          return (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setSelectedCategory(category)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
-                isActive
-                  ? "border-[#1b2d1a] bg-[#1b2d1a] text-white dark:border-[#2f492b] dark:bg-[#253922] dark:text-[#b4e3a8] shadow-sm"
-                  : "border-[#dfe5da] bg-[#f4f6f0] text-[#4e5a51] hover:bg-white dark:border-[#212f1f] dark:bg-[#152014] dark:text-[#849480] dark:hover:bg-[#1d2b1c]"
-              }`}
-            >
-              {category}
-            </button>
-          );
-        })}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-[10px] font-medium text-[#58645b] dark:text-[#a6aea0]">Subject
+          <span className="relative">
+            <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="h-8 appearance-none rounded border border-[#dfe5da] bg-white py-1 pl-2.5 pr-7 text-[10px] text-[#3b453d] outline-none focus:border-[#526d43] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#dce7d9]">
+              {categories.map((category) => <option key={category}>{category}</option>)}
+            </select>
+            <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+          </span>
+        </label>
       </div>
 
-      {/* Dropdown filters */}
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-[#58645b] dark:text-[#849480]">
-        <span className="mr-1 text-[11px] font-medium text-[#58645b] dark:text-[#849480]">
-          Filter by:
-        </span>
-
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded-full border border-[#dfe5da] bg-white px-2 py-0.5 text-[10px] font-medium text-[#3b453d] hover:bg-[#f3f6ef] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#8c9c89] dark:hover:bg-[#1b2819]"
-        >
-          <span>Level</span>
-          <ChevronDown size={11} className="text-[#58645b] dark:text-[#849480]" />
-        </button>
-
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded-full border border-[#dfe5da] bg-white px-2 py-0.5 text-[10px] font-medium text-[#3b453d] hover:bg-[#f3f6ef] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#8c9c89] dark:hover:bg-[#1b2819]"
-        >
-          <span>Duration</span>
-          <ChevronDown size={11} className="text-[#58645b] dark:text-[#849480]" />
-        </button>
-
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded-full border border-[#dfe5da] bg-white px-2 py-0.5 text-[10px] font-medium text-[#3b453d] hover:bg-[#f3f6ef] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#8c9c89] dark:hover:bg-[#1b2819]"
-        >
-          <span>Sort: Popular</span>
-          <ChevronDown size={11} className="text-[#58645b] dark:text-[#849480]" />
-        </button>
-      </div>
-
-      {/* ========================================================= */}
-      {/* 3 CARDS PER ROW GRID (lg:grid-cols-3)                     */}
-      {/* ========================================================= */}
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {filteredCourses.map((course) => (
-          <article
-            key={course.id}
-            className="flex flex-col justify-between overflow-hidden rounded-lg border border-[#dfe5da] bg-white shadow-[0_2px_10px_rgba(26,36,25,0.03)] dark:border-[#212f1f] dark:bg-[#141d13] dark:shadow-none transition-all hover:shadow-md"
-          >
-            <div>
-              {/* Image banner */}
-              <div className="relative aspect-[2.1/1] w-full overflow-hidden bg-slate-900">
-                <Image
-                  src={course.image}
-                  alt={course.title}
-                  fill
-                  className="object-cover"
-                />
-
-                {/* Top left badge */}
-                <span
-                  className={`absolute left-2.5 top-2.5 rounded-full ${course.badgeBg} px-2.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-white shadow-sm`}
-                >
-                  {course.badge}
-                </span>
-
-                {/* Top right enrolled badge */}
-                {course.enrolled && (
-                  <span className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-[#22c55e] px-2 py-0.5 text-[8.5px] font-bold text-white shadow-sm">
-                    <Check size={10} strokeWidth={3} />
-                    <span>Enrolled</span>
-                  </span>
-                )}
+      {loading ? <p className="mt-6 text-[11px] text-[#687463] dark:text-[#a6aea0]">Loading courses from your account…</p> : filteredCourses.length ? (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredCourses.map((course) => {
+            const status = course.enrollmentStatus;
+            const isTaking = status === "ENROLLED" || status === "COMPLETED";
+            const isPending = status === "PENDING";
+            return <article key={course.id} className="flex min-h-[190px] flex-col rounded-lg border border-[#dfe5da] bg-white p-3.5 dark:border-[#212f1f] dark:bg-[#141d13]">
+              <div className="relative -mx-3.5 -mt-3.5 mb-3 h-28 overflow-hidden rounded-t-lg bg-[#e8eee3] dark:bg-[#263521]">
+                {course.banner_image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={course.banner_image} alt={`${course.title} course banner`} loading="lazy" className="h-full w-full object-cover" />
+                ) : <div className="grid h-full place-items-center text-[#718064] dark:text-[#a8be97]"><BookOpen size={28} aria-hidden="true" /></div>}
+                <span className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white">{course.subject || "Course"}</span>
               </div>
-
-              {/* Card Body */}
-              <div className="space-y-2 p-2.5 pb-3">
-                {/* Code Tag & Icon */}
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={`flex h-5 w-5 items-center justify-center rounded ${course.iconBg} ${course.iconColor}`}
-                  >
-                    {renderIcon(course.iconType)}
-                  </span>
-                  <span className={`text-[9.5px] font-bold tracking-wider ${course.codeColor}`}>
-                    {course.codeTag}
-                  </span>
+              <div className="flex items-start gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded bg-[#edf4e8] text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]"><BookOpen size={15} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[8px] font-bold uppercase tracking-wide text-[#718064] dark:text-[#a8be97]">{course.subject || "Course"}</p>
+                  <h2 className="mt-1 text-[12px] font-semibold leading-snug text-[#1b2219] dark:text-[#f0f4ee]">{course.title}</h2>
                 </div>
-
-                {/* Title */}
-                <h2 className="text-[12px] font-semibold leading-snug text-[#1b2219] dark:text-[#f0f4ee]">
-                  {course.title}
-                </h2>
-
-                {/* Subtitle */}
-                <p className="line-clamp-2 text-[10px] leading-[1.4] text-[#58645b] dark:text-[#91a08e]">
-                  {course.subtitle}
-                </p>
-
-                {/* Instructor & Lessons */}
-                <div className="flex items-center justify-between gap-2 pt-0.5 text-[10px] text-[#566257] dark:text-[#889885]">
-                  <span>{course.instructor}</span>
-                  <span>{course.lessons} lessons</span>
-                </div>
-
-                {/* Level & Progress */}
-                {course.enrolled && course.progress !== undefined ? (
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${course.levelBg} ${course.levelColor}`}
-                      >
-                        {course.level}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold ${course.progressTextColor || "text-[#61705c]"}`}
-                      >
-                        {course.progress}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[#edf1ea] dark:bg-[#1e2d1d]">
-                      <div
-                        className={`h-full rounded-full ${course.progressColor || "bg-[#3a5a39]"}`}
-                        style={{ width: `${course.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pt-1">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${course.levelBg} ${course.levelColor}`}
-                    >
-                      {course.level}
-                    </span>
-                  </div>
-                )}
+                {status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
               </div>
-            </div>
-
-            {/* Bottom Button */}
-            <div className="p-2.5 pt-0">
-              {course.enrolled ? (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-[#dfe5da] bg-white py-1.5 text-[10px] font-medium text-[#1b2219] transition hover:border-[#1b2d1a] hover:bg-[#f3f6ef] dark:border-[#273724] dark:bg-[#182317] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]"
-                >
-                  <span>View course</span>
-                  <span aria-hidden="true">→</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={enrollingId === course.id}
-                  onClick={async () => {
-                    if (!window.localStorage.getItem("konnect-access-token")) {
-                      setApiNotice("Log in to enroll in a class.");
-                      return;
-                    }
-                    setEnrollingId(course.id);
-                    setApiNotice("");
-                    try {
-                      await apiJson(await enrollInClass(course.id));
-                      setCourses((current) => current.map((item) => item.id === course.id ? { ...item, enrolled: true } : item));
-                    } catch (error) {
-                      setApiNotice(error instanceof Error ? error.message : "Could not enroll in this class.");
-                    } finally {
-                      setEnrollingId(null);
-                    }
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-[#1b2d1a] py-1.5 text-[10px] font-semibold text-white shadow-sm transition hover:bg-[#111e10] dark:bg-[#273d23] dark:hover:bg-[#304d2b]"
-                >
-                  <span>{enrollingId === course.id ? "Enrolling…" : "Enroll course"}</span>
-                  <span aria-hidden="true">→</span>
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
+              <p className="mt-3 line-clamp-3 flex-1 text-[10px] leading-relaxed text-[#58645b] dark:text-[#a6aea0]">{course.description || "No course description has been added yet."}</p>
+              <p className="mt-3 text-[9px] text-[#687463] dark:text-[#9aa592]">{course.teacher_name || "Instructor not listed"}</p>
+              {isTaking ? <Link href="/learner/dashboard" className="mt-3 flex min-h-9 items-center justify-center rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#1b2219] hover:bg-[#f3f6ef] dark:border-[#273724] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]">Open learner dashboard</Link> : isPending ? <button type="button" disabled className="mt-3 min-h-9 rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:text-[#9aa592]">Enrollment pending</button> : <button type="button" disabled={enrollingId === course.id} onClick={() => void enroll(course.id)} className="mt-3 min-h-9 rounded-md bg-[#1b2d1a] text-[10px] font-semibold text-white hover:bg-[#111e10] disabled:cursor-wait disabled:opacity-60 dark:bg-[#273d23]">{enrollingId === course.id ? "Enrolling…" : "Take this course"}</button>}
+            </article>;
+          })}
++        </div>
+  ) : <div className="mt-4 rounded-lg border border-dashed border-[#d5ddce] px-4 py-10 text-center dark:border-[#303b2d]">
++        <p className="text-[11px] font-semibold text-[#33412e] dark:text-[#e1e8dc]">{courses.length ? "No courses match these filters." : "No courses are available for your account yet."}</p>
++        {!courses.length && <p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Courses will appear here when they are published to the API.</p>}
++      </div>}
++    </div>
   );
 }

@@ -1,6 +1,10 @@
-const defaultApiBaseUrl = "https://konnect-virtual-classroom.onrender.com";
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 
-export const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || defaultApiBaseUrl).replace(/\/+$/, "");
+if (!configuredApiBaseUrl) {
+  throw new Error("NEXT_PUBLIC_API_URL must be set in the environment.");
+}
+
+export const apiBaseUrl = configuredApiBaseUrl.replace(/\/+$/, "");
 
 type ApiRequestOptions = RequestInit & { auth?: boolean };
 

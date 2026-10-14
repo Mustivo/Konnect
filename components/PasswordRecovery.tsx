@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
+import { z } from "zod";
+
+const recoveryEmailSchema = z.string().trim().email("Enter a valid email address.");
 
 type PasswordRecoveryProps = {
   mode: "forgot" | "reset-success";
@@ -14,9 +17,13 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setNotice(
-      "Password reset email delivery is not connected yet. Connect an authentication provider to send reset links.",
-    );
+    const formData = new FormData(event.currentTarget);
+    const result = recoveryEmailSchema.safeParse(formData.get("email"));
+    if (!result.success) {
+      setNotice(result.error.issues[0]?.message ?? "Enter a valid email address.");
+      return;
+    }
+    setNotice("No email was sent. The connected API does not currently provide a password reset or OTP endpoint. Please contact support for help.");
   };
 
   return (
@@ -37,16 +44,16 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
             </Link>
           </div>
           <p className="text-[0.58rem] font-bold uppercase tracking-[0.17em] text-[#687c50] dark:text-[#a8bd8c]">
-            All set
+            Password help
           </p>
           <h1 className="mx-auto mt-2 max-w-[430px] text-[1.8rem] font-semibold leading-tight tracking-[-0.055em] sm:text-[2rem]">
-            Your password has been reset.
+            Password recovery is not available yet.
           </h1>
           <div className="mx-auto mt-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#eaf0e5] text-[#42653a] dark:bg-[#263d21] dark:text-[#c5d6bc]">
-            <Check size={19} />
+            <Info size={19} />
           </div>
           <p className="mt-4 text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-            You can now use your new password to return to Konnect and continue learning.
+            No password was changed. The connected API does not yet support reset emails or OTP verification.
           </p>
           <Link
             href="/login"
@@ -83,7 +90,7 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
             We’ll help you get back in.
           </h1>
           <p className="mt-3 max-w-[390px] text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-            Enter the email linked to your Konnect account. If we find a match, we’ll send a secure reset link that expires in 30 minutes.
+            Enter the email linked to your Konnect account. Password recovery is not available through the connected service yet.
           </p>
           <form onSubmit={handleSubmit} className="mt-5">
             <label className="block text-[0.65rem] font-medium" htmlFor="recovery-email">
@@ -102,10 +109,10 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
               type="submit"
               className="mt-3 min-h-11 w-full rounded bg-[#263d21] px-4 text-xs font-semibold text-white transition hover:bg-[#344f2c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43]"
             >
-              Send reset link
+              Check recovery options
             </button>
           </form>
-          <p aria-live="polite" className="mt-3 min-h-8 text-center text-[0.62rem] leading-4 text-[#526d43] dark:text-[#b7cc9d]">
+          <p role="status" aria-live="polite" className="mt-3 min-h-8 text-center text-[0.62rem] leading-4 text-[#526d43] dark:text-[#b7cc9d]">
             {notice}
           </p>
           <p className="mt-1 text-center text-[0.65rem]">
