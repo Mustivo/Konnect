@@ -132,9 +132,9 @@ export default function LearnerDashboardPage() {
           </div>
 
           {/* Donut and Legend */}
-          <div className="my-2 flex items-center justify-between gap-3">
+          <div className="my-2 flex items-center justify-between gap-2 xl:gap-3">
             {/* Circular Gauge */}
-            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center xl:h-24 xl:w-24">
               <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
                 {/* Background ring */}
                 <circle
@@ -629,14 +629,14 @@ export default function LearnerDashboardPage() {
           {/* REMINDER 1: Django */}
           <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2 xl:flex-nowrap xl:items-center xl:gap-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
                   <span className="rounded-full border border-[#d2e3ca] bg-[#edf4e8] px-2 py-0.5 text-[9px] font-bold text-[#2c5222]">
                     DJANGO
                   </span>
                   <span className="text-[11px] text-[#6e7b69]">Daniel Brooks</span>
                 </div>
-                <span className="rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#2c6e21]">
+                <span className="max-w-full rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium leading-tight text-[#2c6e21] xl:whitespace-nowrap">
                   Next live lesson
                 </span>
               </div>
@@ -646,8 +646,8 @@ export default function LearnerDashboardPage() {
               </h3>
             </div>
 
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 xl:gap-0">
+              <span className="min-w-0 text-[11px] text-[#6e7b69]">
                 Wed, 7 Oct · 10:00–11:30 BST
               </span>
               <button
@@ -662,14 +662,14 @@ export default function LearnerDashboardPage() {
           {/* REMINDER 2: Mathematics */}
           <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2 xl:flex-nowrap xl:items-center xl:gap-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
                   <span className="rounded-full border border-[#ebdcc7] bg-[#fbf7f0] px-2 py-0.5 text-[9px] font-bold text-[#715428]">
                     MATHEMATICS
                   </span>
                   <span className="text-[11px] text-[#6e7b69]">Dr. Elena Ruiz</span>
                 </div>
-                <span className="rounded-full border border-[#fcd9ad] bg-[#fef4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#b45309]">
+                <span className="max-w-full rounded-full border border-[#fcd9ad] bg-[#fef4e6] px-2.5 py-0.5 text-[9.5px] font-medium leading-tight text-[#b45309] xl:whitespace-nowrap">
                   Assignment deadline
                 </span>
               </div>
@@ -679,8 +679,8 @@ export default function LearnerDashboardPage() {
               </h3>
             </div>
 
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 xl:gap-0">
+              <span className="min-w-0 text-[11px] text-[#6e7b69]">
                 Thu, 8 Oct · 18:00 BST
               </span>
               <button
@@ -695,14 +695,14 @@ export default function LearnerDashboardPage() {
           {/* REMINDER 3: UI/UX Design */}
           <div className="flex flex-col justify-between rounded-2xl border border-[#e5e9df] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2 xl:flex-nowrap xl:items-center xl:gap-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
                   <span className="rounded-full border border-[#d2e4dd] bg-[#f1f6f4] px-2 py-0.5 text-[9px] font-bold text-[#2c5b4d]">
                     UI/UX DESIGN
                   </span>
                   <span className="text-[11px] text-[#6e7b69]">Amara Okafor</span>
                 </div>
-                <span className="rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium text-[#2c6e21]">
+                <span className="max-w-full rounded-full border border-[#c6e4bf] bg-[#eaf4e6] px-2.5 py-0.5 text-[9.5px] font-medium leading-tight text-[#2c6e21] xl:whitespace-nowrap">
                   Available now
                 </span>
               </div>
@@ -712,8 +712,8 @@ export default function LearnerDashboardPage() {
               </h3>
             </div>
 
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-[11px] text-[#6e7b69]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 xl:gap-0">
+              <span className="min-w-0 text-[11px] text-[#6e7b69]">
                 Closes 6 Oct · 17:30 BST
               </span>
               <button

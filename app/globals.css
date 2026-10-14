@@ -177,6 +177,12 @@ html[data-theme="dark"] .learner-page select {
   font-size: 0.96rem;
 }
 
+@media (max-width: 767px) {
+  .learner-page {
+    height: 100dvh;
+  }
+}
+
 html:has(.learner-page),
 body:has(.learner-page) {
   overflow: hidden;
@@ -226,22 +232,22 @@ body:has(.learner-page) {
   background: transparent;
 }
 
-.learner-page [class*="text-[6px]"],
-.learner-page [class*="text-[6.5px]"],
-.learner-page [class*="text-[7px]"],
-.learner-page [class*="text-[7.5px]"],
-.learner-page [class*="text-[8px]"],
-.learner-page [class*="text-[8.5px]"] { font-size: 12px !important; }
-.learner-page [class*="text-[9px]"],
-.learner-page [class*="text-[9.5px]"] { font-size: 12px !important; }
-.learner-page [class*="text-[10px]"] { font-size: 14px !important; }
-.learner-page [class*="text-[11px]"] { font-size: 13px !important; }
-.learner-page [class*="text-[12px]"] { font-size: 14px !important; }
-.learner-page [class*="text-[13px]"] { font-size: 15px !important; }
-.learner-page [class*="text-[14px]"] { font-size: 16px !important; }
-.learner-page [class*="text-[15px]"] { font-size: 17px !important; }
-.learner-page [class*="text-[17px]"] { font-size: 19px !important; }
-.learner-page [class*="text-[26px]"] { font-size: 22px !important; }
+.learner-page:not(.teacher-page) [class*="text-[6px]"],
+.learner-page:not(.teacher-page) [class*="text-[6.5px]"],
+.learner-page:not(.teacher-page) [class*="text-[7px]"],
+.learner-page:not(.teacher-page) [class*="text-[7.5px]"],
+.learner-page:not(.teacher-page) [class*="text-[8px]"],
+.learner-page:not(.teacher-page) [class*="text-[8.5px]"] { font-size: 12px !important; }
+.learner-page:not(.teacher-page) [class*="text-[9px]"],
+.learner-page:not(.teacher-page) [class*="text-[9.5px]"] { font-size: 12px !important; }
+.learner-page:not(.teacher-page) [class*="text-[10px]"] { font-size: 14px !important; }
+.learner-page:not(.teacher-page) [class*="text-[11px]"] { font-size: 13px !important; }
+.learner-page:not(.teacher-page) [class*="text-[12px]"] { font-size: 14px !important; }
+.learner-page:not(.teacher-page) [class*="text-[13px]"] { font-size: 15px !important; }
+.learner-page:not(.teacher-page) [class*="text-[14px]"] { font-size: 16px !important; }
+.learner-page:not(.teacher-page) [class*="text-[15px]"] { font-size: 17px !important; }
+.learner-page:not(.teacher-page) [class*="text-[17px]"] { font-size: 19px !important; }
+.learner-page:not(.teacher-page) [class*="text-[26px]"] { font-size: 22px !important; }
 
 .learner-live-class-room [class*="text-[6px]"],
 .learner-live-class-room [class*="text-[6.5px]"],

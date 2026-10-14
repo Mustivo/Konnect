@@ -62,7 +62,7 @@ export default function AttendancePage() {
       </div>
 
       {/* Stat cards */}
-      <div className="mt-[15px] grid grid-cols-4 gap-4">
+      <div className="mt-[15px] grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <div className="rounded-[10px] bg-[#283821] p-[15px] text-white">
           <div className="flex h-4 items-center justify-between">
             <p className="text-[11px] text-white/85">Overall attendance</p>
@@ -115,8 +115,8 @@ export default function AttendancePage() {
       </div>
 
       {/* By class + legend */}
-      <div className="mt-4 grid grid-cols-[1fr_350px] items-start gap-5">
-        <section className="rounded-[10px] border border-[#edefea] bg-white px-[15px] pb-[10px] pt-4">
+      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_350px] xl:gap-5">
+        <section className="min-w-0 rounded-[10px] border border-[#edefea] bg-white px-[15px] pb-[10px] pt-4">
           <h2 className="text-[15px] font-semibold leading-5 text-gray-900">
             Attendance by class
           </h2>
@@ -128,12 +128,12 @@ export default function AttendancePage() {
             {classes.map((c) => (
               <div
                 key={c.name}
-                className="grid h-[26px] grid-cols-[113px_357px_64px_1fr] items-center"
+                className="grid h-[26px] grid-cols-[minmax(68px,0.8fr)_minmax(40px,1fr)_auto_auto] items-center gap-x-1.5 sm:grid-cols-[minmax(90px,1fr)_minmax(75px,1.5fr)_64px_1fr] sm:gap-x-0 xl:grid-cols-[113px_357px_64px_1fr]"
               >
                 <span className="text-[11px] font-semibold text-gray-900">
                   {c.name}
                 </span>
-                <div className="h-[5px] rounded-full bg-[#f2f3ed]">
+                <div className="h-[5px] w-full rounded-full bg-[#f2f3ed]">
                   <div
                     className="h-[5px] rounded-full"
                     style={{
@@ -142,10 +142,10 @@ export default function AttendancePage() {
                     }}
                   />
                 </div>
-                <span className="pl-3 text-[10px] text-gray-500">
+                <span className="pl-1 text-[10px] text-gray-500 sm:pl-3">
                   {c.attended} / {c.total}
                 </span>
-                <span className="pl-3 text-[11px] font-semibold text-gray-900">
+                <span className="pl-1 text-[10px] font-semibold text-gray-900 sm:pl-3 sm:text-[11px]">
                   {pct(c.attended, c.total)}
                 </span>
               </div>
@@ -153,7 +153,7 @@ export default function AttendancePage() {
           </div>
         </section>
 
-        <section className="rounded-[10px] border border-[#dfe4d9] bg-[#eaf0e3] px-[15px] pb-3 pt-4">
+        <section className="min-w-0 rounded-[10px] border border-[#dfe4d9] bg-[#eaf0e3] px-[15px] pb-3 pt-4">
           <h2 className="text-[15px] font-semibold leading-5 text-gray-900">
             Understanding your record
           </h2>
@@ -181,17 +181,17 @@ export default function AttendancePage() {
       </div>
 
       {/* Session history */}
-      <section className="mt-4 rounded-[10px] border border-[#edefea] bg-white p-[15px]">
-        <div className="flex items-center justify-between">
+      <section className="mt-4 min-w-0 rounded-[10px] border border-[#edefea] bg-white p-[15px]">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <h2 className="text-[15px] font-semibold text-gray-900">
             Session history
           </h2>
 
-          <div className="flex items-center gap-[7px]">
+          <div className="grid grid-cols-2 gap-[7px] min-[480px]:flex min-[480px]:flex-wrap md:flex-nowrap">
             {["All classes", "1 Sep–6 Oct 2026", "All statuses"].map((f) => (
               <button
                 key={f}
-                className="flex h-7 items-center gap-3 rounded-md border border-[#dfe4d9] bg-white px-3 text-[10px] font-medium text-gray-800"
+                className="flex min-w-0 items-center justify-between gap-1 rounded-md border border-[#dfe4d9] bg-white px-2 text-[9px] font-medium text-gray-800 sm:gap-3 sm:px-3 sm:text-[10px]"
               >
                 {f}
                 <ChevronDown size={12} className="text-gray-700" />
@@ -200,7 +200,7 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        <div className="mt-[11px]">
+        <div className="mt-[11px] hidden xl:block">
           {/* Header */}
           <div className="grid h-[25px] grid-cols-[102px_464px_122px_122px_1fr] items-center rounded-[3px] bg-[#f2f3ed] px-2.5 pl-2.5 text-[8.5px] font-medium uppercase tracking-wide text-gray-600">
             <span>Date</span>
@@ -244,9 +244,30 @@ export default function AttendancePage() {
           ))}
         </div>
 
+        <div className="mt-[11px] space-y-2 xl:hidden">
+          {sessions.map((s) => (
+            <article
+              key={s.date + s.lesson}
+              className="rounded-md border border-[#f0f2ec] bg-white p-3 first:bg-[#eaf0e3]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[9px] text-gray-500">{s.date} · {s.time} BST</p>
+                  <h3 className="mt-1 text-[11px] font-semibold leading-snug text-gray-900">{s.lesson}</h3>
+                  <p className="mt-1 text-[9px] text-gray-500">{s.course}</p>
+                </div>
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[8px] font-medium ${pill[s.status]}`}>
+                  {s.status}
+                </span>
+              </div>
+              <p className="mt-2 border-t border-[#f0f2ec] pt-2 text-[9px] text-gray-600">{s.detail}</p>
+            </article>
+          ))}
+        </div>
+
         {/* Footer */}
-        <div className="mt-3 flex items-center justify-between px-0">
-          <p className="text-[9px] text-gray-500">
+        <div className="mt-3 flex flex-col gap-2 px-0 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[9px] leading-relaxed text-gray-500">
             Showing 7 recent sessions of 25 · Updated after today&apos;s session
           </p>
           <button className="flex items-center gap-1 text-[9.5px] font-semibold text-gray-900">

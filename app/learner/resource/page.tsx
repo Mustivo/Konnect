@@ -105,7 +105,7 @@ export default function LearnerResourcesPage() {
           </button>
         </section>
 
-        <nav aria-label="Filter resources by course" className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+        <nav aria-label="Filter resources by course" className="mt-3 flex flex-wrap gap-1.5 pb-1">
           {["All enrolled courses", ...courses.map((course) => course.name)].map((name) => {
             const course = courses.find((entry) => entry.name === name);
             const active = courseFilter === name;
@@ -119,7 +119,7 @@ export default function LearnerResourcesPage() {
           ))}
         </div>
 
-        <section className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_285px]" aria-label="Course resources">
+        <section className="mt-3 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_285px]" aria-label="Course resources">
           <div className="min-w-0">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <label className="relative min-w-0 flex-1">
@@ -145,8 +145,8 @@ export default function LearnerResourcesPage() {
               <p className="text-[9px] text-[#858c80]">{groups.length} enrolled courses · {linkCount} links</p>
             </div>
 
-            {groups.length ? <div className="mt-2 grid gap-2.5 md:grid-cols-2">
-              {groups.map((course) => <section key={course.name} className="rounded-lg border border-[#e0e5dd] bg-white p-2.5">
+            {groups.length ? <div className="mt-2 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2.5 md:grid-cols-2">
+              {groups.map((course) => <section key={course.name} className="min-w-0 rounded-lg border border-[#e0e5dd] bg-white p-2.5">
                 <header className="mb-2 flex items-start justify-between gap-2">
                   <div><h3 className="text-[11px] font-bold leading-tight">{course.name}</h3><p className="mt-0.5 text-[8px] text-[#838a80]">{course.teacher} · {course.className}</p></div>
                   <span className="shrink-0 rounded-full bg-[#edf2e8] px-2 py-1 text-[8px] font-semibold text-[#657854]">{course.items.length} {course.items.length === 1 ? "item" : "links"}</span>
@@ -167,11 +167,11 @@ export default function LearnerResourcesPage() {
             <p className="mt-2 text-[8px] text-[#8b9287]">Showing {tab === "Saved" ? "saved resources" : tab.toLowerCase()} across {groups.length} enrolled courses.</p>
           </div>
 
-          <aside className="self-start rounded-lg border border-[#e0e5dd] bg-white p-3" aria-label="Resource preview">
+          <aside className="min-w-0 self-start rounded-lg border border-[#e0e5dd] bg-white p-3" aria-label="Resource preview">
             <div className="flex items-center justify-between"><p className="text-[8px] font-bold uppercase tracking-[0.04em] text-[#6e7d60]">Resource preview</p><Link2 size={13} className="text-[#647a55]" /></div>
             {selected ? <>
-              <div className="mt-2 rounded-md bg-[#f1f3ec] p-3"><p className="flex items-center gap-1.5 text-[8px] font-bold uppercase text-[#6e7e60]"><span className="grid size-4 place-items-center rounded-full bg-[#e3eadd]"><KindIcon kind={selected.kind} size={11} /></span>{selected.course} resource {selected.kind === "link" ? "library" : selected.kind}</p><h2 className="mt-2 text-[17px] font-bold leading-[1.08]">{selected.id === "figma-intro" ? "Better systems. More consistent design." : selected.title}</h2></div>
-              <h3 className="mt-3 text-[13px] font-bold leading-tight">{selected.title}</h3>
+              <div className="mt-2 rounded-md bg-[#f1f3ec] p-3"><p className="flex items-center gap-1.5 text-[8px] font-bold uppercase text-[#6e7e60]"><span className="grid size-4 place-items-center rounded-full bg-[#e3eadd]"><KindIcon kind={selected.kind} size={11} /></span>{selected.course} resource {selected.kind === "link" ? "library" : selected.kind}</p><h2 className="mt-2 break-words text-[17px] font-bold leading-[1.08]">{selected.id === "figma-intro" ? "Better systems. More consistent design." : selected.title}</h2></div>
+              <h3 className="mt-3 break-words text-[13px] font-bold leading-tight">{selected.title}</h3>
               <p className="mt-1 text-[9px] text-[#758070]">{selected.course} · {courses.find((course) => course.name === selected.course)?.className}</p>
               <a href={selected.url} target="_blank" rel="noreferrer" className="mt-1 block truncate text-[8px] text-[#7d8c70] underline decoration-[#cad3c2] underline-offset-2">{selected.source}</a>
               <div className="my-3 border-t border-[#edf0e9]" />

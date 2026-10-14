@@ -73,18 +73,18 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Settings", href: "/teacher/dashboard#settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
-export default function DashSidebar({ role = "learner" }: { role?: DashboardRole }) {
+export default function DashSidebar({ role = "learner", onNavigate }: { role?: DashboardRole; onNavigate?: () => void }) {
   const pathname = usePathname();
   const isTeacher = role === "teacher";
   const menuItems = isTeacher ? teacherMenuItems : learnerMenuItems;
-  const [tasksOpen, setTasksOpen] = useState(() => pathname.startsWith("/learner/tasks") || isTeacher);
+  const [tasksOpen, setTasksOpen] = useState(() => !isTeacher && pathname.startsWith("/learner/tasks"));
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
   const profile = isTeacher
     ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
     : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
 
   return (
-    <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-l-[14px] bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
+    <aside className="flex h-full w-[min(252px,85vw)] flex-col overflow-hidden rounded-l-[14px] bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors md:w-[252px]">
       <div className="h-[92px] shrink-0 pl-[64px] pt-[28px]">
         <Image
           src="/konnect-wordmark.png"
@@ -119,6 +119,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                     <button
                       type="button"
                       onClick={() => setTasksOpen((open) => !open)}
+                      aria-expanded={tasksOpen}
                       className="ml-1 flex h-10 w-[calc(100%-0.25rem)] items-center rounded-l-lg px-[18px] text-[#596052] transition-colors hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
                       style={{ marginTop: item.marginTop }}
                     >
@@ -144,7 +145,10 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                                 key={subItem.name}
                                 href={subItem.href}
                                 aria-current={isSubItemActive ? "page" : undefined}
-                                onClick={() => setActiveLink({ name: subItem.name, href: subItem.href })}
+                                onClick={() => {
+                                  setActiveLink({ name: subItem.name, href: subItem.href });
+                                  onNavigate?.();
+                                }}
                                 className={`flex h-8 items-center rounded-l-lg px-2 transition-colors ${isSubItemActive
                                   ? "bg-[#f2f3ed] font-bold text-[#40522c] dark:bg-[#111510] dark:text-[#e4efe0]"
                                   : "text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
@@ -166,7 +170,10 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                 key={item.name}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => setActiveLink({ name: item.name, href: normalizedHref })}
+                onClick={() => {
+                  setActiveLink({ name: item.name, href: normalizedHref });
+                  onNavigate?.();
+                }}
                 style={{
                   marginTop: item.marginTop,
                   paddingLeft: item.left - 4,

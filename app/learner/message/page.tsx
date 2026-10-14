@@ -137,13 +137,13 @@ export default function LearnerMessagesPage() {
 
   return (
     <div>
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto min-w-0 max-w-[1320px]">
         <header className="mb-4">
           <h1 className="mt-1 text-[26px] font-bold leading-none">Messages</h1>
         </header>
 
-        <section className="grid h-[min(690px,calc(100dvh-180px))] min-h-0 min-w-0 overflow-hidden rounded-lg border border-[#e0e5dd] bg-white md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
-          <aside className="flex min-h-0 flex-col border-b border-[#e7eae4] md:border-b-0 md:border-r">
+        <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-visible rounded-lg border border-[#e0e5dd] bg-white md:h-[min(690px,calc(100dvh-180px))] md:overflow-hidden md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
+          <aside className="flex min-h-[220px] min-w-0 flex-col border-b border-[#e7eae4] md:min-h-0 md:border-b-0 md:border-r">
             <div className="p-3 pb-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-bold">Conversations</h2>
@@ -160,7 +160,7 @@ export default function LearnerMessagesPage() {
               </div>
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto" aria-label="Conversations">
+            <nav className="max-h-40 min-h-0 flex-1 overflow-y-auto md:max-h-none" aria-label="Conversations">
               {visiblePeople.map((person) => {
                 const active = person.id === activeId;
                 return <button key={person.id} type="button" onClick={() => openConversation(person)} aria-current={active ? "true" : undefined} className={`w-full border-b border-[#edf0e9] px-3 py-3 text-left transition ${active ? "bg-[#eaf0e4]" : "bg-white hover:bg-[#f6f7f3]"}`}>
@@ -183,7 +183,7 @@ export default function LearnerMessagesPage() {
 
           </aside>
 
-          <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Conversation with ${activePerson.name}`}>
+          <section className="flex min-h-[460px] min-w-0 flex-col md:min-h-0" aria-label={`Conversation with ${activePerson.name}`}>
             <header className="flex min-h-[53px] items-center justify-between gap-2 border-b border-[#e7eae4] px-3 py-2.5 sm:px-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar person={activePerson} />
@@ -212,7 +212,7 @@ export default function LearnerMessagesPage() {
                       <ArrowDownToLine size={13} className="shrink-0 text-[#718064]" />
                     </div>}
                     {message.link && <a href={message.link.url} target="_blank" rel="noreferrer" className="mt-2 block rounded-md border border-[#e4e8df] bg-white p-2 hover:border-[#b8c4ad]">
-                      <span className="flex items-center gap-1.5 text-[8px] font-bold"><Link2 size={11} className="text-[#6c805e]" />{message.link.title}<ArrowUpRight size={10} /></span>
+                      <span className="flex items-center gap-1.5 text-[8px] font-bold"><Link2 size={11} className="shrink-0 text-[#6c805e]" /><span className="min-w-0 break-words">{message.link.title}</span><ArrowUpRight size={10} className="shrink-0" /></span>
                       <span className="mt-1 block truncate text-[7px] text-[#73816a]">{message.link.url}</span>
                       <span className="mt-1 block text-[7px] text-[#8a9187]">{message.link.site}</span>
                     </a>}
