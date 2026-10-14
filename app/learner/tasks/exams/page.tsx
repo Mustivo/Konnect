@@ -190,7 +190,7 @@ export default function ExamsPage() {
                   <Clock3 size={10} /> {exam.duration}
                 </span>
                 <span className="justify-self-start rounded-full bg-[#f1f3ed] px-2 py-1 text-[6px] font-semibold text-[#687260] dark:bg-[#252c22] dark:text-[#b2bcae] sm:justify-self-end">
-                  Not available yet
+                  Not available
                 </span>
               </article>
             ))}

@@ -9,7 +9,6 @@ import {
   Check,
   FileText,
   Link2,
-  MessageSquare,
   MoreHorizontal,
   Paperclip,
   Search,
@@ -140,12 +139,10 @@ export default function LearnerMessagesPage() {
     <div>
       <div className="mx-auto max-w-[1320px]">
         <header className="mb-4">
-          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#63774f]">Your learning space</p>
           <h1 className="mt-1 text-[26px] font-bold leading-none">Messages</h1>
-          <p className="mt-2 text-xs text-[#72796f]">Keep the conversation going with your instructors.</p>
         </header>
 
-        <section className="grid min-h-[min(690px,calc(100vh-150px))] overflow-hidden rounded-lg border border-[#e0e5dd] bg-white md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
+        <section className="grid h-[min(690px,calc(100dvh-180px))] min-h-0 min-w-0 overflow-hidden rounded-lg border border-[#e0e5dd] bg-white md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
           <aside className="flex min-h-0 flex-col border-b border-[#e7eae4] md:border-b-0 md:border-r">
             <div className="p-3 pb-2">
               <div className="flex items-center justify-between">
@@ -184,13 +181,9 @@ export default function LearnerMessagesPage() {
               {!visiblePeople.length && <p className="px-3 py-8 text-center text-[9px] text-[#7d8579]">No conversations found.</p>}
             </nav>
 
-            <div className="hidden border-t border-[#edf0e9] p-3 md:block">
-              <div className="flex items-center gap-2 text-[#66785b]"><MessageSquare size={15} /><p className="text-[8px] font-bold">A little clarity goes a long way.</p></div>
-              <p className="mt-1.5 pl-5 text-[8px] leading-[1.5] text-[#7d8579]">Mention the lesson or assignment when asking a question, so your instructor has the right context.</p>
-            </div>
           </aside>
 
-          <section className="flex min-h-[560px] min-w-0 flex-col" aria-label={`Conversation with ${activePerson.name}`}>
+          <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Conversation with ${activePerson.name}`}>
             <header className="flex min-h-[53px] items-center justify-between gap-2 border-b border-[#e7eae4] px-3 py-2.5 sm:px-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar person={activePerson} />
@@ -205,7 +198,7 @@ export default function LearnerMessagesPage() {
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-3 py-3 sm:px-4">
+            <div className="message-history-scroll min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-3 py-3 sm:px-4">
               <p className="text-center text-[8px] text-[#8a9187]">Today · Tuesday, 6 October 2026</p>
               {activeMessages.map((message) => {
                 const own = message.sender === "learner";
@@ -230,18 +223,20 @@ export default function LearnerMessagesPage() {
 
             <form onSubmit={sendMessage} className="border-t border-[#e7eae4] bg-white px-3 py-2.5 sm:px-4">
               {attachment && <div className="mb-2 flex items-center gap-2 rounded-md bg-[#f2f5ef] px-2 py-1.5 text-[8px] text-[#53664a]"><FileText size={12} /><span className="min-w-0 flex-1 truncate">{attachment.name}</span><button type="button" aria-label="Remove attachment" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }} className="grid size-5 place-items-center rounded hover:bg-white"><X size={12} /></button></div>}
-              <label htmlFor="message-draft" className="sr-only">Write a message to {activePerson.name}</label>
-              <textarea id="message-draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Write a message to ${activePerson.name.split(" ")[0]}...`} rows={2} className="block min-h-[42px] w-full resize-y rounded-md border border-[#e0e5dc] bg-white px-2.5 py-2 text-[9px] outline-none placeholder:text-[#a2aaa0] focus:border-[#829576] focus:ring-2 focus:ring-[#dce6d5]" />
-              <div className="mt-1.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1">
-                  <input ref={fileInput} type="file" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
-                  <button type="button" aria-label="Attach a file" onClick={() => fileInput.current?.click()} className="grid size-7 place-items-center rounded-md text-[#68785d] hover:bg-[#f2f5ef]"><Paperclip size={15} /></button>
-                  <button type="button" aria-label="Add an emoji" onClick={() => setDraft((current) => `${current}${current ? " " : ""}🙂`)} className="grid size-7 place-items-center rounded-md text-[#68785d] hover:bg-[#f2f5ef]"><Smile size={15} /></button>
-                  <span className="hidden items-center gap-1 pl-1 text-[7px] text-[#858c80] sm:inline-flex"><BookOpen size={11} /> Attach a file or share a useful link</span>
+              <div className="rounded-lg border border-[#e0e5dc] bg-white px-2.5 py-2 focus-within:border-[#829576] focus-within:ring-2 focus-within:ring-[#dce6d5]">
+                <label htmlFor="message-draft" className="sr-only">Write a message to {activePerson.name}</label>
+                <textarea id="message-draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Write a message to ${activePerson.name.split(" ")[0]}...`} rows={2} className="block min-h-[42px] w-full resize-y bg-transparent text-[9px] outline-none placeholder:text-[#a2aaa0]" />
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-[#edf0e9] pt-1.5">
+                  <div className="flex min-w-0 items-center gap-1">
+                    <input ref={fileInput} type="file" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+                    <button type="button" aria-label="Attach a file" onClick={() => fileInput.current?.click()} className="grid size-7 shrink-0 place-items-center rounded-md text-[#68785d] hover:bg-[#f2f5ef]"><Paperclip size={15} /></button>
+                    <button type="button" aria-label="Add an emoji" onClick={() => setDraft((current) => `${current}${current ? " " : ""}🙂`)} className="grid size-7 shrink-0 place-items-center rounded-md text-[#68785d] hover:bg-[#f2f5ef]"><Smile size={15} /></button>
+                    <span className="hidden items-center gap-1 pl-1 text-[7px] text-[#858c80] xl:inline-flex"><BookOpen size={11} /> Attach a file or share a useful link</span>
+                  </div>
+                  <button type="submit" disabled={!draft.trim() && !attachment} className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#293e27] px-3 py-2 text-[8px] font-semibold text-white transition hover:bg-[#385235] disabled:cursor-not-allowed disabled:opacity-45">Send message <Send size={11} /></button>
                 </div>
-                <button type="submit" disabled={!draft.trim() && !attachment} className="inline-flex items-center gap-1.5 rounded-md bg-[#293e27] px-3 py-2 text-[8px] font-semibold text-white transition hover:bg-[#385235] disabled:cursor-not-allowed disabled:opacity-45">Send message <Send size={11} /></button>
+                <p className="mt-1 text-center text-[7px] text-[#91978e]">All message times are shown in BST.</p>
               </div>
-              <p className="mt-1.5 text-center text-[7px] text-[#91978e]">All message times are shown in BST.</p>
             </form>
           </section>
         </section>

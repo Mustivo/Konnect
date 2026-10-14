@@ -5,6 +5,14 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 
 function LearnerThemeInitializer() {
   useEffect(() => {
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    root.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const main = document.querySelector<HTMLElement>(".learner-main-scroll");
+    if (main) main.scrollTop = 0;
+
     const savedTheme = window.localStorage.getItem("konnect-theme");
     const shouldUseLight = savedTheme !== "dark";
 
@@ -15,6 +23,10 @@ function LearnerThemeInitializer() {
     if (!savedTheme) {
       window.localStorage.setItem("konnect-theme", "light");
     }
+
+    return () => {
+      root.style.scrollBehavior = previousScrollBehavior;
+    };
   }, []);
 
   return null;

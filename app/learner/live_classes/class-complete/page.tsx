@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -31,6 +31,10 @@ export default function ClassCompletePage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [savedMaterials, setSavedMaterials] = useState<string[]>([]);
   const [recordingOpen, setRecordingOpen] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.removeItem("konnect-live-class-admitted:uiux");
+  }, []);
 
   function toggleTopic(topic: string) {
     setSelectedTopics((topics) => topics.includes(topic)

@@ -216,8 +216,9 @@ function getCalendarDates(year: number, month: number) {
 }
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 9, 1));
-  const [selectedDate, setSelectedDate] = useState("2026-9-6");
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`);
   const [view, setView] = useState<"Month" | "Week">("Month");
   const [taskExpanded, setTaskExpanded] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -248,6 +249,7 @@ export default function CalendarPage() {
     month: "long",
     year: "numeric",
   });
+  const todayLabel = today.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 
   const selectedHeading = new Date(
     selectedYear,
@@ -264,8 +266,9 @@ export default function CalendarPage() {
   }
 
   function goToday() {
-    setCurrentDate(new Date(2026, 9, 1));
-    setSelectedDate("2026-9-6");
+    const now = new Date();
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(`${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`);
   }
 
   function selectDay(day: number, monthIndex: number, dateYear: number) {
@@ -329,7 +332,7 @@ export default function CalendarPage() {
               className="flex h-[30px] items-center gap-1.5 rounded-md border border-[#e0e4db] bg-white px-3 text-[9px] font-semibold text-[#4b5b3d] transition-colors hover:bg-[#e9f0e2]"
             >
               <CalendarDays size={12} />
-              Today · 6 October
+              Today · {todayLabel}
             </button>
           </section>
 

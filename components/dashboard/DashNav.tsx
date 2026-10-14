@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Search, Bell, CalendarDays } from "lucide-react";
 
 export default function DashNav() {
@@ -40,13 +41,17 @@ export default function DashNav() {
           <span>{currentDate}</span>
         </button>
 
-        <button type="button" aria-label="Notifications, 2 unread" title="2 unread notifications" className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f7f2] dark:border-[#212f1f] dark:bg-[#141d13] dark:hover:bg-[#1b2819]">
+        <Link href="/learner/settings?section=notifications" onClick={() => {
+          if (window.location.pathname === "/learner/settings") {
+            window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "notifications" }));
+          }
+        }} aria-label="Notifications, 2 unread" title="2 unread notifications" className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f7f2] dark:border-[#212f1f] dark:bg-[#141d13] dark:hover:bg-[#1b2819]">
           <Bell size={15} className="text-[#40522c] dark:text-[#b4e3a8]" />
 
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#f2f3ed] bg-[#e5484d] px-1 text-[8px] font-bold leading-none text-white dark:border-[#111510]">
             2
           </span>
-        </button>
+        </Link>
 
       </div>
     </header>

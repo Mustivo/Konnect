@@ -56,8 +56,11 @@ function getCalendarCells(month: Date) {
 
 export default function LiveClassesPage() {
   const router = useRouter();
-  const [calendarMonth, setCalendarMonth] = useState(new Date(2026, 9, 1));
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 9, 6));
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [joinedLesson, setJoinedLesson] = useState<string | null>(null);
   const [joinLessonId, setJoinLessonId] = useState<string | null>(null);
   const [checkedItems, setCheckedItems] = useState(["topic", "notes", "question", "room"]);
@@ -342,7 +345,7 @@ export default function LiveClassesPage() {
                   onClick={() => {
                     setJoinedLesson(joinLesson.id);
                     setJoinLessonId(null);
-                    router.push("/learner/live_classes/liveClass");
+                    router.push(`/learner/live_classes/waiting-room?session=${joinLesson.id}`);
                   }}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#263d21] px-3 text-[9px] font-semibold text-white hover:bg-[#1c3019]"
                 >

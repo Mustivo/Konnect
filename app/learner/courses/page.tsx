@@ -360,7 +360,7 @@ export default function LearnerCoursesPage() {
           >
             <div>
               {/* Image banner */}
-              <div className="relative h-[64px] w-full overflow-hidden bg-slate-900">
+              <div className="relative aspect-[2.1/1] w-full overflow-hidden bg-slate-900">
                 <Image
                   src={course.image}
                   alt={course.title}

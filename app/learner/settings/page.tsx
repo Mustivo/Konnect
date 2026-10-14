@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 type NoticeKey = "invitations" | "lessons" | "assignments" | "exams" | "messages";
+type SettingsSection = "profile" | "notifications" | "appearance" | "account";
 type NoticePreference = { inApp: boolean; email: boolean };
 type Settings = {
   displayName: string;
@@ -53,6 +54,12 @@ const notificationRows: { key: NoticeKey; title: string; description: string }[]
 
 const timezones = ["Europe/London", "Europe/Paris", "America/New_York", "America/Los_Angeles", "Africa/Lagos", "Asia/Kolkata"];
 const languages = ["English", "French", "Spanish", "German"];
+const settingSections = [
+  { id: "profile", label: "Profile", icon: UserRound },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "appearance", label: "Appearance & Language", icon: Globe2 },
+  { id: "account", label: "Account", icon: Shield },
+] as const;
 
 function freshDefaults(): Settings {
   return {
@@ -85,11 +92,43 @@ function initials(name: string) {
 export default function LearnerSettingsPage() {
   const [settings, setSettings] = useState<Settings>(freshDefaults);
   const [saved, setSaved] = useState(false);
+  const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const photoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSettings(readSettings());
+
+    function setSectionFromUrl(section: string | null) {
+      if (settingSections.some((item) => item.id === section)) {
+        setActiveSection(section as SettingsSection);
+      }
+    }
+
+    function handleSectionRequest(event: Event) {
+      const section = (event as CustomEvent<SettingsSection>).detail;
+      setSectionFromUrl(section);
+    }
+
+    function handleHistoryChange() {
+      setSectionFromUrl(new URLSearchParams(window.location.search).get("section"));
+    }
+
+    handleHistoryChange();
+    window.addEventListener("konnect-settings-section", handleSectionRequest);
+    window.addEventListener("popstate", handleHistoryChange);
+    return () => {
+      window.removeEventListener("konnect-settings-section", handleSectionRequest);
+      window.removeEventListener("popstate", handleHistoryChange);
+    };
   }, []);
+
+  function selectSection(section: SettingsSection) {
+    setActiveSection(section);
+    const url = new URL(window.location.href);
+    if (section === "profile") url.searchParams.delete("section");
+    else url.searchParams.set("section", section);
+    window.history.replaceState(window.history.state, "", url);
+  }
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSaved(false);
@@ -148,32 +187,66 @@ export default function LearnerSettingsPage() {
           <p className="mt-2 text-xs text-[#72796f] dark:text-[#a6aea0]">Make your learning space feel like yours. Manage your details and preferences.</p>
         </header>
 
-        <nav aria-label="Settings sections" className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-          <a href="#profile" className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#293e27] px-2.5 py-1.5 text-[9px] font-semibold text-white">Profile <UserRound size={12} /></a>
-          <a href="#notifications" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#e2e6dd] bg-white px-2.5 py-1.5 text-[9px] font-semibold text-[#64705e] hover:border-[#a8b59d] dark:border-white/10 dark:bg-[#1b211a] dark:text-[#d6dfd0]">Notifications <Bell size={12} /></a>
-          <a href="#appearance" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#e2e6dd] bg-white px-2.5 py-1.5 text-[9px] font-semibold text-[#64705e] hover:border-[#a8b59d] dark:border-white/10 dark:bg-[#1b211a] dark:text-[#d6dfd0]">Appearance &amp; Language <Globe2 size={12} /></a>
-          <a href="#account" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#e2e6dd] bg-white px-2.5 py-1.5 text-[9px] font-semibold text-[#64705e] hover:border-[#a8b59d] dark:border-white/10 dark:bg-[#1b211a] dark:text-[#d6dfd0]">Account <Shield size={12} /></a>
+        <nav aria-label="Settings sections" className="mt-3 flex gap-1.5 overflow-x-auto pb-1" role="tablist">
+          {settingSections.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              id={`settings-tab-${id}`}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === id}
+              aria-controls={id}
+              onClick={() => selectSection(id)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[9px] font-semibold transition ${activeSection === id
+                ? "border-[#293e27] bg-[#293e27] text-white"
+                : "border-[#e2e6dd] bg-white text-[#64705e] hover:border-[#a8b59d] dark:border-white/10 dark:bg-[#1b211a] dark:text-[#d6dfd0]"
+              }`}
+            >
+              {label} <Icon size={12} />
+            </button>
+          ))}
         </nav>
 
-        <div className="mt-3 grid items-start gap-3 xl:grid-cols-2">
-          <div className="space-y-3">
-            <section id="profile" className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
+        <div className="mt-3">
+          <div className="contents">
+            <section id="profile" role="tabpanel" aria-labelledby="settings-tab-profile" hidden={activeSection !== "profile"} className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
               <h2 className="text-[11px] font-bold">Your profile</h2>
-              <p className="mt-1 text-[8px] text-[#858c80] dark:text-[#a6aea0]">These details help your instructors recognise you in class.</p>
+              <p className="mt-1 text-[8px] text-[#858c80] dark:text-[#a6aea0]">The learner information instructors see in class.</p>
               <div className="mt-3 flex items-center gap-2.5">
+                <div role="img" aria-label={`${settings.displayName || "Learner"} profile photo`} className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-[#eaf0e4] text-sm font-bold text-[#617555] ring-1 ring-[#e2e9dc] dark:bg-[#303b2c] dark:text-[#d5e3cb]">
+                  {settings.photo ? <span aria-hidden="true" className="size-full bg-cover bg-center" style={{ backgroundImage: `url(${settings.photo})` }} /> : initials(settings.displayName)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold">{settings.displayName || "Your name"}</p>
+                  <p className="mt-0.5 truncate text-[8px] text-[#858c80] dark:text-[#a6aea0]">{settings.email}</p>
+                </div>
+                <button type="button" onClick={() => selectSection("account")} className="shrink-0 rounded-md border border-[#e0e5dc] px-2.5 py-1.5 text-[8px] font-semibold text-[#596d4e] hover:bg-[#f2f5ef] dark:border-white/10 dark:text-[#d5e3cb] dark:hover:bg-[#252d23]">Edit account details</button>
+              </div>
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                <div><p className="text-[8px] font-semibold">Timezone</p><p className="mt-0.5 text-[9px] text-[#596d4e] dark:text-[#d5e3cb]">{settings.timezone}</p></div>
+                <div><p className="text-[8px] font-semibold">Language</p><p className="mt-0.5 text-[9px] text-[#596d4e] dark:text-[#d5e3cb]">{settings.language}</p></div>
+              </div>
+              <div className="mt-2.5 border-t border-[#edf0e9] pt-2.5 dark:border-white/10">
+                <p className="text-[8px] font-semibold">About me</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-[#737b70] dark:text-[#a6aea0]">{settings.about || "No profile description added yet."}</p>
+              </div>
+            </section>
+
+            <section id="account" role="tabpanel" aria-labelledby="settings-tab-account" hidden={activeSection !== "account"} className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
+              <div className="flex items-center justify-between"><h2 className="text-[11px] font-bold">Account &amp; security</h2><Shield size={13} className="text-[#718064]" /></div>
+              <h3 className="mt-2.5 text-[9px] font-bold">Learner information</h3>
+              <div className="mt-2 flex items-center gap-2.5">
                 <button type="button" onClick={() => photoInput.current?.click()} aria-label="Change profile photo" className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-[#eaf0e4] text-sm font-bold text-[#617555] ring-1 ring-[#e2e9dc] dark:bg-[#303b2c] dark:text-[#d5e3cb]">
                   {settings.photo ? <span className="size-full bg-cover bg-center" style={{ backgroundImage: `url(${settings.photo})` }} /> : initials(settings.displayName)}
                 </button>
                 <input ref={photoInput} type="file" accept="image/*" onChange={changePhoto} className="sr-only" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-bold">{settings.displayName || "Your name"}</p>
-                  <p className="mt-0.5 text-[8px] text-[#858c80] dark:text-[#a6aea0]">Learner · 4 enrolled courses</p>
+                  <p className="truncate text-[10px] font-bold">{settings.displayName || "Your name"}</p>
+                  <p className="mt-0.5 text-[8px] text-[#858c80] dark:text-[#a6aea0]">Profile photo · JPG, PNG or WebP</p>
                 </div>
                 <button type="button" onClick={() => photoInput.current?.click()} className="shrink-0 rounded-md border border-[#e0e5dc] px-2.5 py-1.5 text-[8px] font-semibold text-[#596d4e] hover:bg-[#f2f5ef] dark:border-white/10 dark:text-[#d5e3cb] dark:hover:bg-[#252d23]">Change photo</button>
               </div>
-
-              <div className="my-3 border-t border-[#edf0e9] dark:border-white/10" />
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
                 <label className="block text-[8px] font-semibold">Display name
                   <input value={settings.displayName} onChange={(event) => update("displayName", event.target.value)} className="mt-1 block h-[31px] w-full rounded-md border border-[#e0e5dc] bg-white px-2 text-[9px] font-normal outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
                 </label>
@@ -195,10 +268,8 @@ export default function LearnerSettingsPage() {
                 <textarea value={settings.about} onChange={(event) => update("about", event.target.value)} rows={2} className="mt-1 block min-h-[42px] w-full resize-y rounded-md border border-[#e0e5dc] bg-white px-2 py-1.5 text-[9px] font-normal leading-[1.4] outline-none focus:border-[#829576] dark:border-white/10 dark:bg-[#151a14] dark:text-[#edf1e9]" />
               </label>
               <p className="mt-2 text-[7px] text-[#899085] dark:text-[#929a8d]">Lesson times follow your timezone. {settings.timezone} currently uses BST.</p>
-            </section>
-
-            <section id="account" className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
-              <div className="flex items-center justify-between"><h2 className="text-[11px] font-bold">Account &amp; security</h2><Shield size={13} className="text-[#718064]" /></div>
+              <div className="my-3 border-t border-[#edf0e9] dark:border-white/10" />
+              <h3 className="text-[9px] font-bold">Security</h3>
               <div className="mt-2.5 flex items-center justify-between gap-3">
                 <div><p className="text-[9px] font-bold">Password</p><p className="mt-0.5 text-[8px] text-[#858c80] dark:text-[#a6aea0]">Choose a strong password for your account.</p></div>
                 <Link href="/forgot-password" className="shrink-0 rounded-md border border-[#e0e5dc] px-2.5 py-1.5 text-[8px] font-semibold text-[#596d4e] hover:bg-[#f2f5ef] dark:border-white/10 dark:text-[#d5e3cb] dark:hover:bg-[#252d23]">Change password</Link>
@@ -211,8 +282,8 @@ export default function LearnerSettingsPage() {
             </section>
           </div>
 
-          <div className="space-y-3">
-            <section id="notifications" className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
+          <div className="contents">
+            <section id="notifications" role="tabpanel" aria-labelledby="settings-tab-notifications" hidden={activeSection !== "notifications"} className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
               <h2 className="text-[11px] font-bold">Notifications</h2>
               <p className="mt-1 text-[8px] text-[#858c80] dark:text-[#a6aea0]">Choose what you hear about and where you receive it.</p>
               <div className="mt-3 grid grid-cols-[minmax(0,1fr)_42px_42px] items-center gap-2 border-b border-[#edf0e9] pb-1.5 text-[7px] font-bold uppercase text-[#858c80] dark:border-white/10 dark:text-[#a6aea0]">
@@ -230,7 +301,7 @@ export default function LearnerSettingsPage() {
               <p className="mt-2 text-[7px] text-[#899085] dark:text-[#929a8d]">Lesson reminders arrive 15 minutes before the scheduled start.</p>
             </section>
 
-            <section id="appearance" className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
+            <section id="appearance" role="tabpanel" aria-labelledby="settings-tab-appearance" hidden={activeSection !== "appearance"} className="scroll-mt-4 rounded-lg border border-[#e0e5dd] bg-white p-3.5 dark:border-white/10 dark:bg-[#1b211a]">
               <h2 className="text-[11px] font-bold">Appearance &amp; language</h2>
               <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div><p className="text-[8px] font-bold">Theme</p><p className="mt-0.5 text-[7px] text-[#858c80] dark:text-[#a6aea0]">Choose your portal appearance.</p></div>

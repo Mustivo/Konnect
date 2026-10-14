@@ -71,6 +71,9 @@ export default function ExamStartPage() {
   const [cameraMinimized, setCameraMinimized] = useState(false);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [examSubmitted, setExamSubmitted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState("");
+  const [tabSwitchDetected, setTabSwitchDetected] = useState(false);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const micContextRef = useRef<AudioContext | null>(null);
   const micAnalyserRef = useRef<AnalyserNode | null>(null);
@@ -86,6 +89,23 @@ export default function ExamStartPage() {
     }
     setStream(activeStream);
   }, [router]);
+
+  useEffect(() => {
+    const updateFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const detectTabSwitch = () => {
+      if (document.visibilityState === "hidden" && !examSubmitted) {
+        setTabSwitchDetected(true);
+      }
+    };
+
+    updateFullscreen();
+    document.addEventListener("fullscreenchange", updateFullscreen);
+    document.addEventListener("visibilitychange", detectTabSwitch);
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreen);
+      document.removeEventListener("visibilitychange", detectTabSwitch);
+    };
+  }, [examSubmitted]);
 
   useEffect(() => {
     if (cameraRef.current) cameraRef.current.srcObject = stream;
@@ -161,6 +181,21 @@ export default function ExamStartPage() {
     releaseExamMediaStream();
     setStream(null);
     setSubmitDialogOpen(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  }
+
+  async function enterFullscreen() {
+    if (!document.fullscreenEnabled) {
+      setFullscreenError("Fullscreen is not available in this browser.");
+      return;
+    }
+
+    try {
+      await document.documentElement.requestFullscreen();
+      setFullscreenError("");
+    } catch {
+      setFullscreenError("Fullscreen was blocked. Select the button again to retry.");
+    }
   }
 
   const page = (
@@ -185,8 +220,18 @@ export default function ExamStartPage() {
       </header>
 
       <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-[#e0e5dc] px-4 sm:px-7">
-        <span className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c]"><Maximize size={11} /> Full-screen exam <span className="font-normal normal-case text-[#7d8579]">· In progress</span></span>
-        <span className="hidden text-[9px] text-[#788172] sm:inline">6 October 2026 · 16:00–17:30 BST · 90 minutes · Teacher: Amara Okafor</span>
+        {isFullscreen ? (
+          <span className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c]"><Maximize size={11} /> Full-screen exam <span className="font-normal normal-case text-[#7d8579]">· In progress</span></span>
+        ) : (
+          <div className="flex min-w-0 items-center gap-2">
+            <button type="button" onClick={enterFullscreen} className="inline-flex shrink-0 items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c] hover:text-[#263d21]"><Maximize size={11} /> Enter fullscreen</button>
+            {fullscreenError && <span role="status" className="truncate text-[8px] text-[#907a53]">{fullscreenError}</span>}
+          </div>
+        )}
+        <div className="flex min-w-0 items-center justify-end gap-3">
+          {tabSwitchDetected && <span role="status" className="hidden text-[8px] font-semibold text-[#907a53] sm:inline">Exam tab switch detected</span>}
+          <span className="hidden text-[9px] text-[#788172] sm:inline">6 October 2026 · 16:00–17:30 BST · 90 minutes · Teacher: Amara Okafor</span>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-3 sm:px-7 sm:pt-5">

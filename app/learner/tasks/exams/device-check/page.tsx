@@ -295,7 +295,13 @@ export default function ExamDeviceCheckPage() {
         <Link href="/learner/tasks/exams/rules" className="inline-flex h-9 items-center gap-2 rounded-md border border-[#dfe5da] px-3 text-[11px] font-semibold text-[#43503d] hover:bg-[#f5f7f2]"><ArrowLeft size={13} /> Back to rules</Link>
         <div className="flex items-center gap-3">
           <span className="hidden text-[10px] text-[#788172] sm:inline">Your timer has not started yet.</span>
-          <button type="button" disabled={!allChecksPassed} onClick={() => { preserveStreamOnRouteRef.current = true; router.push("/learner/tasks/exams/start"); }} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#263d21] px-4 text-[10px] font-semibold text-white hover:bg-[#1c3019] disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" disabled={!allChecksPassed} onClick={() => {
+            preserveStreamOnRouteRef.current = true;
+            if (document.fullscreenEnabled) {
+              void document.documentElement.requestFullscreen().catch(() => {});
+            }
+            router.push("/learner/tasks/exams/start");
+          }} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#263d21] px-4 text-[10px] font-semibold text-white hover:bg-[#1c3019] disabled:cursor-not-allowed disabled:opacity-40">
             Start exam <ArrowRight size={13} />
           </button>
         </div>

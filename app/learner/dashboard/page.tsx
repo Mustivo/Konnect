@@ -20,6 +20,13 @@ import {
 } from "lucide-react";
 
 export default function LearnerDashboardPage() {
+  const todayLabel = new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).toUpperCase();
+
   return (
     <div className="space-y-6 pt-3 pb-8">
       {/* ========================================================= */}
@@ -32,7 +39,7 @@ export default function LearnerDashboardPage() {
             Gabriella Igabe <span className="text-xl">👋</span>
           </h1>
           <p className="text-[9.5px] font-bold tracking-wider uppercase text-[#707c6c] mt-0.5">
-            TUESDAY, 6 OCTOBER 2026
+            {todayLabel}
           </p>
         </div>
       </header>
