@@ -46,7 +46,7 @@ export default function DashSidebar() {
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
   return (
-    <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-l-[14px] bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
+    <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-none bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
       <div className="h-[92px] shrink-0 pl-[64px] pt-[28px]">
         <Image
           src="/konnect-wordmark.png"

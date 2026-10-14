@@ -138,11 +138,11 @@ export default function LearnerMessagesPage() {
   return (
     <div>
       <div className="mx-auto max-w-[1320px]">
-        <header className="mb-4">
-          <h1 className="mt-1 text-[26px] font-bold leading-none">Messages</h1>
+        <header className="mb-2">
+          <h1 className="text-[26px] font-bold leading-none">Messages</h1>
         </header>
 
-        <section className="grid h-[min(690px,calc(100dvh-180px))] min-h-0 min-w-0 overflow-hidden rounded-lg border border-[#e0e5dd] bg-white md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
+        <section className="grid h-[min(690px,calc(100dvh-110px))] min-h-0 min-w-0 overflow-hidden rounded-lg border border-[#e0e5dd] bg-white md:grid-cols-[225px_minmax(0,1fr)]" aria-label="Messages">
           <aside className="flex min-h-0 flex-col border-b border-[#e7eae4] md:border-b-0 md:border-r">
             <div className="p-3 pb-2">
               <div className="flex items-center justify-between">
@@ -160,7 +160,7 @@ export default function LearnerMessagesPage() {
               </div>
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto" aria-label="Conversations">
+            <nav className="conversation-list-scroll min-h-0 flex-1 overflow-y-auto" aria-label="Conversations">
               {visiblePeople.map((person) => {
                 const active = person.id === activeId;
                 return <button key={person.id} type="button" onClick={() => openConversation(person)} aria-current={active ? "true" : undefined} className={`w-full border-b border-[#edf0e9] px-3 py-3 text-left transition ${active ? "bg-[#eaf0e4]" : "bg-white hover:bg-[#f6f7f3]"}`}>
@@ -184,7 +184,7 @@ export default function LearnerMessagesPage() {
           </aside>
 
           <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Conversation with ${activePerson.name}`}>
-            <header className="flex min-h-[53px] items-center justify-between gap-2 border-b border-[#e7eae4] px-3 py-2.5 sm:px-4">
+            <header className="flex min-h-[53px] shrink-0 items-center justify-between gap-2 border-b border-[#e7eae4] px-3 py-2.5 sm:px-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar person={activePerson} />
                 <div className="min-w-0"><h2 className="truncate text-[11px] font-bold">{activePerson.name}</h2><p className="mt-0.5 truncate text-[8px] text-[#7d8579]">{activePerson.course} · {coursesDescription(activePerson.course)} · Instructor</p></div>
@@ -221,11 +221,11 @@ export default function LearnerMessagesPage() {
               })}
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-[#e7eae4] bg-white px-3 py-2.5 sm:px-4">
+            <form onSubmit={sendMessage} className="shrink-0 border-t border-[#e7eae4] bg-white px-3 py-2.5 sm:px-4">
               {attachment && <div className="mb-2 flex items-center gap-2 rounded-md bg-[#f2f5ef] px-2 py-1.5 text-[8px] text-[#53664a]"><FileText size={12} /><span className="min-w-0 flex-1 truncate">{attachment.name}</span><button type="button" aria-label="Remove attachment" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }} className="grid size-5 place-items-center rounded hover:bg-white"><X size={12} /></button></div>}
               <div className="rounded-lg border border-[#e0e5dc] bg-white px-2.5 py-2 focus-within:border-[#829576] focus-within:ring-2 focus-within:ring-[#dce6d5]">
                 <label htmlFor="message-draft" className="sr-only">Write a message to {activePerson.name}</label>
-                <textarea id="message-draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Write a message to ${activePerson.name.split(" ")[0]}...`} rows={2} className="block min-h-[42px] w-full resize-y bg-transparent text-[9px] outline-none placeholder:text-[#a2aaa0]" />
+                <textarea id="message-draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Write a message to ${activePerson.name.split(" ")[0]}...`} rows={2} className="block min-h-[42px] w-full resize-none bg-transparent px-2 py-1 text-xs text-[#394136] outline-none placeholder:font-medium placeholder:text-[#52624b] placeholder:opacity-100" />
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-[#edf0e9] pt-1.5">
                   <div className="flex min-w-0 items-center gap-1">
                     <input ref={fileInput} type="file" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
