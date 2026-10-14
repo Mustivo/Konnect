@@ -83,7 +83,7 @@ export default function Navbar() {
           : "border-[#dfe5d8] bg-[#f5f3ee]/90"
       }`}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-5 py-4 lg:px-12">
+      <div className="flex w-full items-center justify-between gap-6 px-3 py-4 sm:px-4 lg:px-6">
         <Logo />
 
         {open && (

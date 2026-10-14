@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRef } from "react";
 import AccountStep from "./steps/AccountStep";
 import ProfileStep from "./steps/ProfileStep";
 import DocumentsStep from "./steps/DocumentsStep";
 import ReviewStep from "./steps/ReviewStep";
 import EmailVerification from "./screens/EmailVerification";
 import ApplicationStatus from "./screens/ApplicationStatus";
+import { apiErrorMessage, login, register, updateTeacherProfile } from "@/lib/api";
 
 type TeacherSignupProps = {
   role: "learner" | "teacher";
@@ -42,6 +44,82 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [verifiedAt, setVerifiedAt] = useState<Date | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const applicationForm = useRef<HTMLFormElement>(null);
+
+  function validateCurrentStep() {
+    const fieldset = applicationForm.current?.querySelector<HTMLFieldSetElement>("fieldset:not([hidden])");
+    if (!fieldset?.reportValidity()) return false;
+
+    if (step === 1 && applicationForm.current) {
+      const values = new FormData(applicationForm.current);
+      const password = String(values.get("password") ?? "");
+      const passwordConfirm = String(values.get("confirmPassword") ?? "");
+      if (password !== passwordConfirm) {
+        setNotice("Passwords do not match.");
+        return false;
+      }
+      setEmail(String(values.get("email") ?? "").trim());
+    }
+    setNotice("");
+    return true;
+  }
+
+  async function submitApplication() {
+    if (!validateCurrentStep() || !applicationForm.current) return;
+    const values = new FormData(applicationForm.current);
+    const emailAddress = String(values.get("email") ?? "").trim().toLowerCase();
+    const fullName = String(values.get("fullName") ?? "").trim();
+    const [firstName, ...lastNameParts] = fullName.split(/\s+/);
+    const password = String(values.get("password") ?? "");
+    const passwordConfirm = String(values.get("confirmPassword") ?? "");
+    let accountCreated = false;
+
+    setSubmitting(true);
+    setNotice("");
+    try {
+      await register({
+        email: emailAddress,
+        username: emailAddress.slice(0, 150),
+        first_name: firstName,
+        last_name: lastNameParts.join(" "),
+        phone_number: String(values.get("phone") ?? "").trim() || undefined,
+        password,
+        password_confirm: passwordConfirm,
+        role: "TEACHER",
+      });
+      accountCreated = true;
+
+      const tokens = await login(emailAddress, password);
+      localStorage.setItem("konnect-access-token", tokens.access);
+      localStorage.setItem("konnect-refresh-token", tokens.refresh);
+
+      const profile = new FormData();
+      profile.set("bio", String(values.get("bio") ?? ""));
+      profile.set("qualifications", [
+        String(values.get("headline") ?? ""),
+        String(values.get("experience") ?? ""),
+        String(values.get("educationLevel") ?? ""),
+        String(values.get("institution") ?? ""),
+        String(values.get("languages") ?? ""),
+        String(values.get("teachingMode") ?? ""),
+        String(values.get("availability") ?? ""),
+      ].filter(Boolean).join(" · "));
+      profile.set("expertise_subjects", String(values.get("subjects") ?? ""));
+      profile.set("verification_notes", `Legal name on documents: ${String(values.get("documentName") ?? "")}`);
+      const certificate = values.get("degree-certificate");
+      if (certificate instanceof File && certificate.size > 0) profile.set("verification_document", certificate);
+
+      await updateTeacherProfile(profile);
+      setVerifiedAt(new Date());
+      setStep(6);
+    } catch (error) {
+      const message = apiErrorMessage(error instanceof Error && "payload" in error ? error.payload : error, "Please review your details and try again.");
+      setNotice(accountCreated ? `Your account was created, but the teacher profile could not be submitted: ${message}` : message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (step === 5) {
     return (
@@ -102,40 +180,32 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
         {stepDescriptions[step]}
       </p>
 
-      <div className="mt-4">
+      <form ref={applicationForm} onSubmit={(event) => event.preventDefault()} className="mt-4">
         <AccountStep
           hidden={step !== 1}
           role={role}
           onRoleChange={onRoleChange}
           onEmailChange={setEmail}
-          onContinue={() => {
-            setStep(2);
-            setNotice("");
-          }}
+          onContinue={() => { if (validateCurrentStep()) setStep(2); }}
         />
         <ProfileStep
           hidden={step !== 2}
           onBack={() => setStep(1)}
-          onContinue={() => setStep(3)}
+          onContinue={() => { if (validateCurrentStep()) setStep(3); }}
         />
         <DocumentsStep
           hidden={step !== 3}
           onBack={() => setStep(2)}
-          onContinue={() => setStep(4)}
+          onContinue={() => { if (validateCurrentStep()) setStep(4); }}
         />
         <ReviewStep
           hidden={step !== 4}
           onEdit={setStep}
           onBack={() => setStep(3)}
-          onSubmit={() => {
-            setNotice("");
-            setStep(5);
-          }}
+          onSubmit={submitApplication}
         />
-      </div>
-      <p aria-live="polite" className="mt-2 min-h-4 text-center text-[0.58rem] text-[#526d43] dark:text-[#b7cc9d]">
-        {notice}
-      </p>
+      </form>
+      <p aria-live="polite" className="mt-2 min-h-4 text-center text-[0.58rem] text-[#526d43] dark:text-[#b7cc9d]">{submitting ? "Submitting your application…" : notice}</p>
       <p className="mt-2 text-center text-[0.62rem] text-[#70786d] dark:text-[#b0b8aa]">
         Already have an account? <Link href="/login" className="font-semibold text-[#263d21] dark:text-[#c5d6bc]">Log in</Link>
       </p>

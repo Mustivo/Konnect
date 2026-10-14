@@ -6,7 +6,7 @@ const avatars = ["ML", "RK", "SA"];
 export default function Hero() {
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(108deg,#f7f6ef_0%,#f2f3e9_55%,#566746_100%)] dark:bg-[linear-gradient(108deg,#070b05_0%,#111b0c_55%,#35451d_100%)]">
-      <div className="mx-auto grid min-h-[560px] max-w-[1440px] items-center gap-10 px-5 py-14 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 lg:py-2">
+      <div className="mx-auto grid min-h-[560px] w-full items-center gap-10 px-3 py-14 sm:px-4 lg:grid-cols-[1.05fr_0.95fr] lg:px-6 lg:py-2">
         <div className="relative z-10 max-w-[600px] pt-4 lg:pt-8">
           <p className="mb-5 flex items-center justify-center gap-2 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[#536b3c] lg:justify-start dark:text-[#bac5ad]">
             <span className="h-2 w-2 rounded-full bg-[#4c8d3d]" />

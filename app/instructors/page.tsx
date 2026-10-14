@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 
 type Teacher = {
@@ -284,7 +285,7 @@ export default function InstructionsPage() {
 
       {/* ================= CTA ================= */}
       <section
-        className="bg-[var(--cta-background)] px-[7%] py-12 transition-colors duration-300 lg:px-[5.5%] lg:py-12"
+        className="bg-[var(--cta-background)] px-3 py-12 transition-colors duration-300 sm:px-4 lg:px-6 lg:py-12"
       >
         {/* Top CTA */}
         <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-center">
@@ -343,15 +344,12 @@ export default function InstructionsPage() {
       {/* ================= FOOTER ================= */}
       <footer
         id="contact"
-        className="grid gap-10 bg-[#fffdf9] px-6 py-10 shadow-[inset_0_1px_0_rgba(72,88,69,0.08)] transition-colors duration-300 sm:grid-cols-2 lg:grid-cols-[2.2fr_1fr_1fr_1fr]"
+        className="grid gap-10 bg-[#fffdf9] px-3 py-10 shadow-[inset_0_1px_0_rgba(72,88,69,0.08)] transition-colors duration-300 sm:grid-cols-2 sm:px-4 lg:grid-cols-[2.2fr_1fr_1fr_1fr] lg:px-6"
       >
         {/* Brand */}
         <div className="sm:col-span-2 lg:col-span-1">
-          <a
-            href="/"
-            className="font-serif text-[28px] italic tracking-[-2px] text-[var(--foreground)]"
-          >
-            Konnect
+          <a href="/" aria-label="Konnect home" className="inline-flex w-fit">
+            <Image src="/konnect-wordmark.png" alt="Konnect" width={120} height={48} className="h-10 w-auto object-contain object-left" />
           </a>
 
           <p className="mt-5 max-w-[320px] text-[13px] leading-[1.8] text-[var(--muted)]">

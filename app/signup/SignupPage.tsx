@@ -50,7 +50,7 @@ export default function SignupPage() {
         </nav>
       </section>
 
-      <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-5 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-8 md:min-h-screen md:px-8 md:py-5">
+      <main className="flex min-h-[620px] flex-1 items-center justify-center bg-[#f8f7f1] px-3 py-8 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-4 md:min-h-screen md:px-5 md:py-5">
         <div className="w-full">
           <div className="mb-7 flex justify-center">
             <Link href="/" aria-label="Konnect home">

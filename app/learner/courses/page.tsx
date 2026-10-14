@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { apiJson, browseClasses, enrollInClass, getLearnerClasses } from "@/lib/api";
 import {
   Check,
   Code2,
@@ -36,6 +37,13 @@ interface Course {
   progressColor?: string;
   progressTextColor?: string;
   image: string;
+}
+
+type ApiClass = { id: string; title: string; description?: string; subject?: string; teacher_name?: string; enrolled_count?: string | number; max_students?: number };
+type ApiClassCollection = ApiClass[] | { results?: ApiClass[] };
+
+function listFromApi(value: ApiClassCollection) {
+  return Array.isArray(value) ? value : value.results ?? [];
 }
 
 const allCourses: Course[] = [
@@ -230,9 +238,56 @@ const categories = [
 export default function LearnerCoursesPage() {
   const [selectedStatus, setSelectedStatus] = useState("All Courses");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [courses, setCourses] = useState(allCourses);
+  const [enrollingId, setEnrollingId] = useState<string | null>(null);
+  const [apiNotice, setApiNotice] = useState("");
 
-  const filteredCourses = allCourses.filter((course) => {
-    if (selectedStatus === "Enrolled · 4" && !course.enrolled) return false;
+  useEffect(() => {
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    let cancelled = false;
+
+    async function loadCourses() {
+      try {
+        const [browseResponse, enrolledResponse] = await Promise.all([browseClasses(), getLearnerClasses()]);
+        const [browseData, enrolledData] = await Promise.all([
+          apiJson<ApiClassCollection>(browseResponse),
+          apiJson<ApiClassCollection>(enrolledResponse),
+        ]);
+        const enrolledClasses = listFromApi(enrolledData);
+        const enrolledIds = new Set(enrolledClasses.map((course) => course.id));
+        const apiClasses = [...listFromApi(browseData), ...enrolledClasses];
+        const uniqueClasses = [...new Map(apiClasses.map((course) => [course.id, course])).values()];
+
+        if (!cancelled && uniqueClasses.length) {
+          setCourses(uniqueClasses.map((course, index) => {
+            const category = course.subject || "Development";
+            const reference = allCourses.find((item) => item.category.toLowerCase() === category.toLowerCase()) ?? allCourses[index % allCourses.length];
+            return {
+              ...reference,
+              id: course.id,
+              title: course.title,
+              subtitle: course.description || reference.subtitle,
+              category,
+              codeTag: `${category.toUpperCase()} · CLASS`,
+              badge: category.toUpperCase(),
+              instructor: course.teacher_name || "Konnect instructor",
+              enrolled: enrolledIds.has(course.id),
+            };
+          }));
+        }
+      } catch {
+        if (!cancelled) setApiNotice("Live course data is temporarily unavailable. Showing the course preview.");
+      }
+    }
+
+    void loadCourses();
+    return () => { cancelled = true; };
+  }, []);
+
+  const enrolledCount = courses.filter((course) => course.enrolled).length;
+  const statusTabs = ["All Courses", `Enrolled · ${enrolledCount}`, "Completed · 0"];
+  const filteredCourses = courses.filter((course) => {
+    if (selectedStatus.startsWith("Enrolled") && !course.enrolled) return false;
     if (selectedStatus === "Completed · 0") return false;
 
     if (selectedCategory !== "All Categories" && course.category !== selectedCategory) {
@@ -275,6 +330,8 @@ export default function LearnerCoursesPage() {
           My Courses
         </h1>
       </div>
+
+      {apiNotice && <p role="status" className="mt-2 text-[9px] text-[#788173]">{apiNotice}</p>}
 
       {/* Status tabs */}
       <div className="mt-4 flex flex-wrap items-center gap-1.5">
@@ -461,9 +518,26 @@ export default function LearnerCoursesPage() {
               ) : (
                 <button
                   type="button"
+                  disabled={enrollingId === course.id}
+                  onClick={async () => {
+                    if (!window.localStorage.getItem("konnect-access-token")) {
+                      setApiNotice("Log in to enroll in a class.");
+                      return;
+                    }
+                    setEnrollingId(course.id);
+                    setApiNotice("");
+                    try {
+                      await apiJson(await enrollInClass(course.id));
+                      setCourses((current) => current.map((item) => item.id === course.id ? { ...item, enrolled: true } : item));
+                    } catch (error) {
+                      setApiNotice(error instanceof Error ? error.message : "Could not enroll in this class.");
+                    } finally {
+                      setEnrollingId(null);
+                    }
+                  }}
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-[#1b2d1a] py-1.5 text-[10px] font-semibold text-white shadow-sm transition hover:bg-[#111e10] dark:bg-[#273d23] dark:hover:bg-[#304d2b]"
                 >
-                  <span>Enroll course</span>
+                  <span>{enrollingId === course.id ? "Enrolling…" : "Enroll course"}</span>
                   <span aria-hidden="true">→</span>
                 </button>
               )}

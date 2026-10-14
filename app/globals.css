@@ -109,6 +109,14 @@ body {
     color 0.3s ease;
 }
 
+html:not(:has(.learner-page)) main .mx-auto[class~="max-w-6xl"],
+html:not(:has(.learner-page)) main .mx-auto[class~="max-w-[1400px]"],
+html:not(:has(.learner-page)) main .mx-auto[class~="max-w-[1440px]"] {
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(12px, 1.5vw, 24px);
+}
+
 .signup-page [class*="text-[0."] {
   font-size: 0.78rem !important;
   line-height: 1.4;

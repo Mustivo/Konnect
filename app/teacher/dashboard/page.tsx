@@ -1,4 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
 import {
   ArrowRight,
   BarChart2,
@@ -25,6 +29,9 @@ const classes = [
   { code: "ALG 201", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, time: "Tue, Thu (11:00 AM)" },
   { code: "GEOM 301", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, time: "Mon, Wed (02:00 PM)" },
 ];
+
+type ApiClassRoom = { id: string; title: string; subject?: string; enrolled_count?: string | number; max_students?: number; start_date?: string | null };
+type ApiAssessmentList = { results?: Array<{ id: string }> } | Array<{ id: string }>;
 
 const approvals = [
   { name: "Oliver James", meta: "G1 / Class - A - 5 mins ago" },
@@ -58,6 +65,58 @@ function Avatar({ name, index }: { name: string; index: number }) {
 }
 
 export default function TeacherDashboardPage() {
+  const [activeClasses, setActiveClasses] = useState(classes);
+  const [apiClassCount, setApiClassCount] = useState<number | null>(null);
+  const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
+  const [loadNotice, setLoadNotice] = useState("");
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    let cancelled = false;
+
+    async function loadTeacherClasses() {
+      try {
+        const response = await getTeacherClasses();
+        const payload = await apiJson<ApiClassRoom[] | { results?: ApiClassRoom[] }>(response);
+        const records = Array.isArray(payload) ? payload : payload.results ?? [];
+        const mapped = await Promise.all(records.map(async (classRoom, index) => {
+          let taskCount = 0;
+          try {
+            const assessments = await apiJson<ApiAssessmentList>(await getClassAssessments(classRoom.id));
+            taskCount = Array.isArray(assessments) ? assessments.length : assessments.results?.length ?? 0;
+          } catch {
+            taskCount = 0;
+          }
+          return {
+            code: (classRoom.subject || `CLASS ${index + 1}`).toUpperCase().slice(0, 12),
+            title: classRoom.title,
+            group: classRoom.subject || `Class ${index + 1}`,
+            students: Number(classRoom.enrolled_count) || 0,
+            tasks: taskCount,
+            time: classRoom.start_date ? `Starts ${new Date(classRoom.start_date).toLocaleDateString("en-GB")}` : "Schedule to be announced",
+          };
+        }));
+
+        if (!cancelled) {
+          setActiveClasses(mapped);
+          setApiClassCount(records.length);
+          setApiStudentCount(records.reduce((sum, item) => sum + (Number(item.enrolled_count) || 0), 0));
+        }
+      } catch {
+        if (!cancelled) setLoadNotice("Live class data is temporarily unavailable. Showing the dashboard preview.");
+      }
+    }
+
+    void loadTeacherClasses();
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleStats = stats.map((stat) => {
+    if (stat.label === "Active Classes" && apiClassCount !== null) return { ...stat, value: String(apiClassCount), note: `${apiClassCount}/3 class limit` };
+    if (stat.label === "Students" && apiStudentCount !== null) return { ...stat, value: String(apiStudentCount), note: "Across your classes" };
+    return stat;
+  });
+
   return (
     <DashboardShell role="teacher">
       <div className="space-y-5 pb-8 pt-1">
@@ -73,8 +132,10 @@ export default function TeacherDashboardPage() {
           </div>
         </header>
 
+        {loadNotice && <p role="status" className="text-[9px] text-[#7d8979]">{loadNotice}</p>}
+
         <section id="analytics" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map(({ label, value, note, icon: Icon, tone }) => (
+          {visibleStats.map(({ label, value, note, icon: Icon, tone }) => (
             <article key={label} className="rounded-xl border border-[#e2e7dd] bg-white p-3.5 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -168,7 +229,7 @@ export default function TeacherDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              {classes.map((item) => (
+              {activeClasses.map((item) => (
                 <article key={item.title} className="rounded-xl border border-[#e2e7dd] bg-white p-3.5 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
                   <div className="mb-2.5 flex items-center justify-between">
                     <span className="text-[9.5px] font-bold tracking-wider text-[#707c6c]">{item.code}</span>

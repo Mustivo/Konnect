@@ -26,7 +26,7 @@ import {
   left      = icon's left edge from the sidebar's left edge (px)
   marginTop = extra gap above the item (the screenshot's rhythm is uneven)
 */
-type DashboardRole = "learner" | "teacher";
+type DashboardRole = "learner" | "teacher" | "admin";
 type MenuItem = {
   name: string;
   href: string;
@@ -73,10 +73,21 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Settings", href: "/teacher/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
+const adminMenuItems: MenuItem[] = [
+  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
+  { name: "Teachers", href: "/admin/dashboard#teachers", icon: Users, left: 20, marginTop: 1, badge: "4" },
+  { name: "Learners", href: "/admin/dashboard#learners", icon: GraduationCap, left: 20, marginTop: 1, badge: "1,248" },
+  { name: "Classes", href: "/admin/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "62" },
+  { name: "Reports & Permissions", href: "/admin/dashboard#reports", icon: BarChart3, left: 20, marginTop: 1 },
+  { name: "Analytics", href: "/admin/dashboard#analytics", icon: BarChart3, left: 20, marginTop: 1 },
+  { name: "Settings", href: "/admin/dashboard#settings", icon: Settings, left: 20, marginTop: 1 },
+];
+
 export default function DashSidebar({ role = "learner" }: { role?: DashboardRole }) {
   const pathname = usePathname();
   const isTeacher = role === "teacher";
-  const menuItems = isTeacher ? teacherMenuItems : learnerMenuItems;
+  const isAdmin = role === "admin";
+  const menuItems = isAdmin ? adminMenuItems : isTeacher ? teacherMenuItems : learnerMenuItems;
   const [tasksOpen, setTasksOpen] = useState(false);
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
@@ -84,9 +95,11 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
     setTasksOpen(pathname.startsWith("/learner/tasks") || (isTeacher && ["/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)));
   }, [isTeacher, pathname]);
 
-  const profile = isTeacher
-    ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
-    : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
+  const profile = isAdmin
+    ? { initials: "AM", name: "Admin Manager", meta: "Platform admin" }
+    : isTeacher
+      ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
+      : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
 
   return (
     <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-none bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
@@ -110,15 +123,17 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
             const isNestedItemActive = item.nested?.some((subItem) => subItem.name === selectedLinkName) ?? false;
             const isActive = selectedLinkName
               ? selectedLinkName === item.name || isNestedItemActive
-              : isTeacher
-                ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
-                : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
-                (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
-                (item.name === "Live Classes" && pathname === "/learner/live_classes") ||
-                (item.name === "Attendance" && pathname === "/learner/attendance") ||
-                (item.name === "Resources" && pathname === "/learner/resource") ||
-                (item.name === "Messages" && pathname === "/learner/message") ||
-                (item.name === "Settings" && pathname === "/learner/settings");
+              : isAdmin
+                ? (item.name === "Dashboard" && pathname === "/admin/dashboard") || (item.name === "Teachers" && pathname === "/admin/dashboard") || (item.name === "Learners" && pathname === "/admin/dashboard") || (item.name === "Classes" && pathname === "/admin/dashboard") || (item.name === "Reports & Permissions" && pathname === "/admin/dashboard") || (item.name === "Analytics" && pathname === "/admin/dashboard") || (item.name === "Settings" && pathname === "/admin/dashboard")
+                : isTeacher
+                  ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
+                  : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
+                    (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
+                    (item.name === "Live Classes" && pathname === "/learner/live_classes") ||
+                    (item.name === "Attendance" && pathname === "/learner/attendance") ||
+                    (item.name === "Resources" && pathname === "/learner/resource") ||
+                    (item.name === "Messages" && pathname === "/learner/message") ||
+                    (item.name === "Settings" && pathname === "/learner/settings");
 
             if (item.nested) {
               return (

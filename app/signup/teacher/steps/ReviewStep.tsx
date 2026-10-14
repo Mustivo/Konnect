@@ -29,9 +29,9 @@ export default function ReviewStep({ hidden, onEdit, onBack, onSubmit }: ReviewS
       </section>
       <section className="space-y-2 rounded-lg bg-[#f0f1e9] p-3 text-[0.55rem]">
         <h3 className="font-semibold">Declarations</h3>
-        <label className="flex items-start gap-2"><input type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I confirm the information in this application is complete and accurate.</label>
-        <label className="flex items-start gap-2"><input type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I consent to identity and qualification verification for this application.</label>
-        <label className="flex items-start gap-2"><input type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I accept Konnect’s safeguarding standards and Instructor Code of Conduct.</label>
+        <label className="flex items-start gap-2"><input required type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I confirm the information in this application is complete and accurate.</label>
+        <label className="flex items-start gap-2"><input required type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I consent to identity and qualification verification for this application.</label>
+        <label className="flex items-start gap-2"><input required type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I accept Konnect’s safeguarding standards and Instructor Code of Conduct.</label>
       </section>
       <p className="rounded bg-[#edf2e8] px-3 py-2 text-[0.5rem] text-[#52644a]">
         After submission, verify your email to start review. You can’t teach or access teaching tools until an administrator approves your application.

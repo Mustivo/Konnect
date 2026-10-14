@@ -43,7 +43,7 @@ export default function ApplicationStatus({
     });
 
     return (
-      <div className="mx-auto w-full max-w-[390px] text-[#20271d]">
+      <div className="mx-auto w-full max-w-[480px] text-[#20271d]">
         <HelpLink />
         <p className="text-[0.48rem] font-bold uppercase tracking-[0.12em] text-[#526d43]">Application status</p>
         <h1 className="mt-1 text-[1.23rem] font-semibold leading-tight tracking-[-0.04em]">Your application is under review.</h1>
@@ -94,7 +94,7 @@ export default function ApplicationStatus({
 
   if (status === "rejected") {
     return (
-      <div className="mx-auto w-full max-w-[390px] text-[#20271d]">
+      <div className="mx-auto w-full max-w-[480px] text-[#20271d]">
         <HelpLink />
         <p className="text-[0.48rem] font-bold uppercase tracking-[0.12em] text-[#526d43]">Application status</p>
         <h1 className="mt-1 text-[1.23rem] font-semibold leading-tight tracking-[-0.04em]">
@@ -138,7 +138,7 @@ export default function ApplicationStatus({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[390px] text-[#20271d]">
+    <div className="mx-auto w-full max-w-[480px] text-[#20271d]">
       <HelpLink />
       <p className="text-[0.48rem] font-bold uppercase tracking-[0.12em] text-[#526d43]">Application approved</p>
       <h1 className="mt-1 text-[1.3rem] font-semibold leading-tight tracking-[-0.04em]">Welcome to Konnect.</h1>

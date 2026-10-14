@@ -42,7 +42,7 @@ export default function EmailVerification({
   };
 
   return (
-    <div className="mx-auto w-full max-w-[370px] text-[#20271d]">
+    <div className="mx-auto w-full max-w-[480px] text-[#20271d]">
       <div className="mb-5 flex justify-end">
         <a href="/help" className="inline-flex items-center gap-1.5 text-[0.55rem] font-medium text-[#586853] hover:text-[#263d21]">
           <CircleHelp aria-hidden="true" className="h-3 w-3" />

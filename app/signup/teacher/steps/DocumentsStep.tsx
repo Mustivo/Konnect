@@ -17,7 +17,7 @@ export default function DocumentsStep({ hidden, onBack, onContinue }: DocumentsS
     <fieldset hidden={hidden} className="space-y-3 border-0 p-0">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="block text-[0.65rem] font-medium">Legal name on documents
-          <input name="documentName" placeholder="Enter name as shown on your ID" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
+          <input required name="documentName" placeholder="Enter name as shown on your ID" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
           <span className="mt-1 block text-[0.5rem] font-normal text-[#84907a]">Must exactly match your government ID</span>
         </label>
         <p className="rounded bg-[#f0f1e9] p-3 text-[0.55rem] text-[#6c7469]">Before uploading, make sure all names and dates are readable and match your application.</p>
@@ -30,7 +30,7 @@ export default function DocumentsStep({ hidden, onBack, onContinue }: DocumentsS
           <label key={document.name} className="block rounded border border-dashed border-[#cbd5c1] bg-white p-3 text-[0.6rem] dark:border-white/15 dark:bg-white/5">
             <span className="font-semibold">{document.name}</span>
             <span className="mt-1 block text-[0.5rem] text-[#84907a]">{document.hint}</span>
-            <input type="file" name={document.name.toLowerCase().replaceAll(/[^a-z]+/g, "-")} accept={document.accept} className="mt-2 block w-full text-[0.55rem]" />
+            <input required={document.name === "Degree certificate"} type="file" name={document.name.toLowerCase().replaceAll(/[^a-z]+/g, "-")} accept={document.accept} className="mt-2 block w-full text-[0.55rem]" />
           </label>
         ))}
       </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import RoleSelector from "../RoleSelector";
+import { register } from "@/lib/api/auth";
 
 type LearnerSignupProps = {
   onRoleChange: (role: "learner" | "teacher") => void;
@@ -12,10 +13,35 @@ type LearnerSignupProps = {
 export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setNotice("Learner account creation will be available once authentication is connected.");
+    setNotice("");
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const password = String(formData.get("password") ?? "");
+    const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
+    if (password !== passwordConfirm) {
+      setNotice("Passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await register({
+        email,
+        username: email.replace(/[^a-z0-9@.+_-]/g, "").slice(0, 150),
+        password,
+        password_confirm: passwordConfirm,
+        role: "LEARNER",
+      });
+      setNotice("Your account was created. You can now log in.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "We couldn’t create your account. Please check your details.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -45,12 +71,16 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
             </button>
           </span>
         </label>
+        <label className="block text-[0.65rem] font-medium">
+          Confirm password
+          <input required minLength={8} autoComplete="new-password" name="passwordConfirm" type="password" placeholder="Re-enter your password" className="mt-1.5 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#526d43] dark:border-white/10 dark:bg-white/5" />
+        </label>
         <label className="flex items-center gap-2 text-[0.58rem] leading-4 text-[#70786d] dark:text-[#b0b8aa]">
           <input required type="checkbox" name="terms" className="h-3 w-3 accent-[#263d21]" />
           <span>I agree to the <span className="font-semibold text-[#526d43]">Terms and Privacy Policy.</span></span>
         </label>
-        <button type="submit" className="group relative flex min-h-12 w-full items-center justify-center rounded-lg bg-[#263d21] px-12 text-sm font-semibold text-white md:min-h-10 md:rounded md:text-xs">
-          Create account
+        <button type="submit" disabled={submitting} className="group relative flex min-h-12 w-full items-center justify-center rounded-lg bg-[#263d21] px-12 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60 md:min-h-10 md:rounded md:text-xs">
+          {submitting ? "Creating account…" : "Create account"}
           <ArrowRight size={16} className="absolute right-4 md:hidden" />
         </button>
       </form>
