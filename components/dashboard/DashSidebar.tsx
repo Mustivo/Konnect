@@ -65,7 +65,7 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
   { name: "Classes", href: "/teacher/classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
   { name: "Attendance", href: "/teacher/attendance", icon: CalendarDays, left: 20, marginTop: 1 },
-  { name: "Students Roster", href: "/teacher/dashboard#students", icon: Users, left: 20, marginTop: 1 },
+  { name: "Students Roster", href: "/teacher/student", icon: Users, left: 20, marginTop: 1 },
   { name: "Activities", href: "/teacher/activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
     { name: "Assignments", href: "/teacher/activities/assignments", icon: ClipboardList, left: 20 },
     { name: "Exams", href: "/teacher/activities/exams", icon: ClipboardList, left: 20 },
@@ -167,7 +167,7 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
               : isAdmin
                 ? (item.name === "Dashboard" && pathname === "/admin/dashboard") || (item.name === "Teachers" && pathname === "/admin/dashboard") || (item.name === "Learners" && pathname === "/admin/dashboard") || (item.name === "Classes" && pathname === "/admin/dashboard") || (item.name === "Reports & Permissions" && pathname === "/admin/dashboard") || (item.name === "Analytics" && pathname === "/admin/dashboard") || (item.name === "Settings" && pathname === "/admin/dashboard")
                 : isTeacher
-                  ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
+                  ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Students Roster" && pathname === "/teacher/student") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
                   : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
                     (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
                     (item.name === "Live Classes" && pathname === "/learner/live_classes") ||

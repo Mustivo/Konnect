@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
 import {
   ArrowRight,
   BookOpen,
@@ -25,14 +26,93 @@ const completedClasses = [
 
 const allClasses = [...initialClasses, ...completedClasses];
 
+type TeacherClass = (typeof allClasses)[number] & { isCompleted?: boolean };
+type ApiClassRoom = {
+  id: string | number;
+  title: string;
+  subject?: string;
+  description?: string;
+  grade?: string;
+  group?: string;
+  enrolled_count?: string | number;
+  start_date?: string | null;
+  join_code?: string;
+  status?: string;
+};
+type ApiAssessmentList = { results?: Array<{ id: string }> } | Array<{ id: string }>;
+
+function toTeacherClass(classRoom: ApiClassRoom, activities: number): TeacherClass {
+  const date = classRoom.start_date ? new Date(`${classRoom.start_date.slice(0, 10)}T00:00:00`) : null;
+  const formattedDate = date && Number.isFinite(date.getTime())
+    ? date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    : "Not scheduled";
+  const group = classRoom.group || classRoom.subject || "Class";
+  const status = classRoom.status?.toUpperCase();
+
+  return {
+    id: String(classRoom.id),
+    grade: classRoom.grade || "Grade not set",
+    group: group.startsWith("Class ") ? group : `Class ${group}`,
+    title: classRoom.title,
+    topic: classRoom.description || classRoom.subject || "Course details to be announced",
+    students: Number(classRoom.enrolled_count) || 0,
+    activities,
+    schedule: formattedDate === "Not scheduled" ? formattedDate : `Starts · ${formattedDate}`,
+    joinCode: classRoom.join_code || "Not available",
+    nextSession: "Not scheduled",
+    nextTopic: classRoom.description || classRoom.subject || "Course details to be announced",
+    preparation: activities ? `${activities} assessment${activities === 1 ? "" : "s"} available` : "No assessments yet",
+    isCompleted: status === "COMPLETED" || status === "FINISHED" || status === "ARCHIVED",
+  };
+}
+
 export default function TeacherClassesPage() {
+  const [classes, setClasses] = useState<TeacherClass[]>(allClasses);
   const [activeClassIds, setActiveClassIds] = useState(initialClasses.map((item) => item.id));
   const [completedClassIds, setCompletedClassIds] = useState(completedClasses.map((item) => item.id));
   const [classTab, setClassTab] = useState<"active" | "completed">("active");
+  const [loadNotice, setLoadNotice] = useState("");
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    let cancelled = false;
+
+    async function loadClasses() {
+      try {
+        const response = await getTeacherClasses();
+        const payload = await apiJson<ApiClassRoom[] | { results?: ApiClassRoom[] }>(response);
+        const records = Array.isArray(payload) ? payload : payload.results ?? [];
+        const mapped = await Promise.all(records.map(async (classRoom) => {
+          let activities = 0;
+          try {
+            const assessments = await apiJson<ApiAssessmentList>(await getClassAssessments(String(classRoom.id)));
+            activities = Array.isArray(assessments) ? assessments.length : assessments.results?.length ?? 0;
+          } catch {
+            activities = 0;
+          }
+          return toTeacherClass(classRoom, activities);
+        }));
+
+        if (!cancelled) {
+          const active = mapped.filter((item) => !item.isCompleted);
+          const completed = mapped.filter((item) => item.isCompleted);
+          setClasses(mapped);
+          setActiveClassIds(active.map((item) => item.id));
+          setCompletedClassIds(completed.map((item) => item.id));
+        }
+      } catch {
+        if (!cancelled) setLoadNotice("Live class data is unavailable. Showing the sample classes.");
+      }
+    }
+
+    void loadClasses();
+    return () => { cancelled = true; };
+  }, []);
+
   const visibleClasses = classTab === "active"
-    ? allClasses.filter((item) => activeClassIds.includes(item.id))
-    : allClasses.filter((item) => completedClassIds.includes(item.id));
-  const activeClasses = allClasses.filter((item) => activeClassIds.includes(item.id));
+    ? classes.filter((item) => activeClassIds.includes(item.id))
+    : classes.filter((item) => completedClassIds.includes(item.id));
+  const activeClasses = classes.filter((item) => activeClassIds.includes(item.id));
   const activityCount = activeClasses.reduce((total, item) => total + item.activities, 0);
   const studentCount = activeClasses.reduce((total, item) => total + item.students, 0);
 
@@ -56,6 +136,8 @@ export default function TeacherClassesPage() {
             <p className="mt-1 text-[9px] text-[#707c6c] dark:text-[#9aa592]">A little structure for every learning moment.</p>
           </div>
         </header>
+
+        {loadNotice && <p role="status" className="text-[8px] text-[#8a5c32] dark:text-[#d4a777]">{loadNotice}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[9px] font-semibold text-[#253322] dark:text-[#d6dfd2]">

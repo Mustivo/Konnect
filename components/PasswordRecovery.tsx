@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, Info } from "lucide-react";
 import { z } from "zod";
+import AuthMessage from "@/components/ui/AuthMessage";
 
 const recoveryEmailSchema = z.string().trim().email("Enter a valid email address.");
 
@@ -90,7 +91,7 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
             We’ll help you get back in.
           </h1>
           <p className="mt-3 max-w-[390px] text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-            Enter the email linked to your Konnect account. Password recovery is not available through the connected service yet.
+            Enter the email linked to your Konnect account. This field is required. Password recovery is not available through the connected service yet.
           </p>
           <form onSubmit={handleSubmit} className="mt-5">
             <label className="block text-[0.65rem] font-medium" htmlFor="recovery-email">
@@ -112,10 +113,21 @@ export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
               Check recovery options
             </button>
           </form>
-          <p role="status" aria-live="polite" className="mt-3 min-h-8 text-center text-[0.62rem] leading-4 text-[#526d43] dark:text-[#b7cc9d]">
-            {notice}
-          </p>
-          <p className="mt-1 text-center text-[0.65rem]">
+          <AuthMessage
+            notice={
+              notice
+                ? {
+                    type: notice.includes("valid") ? "error" : "info",
+                    title: notice.includes("valid") ? "Invalid email address" : "Password reset info",
+                    message: notice,
+                  }
+                : null
+            }
+            onDismiss={() => setNotice("")}
+            className="mt-4"
+          />
+
+          <p className="mt-3 text-center text-[0.65rem]">
             <Link href="/login" className="font-semibold text-[#526d43] hover:underline dark:text-[#b7cc9d]">
               + Return to login
             </Link>

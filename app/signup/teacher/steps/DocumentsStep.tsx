@@ -5,9 +5,9 @@ type DocumentsStepProps = {
 };
 
 const documents = [
-  { name: "CV or résumé", hint: "PDF, DOC, DOCX · up to 10 MB", accept: ".pdf,.doc,.docx" },
-  { name: "Government ID — front", hint: "PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
-  { name: "Government ID — back", hint: "PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
+  { name: "CV or résumé", hint: "Optional · PDF, DOC, DOCX · up to 10 MB", accept: ".pdf,.doc,.docx" },
+  { name: "Government ID — front", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
+  { name: "Government ID — back", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
   { name: "Degree certificate", hint: "PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
   { name: "Teaching certificates", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
 ];

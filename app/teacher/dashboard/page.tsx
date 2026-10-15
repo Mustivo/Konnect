@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
 import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
@@ -73,10 +74,16 @@ const plannerItems = [
 ];
 
 export default function TeacherDashboardPage() {
+  const pathname = usePathname();
+  const isRosterView = pathname === "/teacher/student";
   const [activeClasses, setActiveClasses] = useState(classes);
   const [approvals, setApprovals] = useState(initialApprovals);
   const [notes] = useState(initialNotes);
   const [, setAddingNote] = useState(false);
+  const [rosterClass, setRosterClass] = useState("Algebra I · Grade 9 · Class A");
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [rosterTab, setRosterTab] = useState<"enrolled" | "requests">("enrolled");
+  const [copyMessage, setCopyMessage] = useState("");
   const [apiClassCount, setApiClassCount] = useState<number | null>(null);
   const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
   const [loadNotice, setLoadNotice] = useState("");
@@ -129,49 +136,53 @@ export default function TeacherDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const visibleStats = stats.map((stat) => {
-    if (stat.label === "Active Classes" && apiClassCount !== null) return { ...stat, value: String(apiClassCount), note: `${apiClassCount}/3 class limit` };
-    if (stat.label === "Students" && apiStudentCount !== null) return { ...stat, value: String(apiStudentCount), note: "Across your classes" };
-    return stat;
+  const activeClassTotal = apiClassCount ?? activeClasses.length;
+  const studentTotal = apiStudentCount ?? activeClasses.reduce((total, item) => total + item.students, 0);
+  const pendingReviewCount = stats.find((stat) => stat.label === "Pending Reviews")?.value ?? "0";
+  const overviewMetrics = [
+    { label: "Active Classes", value: String(activeClassTotal), icon: BookOpen, tone: "bg-[#e5efdf] text-[#34522a]" },
+    { label: "Students", value: String(studentTotal), icon: Users, tone: "bg-[#eaf2ff] text-[#2563a8]" },
+    { label: "Pending Review", value: String(pendingReviewCount), icon: FileText, tone: "bg-[#fce7f3] text-[#be3b75]" },
+    { label: "Approvals", value: String(approvals.length), icon: Check, tone: "bg-[#fef4e8] text-[#c2781b]" },
+    { label: "Classes Created", value: `${activeClassTotal}/3`, icon: CalendarDays, tone: "bg-[#e5f0ff] text-[#3475b9]" },
+  ];
+  const filteredStudents = rosterStudents.filter((student) => {
+    const query = rosterSearch.trim().toLowerCase();
+    return !query || `${student.name} ${student.id} ${student.email}`.toLowerCase().includes(query);
   });
+
+  async function copyInviteCode() {
+    try {
+      await navigator.clipboard.writeText("ALG-9A-26");
+      setCopyMessage("Class code copied.");
+    } catch {
+      setCopyMessage("Copy is unavailable in this browser.");
+    }
+  }
 
   return (
     <DashboardShell role="teacher" teacherDashboard>
       <TeacherClassCreator />
       <div className="space-y-5 pt-1 pb-8">
-        <header className="flex flex-col gap-1.5">
-          <div>
-            <p className="text-[12px] font-medium leading-5 text-[#707c6c]">Good afternoon,</p>
-            <h1 className="text-[26px] font-bold leading-8 tracking-[0] text-[#172115] dark:text-[#ecf1ea]">
-              Edna Francis
-            </h1>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#707c6c]">
-              Teacher workspace - approvals, class performance, notes & tasks
-            </p>
-          </div>
-        </header>
-
         {loadNotice && <p role="status" className="text-[9px] text-[#7d8979]">{loadNotice}</p>}
 
-        <section id="analytics" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {visibleStats.map(({ label, value, note, icon: Icon, tone }) => (
-            <article key={label} className="rounded-xl border border-[#e2e7dd] bg-white p-3.5 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold text-[#687564] dark:text-[#8b9987]">{label}</p>
-                  <p className="mt-1 text-[24px] font-bold leading-7 tracking-[0] text-[#172115] dark:text-[#ecf1ea]">{value}</p>
-                  <p className="mt-1 text-[10px] text-[#85917f]">{note}</p>
-                </div>
-                <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`}>
-                  <Icon size={14} />
-                </span>
-              </div>
-            </article>
-          ))}
-        </section>
+        {!isRosterView && <section id="analytics" aria-label="Assignments and classes overview" className="rounded-xl border border-[#e2e7dd] bg-white px-3 py-3 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-[11px] font-bold text-[#172115] dark:text-[#ecf1ea]">Assignments &amp; Classes Overview</h2>
+            <span className="text-[7px] font-medium text-[#778171] dark:text-[#9ca797]">Current term</span>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-y divide-[#edf0e9] sm:grid-cols-3 xl:grid-cols-5 xl:divide-y-0 dark:divide-[#2a312a]">
+            {overviewMetrics.map(({ label, value, icon: Icon, tone }) => (
+              <article key={label} className="flex min-h-[70px] items-center justify-between gap-2 px-3 py-2 first:pl-1">
+                <div className="min-w-0"><p className="truncate text-[8px] font-medium text-[#707c6c] dark:text-[#9aa592]">{label}</p><p className="mt-1 text-[19px] font-bold leading-none text-[#172115] dark:text-[#ecf1ea]">{value}</p></div>
+                <span className={`grid size-7 shrink-0 place-items-center rounded-full ${tone}`}><Icon size={13} /></span>
+              </article>
+            ))}
+          </div>
+        </section>}
 
         <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
-          <section
+          {isRosterView && <section
             id="students"
             aria-label="Students roster"
             className="min-w-0 rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] lg:col-span-3 dark:border-[#212f1f] dark:bg-[#141d13]"
@@ -313,7 +324,41 @@ export default function TeacherDashboardPage() {
                 <button type="button" onClick={() => setRosterTab("requests")} className="mt-2 rounded-full bg-[#e5efdf] px-2.5 py-1.5 text-[6px] font-semibold text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">Review requests</button>
               </article>
             </div>
-          </section>
+          </section>}
+
+          {!isRosterView && <section
+            aria-label="Student performance"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="mb-2 flex items-center justify-between"><h2 className="text-[10px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students Performance</h2><span className="rounded-full bg-[#f1f4ed] px-2 py-1 text-[7px] font-semibold text-[#52634b] dark:bg-[#20271e] dark:text-[#c5d6b8]">Attendance</span></div>
+            <div className="space-y-2">
+              {rosterStudents.slice(0, 3).map((student, index) => <div key={student.id} className="flex items-center gap-2">
+                <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[7px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index]}`}>{student.name.split(" ").map((part) => part[0]).join("")}</span>
+                <div className="min-w-0 flex-1"><p className="truncate text-[8px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p><p className="text-[6px] text-[#7c8776] dark:text-[#9ca797]">{student.id}</p></div>
+                <span className="text-[8px] font-bold text-[#273423] dark:text-[#d6dfd2]">{student.attendance}</span>
+                <ThumbsUp size={10} className="text-[#e78648]" />
+              </div>)}
+            </div>
+            <Link href="/teacher/student" className="mt-3 block text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">View All Students <span aria-hidden="true">›</span></Link>
+          </section>}
+
+          {!isRosterView && <section
+            id="approvals"
+            aria-label="Students pending approval"
+            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2"><h2 className="text-[10px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students Pending Approval</h2><span className="rounded-full bg-[#fce9dc] px-2 py-1 text-[7px] font-semibold text-[#bc612a]">{approvals.length} waiting</span></div>
+            <div className="space-y-2">
+              {approvals.slice(0, 3).map((student, index) => <div key={student.name} className="flex items-center gap-2 rounded-lg bg-[#f6f7f3] p-2 dark:bg-[#20271e]">
+                <span className={`grid size-6 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>{student.name.split(" ").map((part) => part[0]).join("")}</span>
+                <div className="min-w-0 flex-1"><p className="truncate text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p><p className="truncate text-[6px] text-[#7c8776] dark:text-[#9ca797]">{student.meta}</p></div>
+                <button type="button" onClick={() => dismissApproval(student.name)} aria-label={`Approve ${student.name}`} className="rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white">Approve</button>
+                <button type="button" onClick={() => dismissApproval(student.name)} aria-label={`Dismiss ${student.name}`} className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[#71806b] dark:bg-[#161b17]"><X size={9} /></button>
+              </div>)}
+              {!approvals.length && <p className="py-5 text-center text-[8px] text-[#7c8776]">No pending approvals.</p>}
+            </div>
+            <Link href="/teacher/student#approvals" className="mt-3 block text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">View All Requests <span aria-hidden="true">›</span></Link>
+          </section>}
 
           {!isRosterView && <section
             aria-label="My notes"

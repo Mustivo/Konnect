@@ -8,6 +8,8 @@ import { Search, Bell, CalendarDays, Plus } from "lucide-react";
 
 type DashboardRole = "learner" | "teacher" | "admin";
 const teacherPageHeaders: Record<string, { title: string; description: string; searchPlaceholder: string }> = {
+  "/teacher/dashboard": { title: "Dashboard", description: "Overview of student approvals, class performance, notes & tasks", searchPlaceholder: "Search programs, assessments..." },
+  "/teacher/student": { title: "Students Roster", description: "Manage enrolled learners and join requests for your classes.", searchPlaceholder: "Search students..." },
   "/teacher/activities": { title: "Activities", description: "Assignments and exams for your classes.", searchPlaceholder: "Search activities..." },
   "/teacher/activities/assignments": { title: "Assignments", description: "Practice, check understanding and keep learning on track.", searchPlaceholder: "Search assignments..." },
   "/teacher/activities/exams": { title: "Exams", description: "Thoughtful assessments. Clear expectations. Confident learners.", searchPlaceholder: "Search exams..." },
@@ -21,6 +23,7 @@ export default function DashNav({ role = "learner", menuButton }: { role?: Dashb
   const [currentDate, setCurrentDate] = useState("Today");
   const isTeacher = role === "teacher";
   const isAdmin = role === "admin";
+  const isTeacherDashboard = isTeacher && pathname === "/teacher/dashboard";
   const teacherPageHeader = isTeacher ? teacherPageHeaders[pathname] : undefined;
 
   useEffect(() => {
@@ -81,11 +84,14 @@ export default function DashNav({ role = "learner", menuButton }: { role?: Dashb
           </div>
         )}
 
-        {isTeacher && !teacherPageHeader ? (
+        {isTeacher && (!teacherPageHeader || isTeacherDashboard) ? (
+          <div className="flex shrink-0 items-center gap-1.5">
           <button type="button" onClick={() => window.dispatchEvent(new Event("konnect-open-create-class"))} className="hidden h-8 items-center gap-1.5 rounded-md bg-[#23351f] px-3 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#182615] sm:flex">
             <Plus size={13} />
             <span>Create Class</span>
           </button>
+            {isTeacherDashboard && <span className="hidden rounded-full bg-[#e5efdf] px-2 py-1 text-[8px] font-semibold text-[#405c35] sm:inline-flex dark:bg-[#263521] dark:text-[#c5d6b8]">3/3 Limit</span>}
+          </div>
         ) : isAdmin ? (
           <button type="button" className="hidden h-8 items-center gap-1.5 rounded-md bg-[#23351f] px-3 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#182615] sm:flex">
             <Plus size={13} />

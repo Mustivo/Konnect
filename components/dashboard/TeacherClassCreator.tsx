@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { apiJson, createTeacherClass } from "@/lib/api";
 import { createClassSession, startSession } from "@/lib/api/sessions";
 import { ApiError, apiErrorMessage } from "@/lib/api/client";
@@ -144,6 +145,7 @@ export default function TeacherClassCreator() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={starting} onClick={() => void startLiveSession()} className="inline-flex min-h-9 items-center gap-2 rounded bg-[#263d21] px-3 text-[10px] font-semibold text-white hover:bg-[#344f2c] disabled:opacity-60">{starting ? "Starting…" : "Start class"}</button>
+              <Link href={`/teacher/live-classes/${encodeURIComponent(createdSession.id)}`} className="inline-flex min-h-9 items-center gap-2 rounded border border-[#dfe5d8] px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]">Open class chat</Link>
               <a href={createdSession.meeting_url} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-2 rounded bg-[#263d21] px-3 text-[10px] font-semibold text-white hover:bg-[#344f2c]"><ExternalLink size={13} /> Open meeting</a>
               <button type="button" onClick={() => void copyMeetingLink()} className="inline-flex min-h-9 items-center gap-2 rounded border border-[#dfe5d8] px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]"><Copy size={13} /> Copy meeting link</button>
             </div>

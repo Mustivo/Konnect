@@ -28,7 +28,7 @@ export default function AccountStep({ hidden, role, onRoleChange, onEmailChange,
           <input required autoComplete="email" name="email" type="email" placeholder="you@example.com" onChange={(event) => onEmailChange(event.target.value)} className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
         <label className="block text-[0.65rem] font-medium">
-          Phone number
+          Phone number <span className="font-normal text-[#84907a]">(optional)</span>
           <input autoComplete="tel" name="phone" type="tel" placeholder="+1 415 555 0184" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
         <label className="block text-[0.65rem] font-medium">

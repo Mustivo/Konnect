@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiJson, getLearnerClasses } from "@/lib/api";
+import { getClassSessions } from "@/lib/api/sessions";
 import {
   CalendarDays,
   Check,
@@ -14,7 +16,26 @@ import {
   X,
 } from "lucide-react";
 
-const lessons = [
+type LiveLesson = {
+  id: string;
+  day: string;
+  weekday: string;
+  time: string;
+  subject: string;
+  detail: string;
+  color: string;
+  join?: boolean;
+  sessionTitle?: string;
+  teacher?: string;
+  date?: string;
+  fullTime?: string;
+};
+
+type ApiEnrollment = { class_room: string; class_title: string; class_subject: string; teacher_name: string; status?: string };
+type ApiSession = { id: string | number; title?: string; scheduled_start?: string; scheduled_end?: string; status?: string };
+type ApiCollection<T> = T[] | { results?: T[]; sessions?: T[] };
+
+const previewLessons: LiveLesson[] = [
   { id: "uiux", day: "06", weekday: "TUE", time: "14:00–15:30", subject: "UI/UX Design", detail: "Design systems & component libraries", color: "#8957e5", join: true, sessionTitle: "UI/UX Design — From Wireframes to Prototypes", teacher: "Amara Okafor", date: "Tue 6 October 2026", fullTime: "14:00–15:30 BST" },
   { id: "django-07", day: "07", weekday: "WED", time: "10:00–11:30", subject: "Django", detail: "REST APIs with Django REST Framework", color: "#18a769" },
   { id: "django-08", day: "08", weekday: "WED", time: "10:00–11:30", subject: "Django", detail: "REST APIs with Django REST Framework", color: "#18a769" },
@@ -56,6 +77,7 @@ function getCalendarCells(month: Date) {
 
 export default function LiveClassesPage() {
   const router = useRouter();
+  const [lessons, setLessons] = useState(previewLessons);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -67,6 +89,52 @@ export default function LiveClassesPage() {
   const monthLabel = calendarMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const calendarCells = getCalendarCells(calendarMonth);
   const joinLesson = lessons.find((lesson) => lesson.id === joinLessonId);
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    let active = true;
+
+    async function loadSessions() {
+      try {
+        const enrollmentPayload = await apiJson<ApiCollection<ApiEnrollment>>(await getLearnerClasses());
+        const enrollments = Array.isArray(enrollmentPayload) ? enrollmentPayload : enrollmentPayload.results ?? [];
+        const sessionGroups = await Promise.all(enrollments
+          .filter((enrollment) => !enrollment.status || enrollment.status === "ENROLLED")
+          .map(async (enrollment) => {
+            const payload = await apiJson<ApiCollection<ApiSession>>(await getClassSessions(enrollment.class_room));
+            const sessions = Array.isArray(payload) ? payload : payload.results ?? payload.sessions ?? [];
+            return sessions.map((session) => ({ enrollment, session }));
+          }));
+        const mapped = sessionGroups.flat().map(({ enrollment, session }) => {
+          const start = session.scheduled_start ? new Date(session.scheduled_start) : null;
+          const end = session.scheduled_end ? new Date(session.scheduled_end) : null;
+          const validStart = start && Number.isFinite(start.getTime());
+          const joinable = !["COMPLETED", "CANCELLED", "CANCELED"].includes(session.status?.toUpperCase() ?? "");
+          return {
+            id: String(session.id),
+            day: validStart ? String(start.getDate()).padStart(2, "0") : "--",
+            weekday: validStart ? start.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase() : "TBD",
+            time: validStart ? `${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${end ? `–${end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}` : "Time to be announced",
+            subject: enrollment.class_subject || "Live class",
+            detail: session.title || enrollment.class_title,
+            color: "#18a769",
+            join: joinable,
+            sessionTitle: session.title || enrollment.class_title,
+            teacher: enrollment.teacher_name,
+            date: validStart ? start.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "Schedule to be announced",
+            fullTime: validStart ? `${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${end ? `–${end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}` : "Time to be announced",
+          } satisfies LiveLesson;
+        });
+
+        if (active) setLessons(mapped);
+      } catch {
+        // Keep the preview lessons available if the API has no live-session data.
+      }
+    }
+
+    void loadSessions();
+    return () => { active = false; };
+  }, []);
 
   return (
     <div className="space-y-3 py-3">
@@ -130,6 +198,7 @@ export default function LiveClassesPage() {
                   )}
                 </div>
               ))}
+              {!lessons.length && <p className="py-6 text-center text-[8px] text-[#788173] dark:text-[#95a18f]">No upcoming live sessions are available for your enrolled classes.</p>}
             </div>
           </section>
 
@@ -345,7 +414,7 @@ export default function LiveClassesPage() {
                   onClick={() => {
                     setJoinedLesson(joinLesson.id);
                     setJoinLessonId(null);
-                    router.push(`/learner/live_classes/waiting-room?session=${joinLesson.id}`);
+                    router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(joinLesson.id)}`);
                   }}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#263d21] px-3 text-[9px] font-semibold text-white hover:bg-[#1c3019]"
                 >

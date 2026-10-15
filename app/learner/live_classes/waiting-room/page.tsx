@@ -4,6 +4,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+import { apiJson } from "@/lib/api";
+import { getSession, joinSession } from "@/lib/api/sessions";
 import {
   ArrowLeft,
   Check,
@@ -16,12 +18,21 @@ import {
   VideoOff,
 } from "lucide-react";
 
-const session = {
+const fallbackSession = {
   id: "uiux",
   title: "Design systems & component libraries",
   course: "UI/UX Design — From Wireframes to Prototypes",
   teacher: "Amara Okafor",
   time: "Tue, 6 Oct 2026 · 14:00–15:30 BST",
+};
+
+type ApiSession = {
+  title?: string;
+  course_title?: string;
+  teacher_name?: string;
+  scheduled_start?: string;
+  scheduled_end?: string;
+  class_room?: string | { title?: string; subject?: string; teacher_name?: string };
 };
 
 type AdmissionMessage = {
@@ -33,6 +44,8 @@ type AdmissionMessage = {
 function LiveClassWaitingRoomContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session") || "";
+  const [session, setSession] = useState({ ...fallbackSession, id: sessionId || fallbackSession.id });
   const [mounted, setMounted] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraOn, setCameraOn] = useState(false);
@@ -47,15 +60,41 @@ function LiveClassWaitingRoomContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestIdRef = useRef("");
-  const isCorrectSession = !searchParams.get("session") || searchParams.get("session") === session.id;
   const admissionStorageKey = `konnect-live-class-admission:${session.id}`;
   const requestStorageKey = `konnect-live-class-request:${session.id}`;
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!isCorrectSession) router.replace("/learner/live_classes");
-  }, [isCorrectSession, router]);
+    if (!sessionId) {
+      router.replace("/learner/live_classes");
+      return;
+    }
+    let active = true;
+    setSession((current) => ({ ...current, id: sessionId }));
+    async function loadSession() {
+      try {
+        const detail = await apiJson<ApiSession>(await getSession(sessionId));
+        const classRoom = typeof detail.class_room === "object" ? detail.class_room : null;
+        const start = detail.scheduled_start ? new Date(detail.scheduled_start) : null;
+        const end = detail.scheduled_end ? new Date(detail.scheduled_end) : null;
+        if (!active) return;
+        setSession({
+          id: sessionId,
+          title: detail.title || fallbackSession.title,
+          course: detail.course_title || classRoom?.title || classRoom?.subject || fallbackSession.course,
+          teacher: detail.teacher_name || classRoom?.teacher_name || fallbackSession.teacher,
+          time: start && Number.isFinite(start.getTime())
+            ? `${start.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · ${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${end ? `–${end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}`
+            : fallbackSession.time,
+        });
+      } catch {
+        if (active) setRequestError("Session details could not be loaded. You can still try to join.");
+      }
+    }
+    void loadSession();
+    return () => { active = false; };
+  }, [router, sessionId]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = stream;
@@ -154,7 +193,7 @@ function LiveClassWaitingRoomContent() {
     else setMicrophoneOn(false);
   }
 
-  function sendJoinRequest() {
+  async function sendJoinRequest() {
     const requestId = typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `${Date.now()}`;
@@ -162,15 +201,10 @@ function LiveClassWaitingRoomContent() {
     setRequestError("");
 
     try {
-      localStorage.setItem(requestStorageKey, JSON.stringify({
-        sessionId: session.id,
-        requestId,
-        learner: "Gabriella Igabe",
-        requestedAt: new Date().toISOString(),
-      }));
-      setAdmissionState("waiting");
+      await apiJson(await joinSession(sessionId));
+      setAdmissionState("admitted");
     } catch {
-      setRequestError("Your request couldn't be sent. Please check your browser storage and retry.");
+      setRequestError("You could not join this session. Check your enrollment and try again.");
     }
   }
 
@@ -185,7 +219,7 @@ function LiveClassWaitingRoomContent() {
   function enterClass() {
     sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    router.push("/learner/live_classes/liveClass");
+    router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(session.id)}`);
   }
 
   const lobby = (

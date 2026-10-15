@@ -10,7 +10,7 @@ export default function ProfileStep({ hidden, onBack, onContinue }: ProfileStepP
       <div className="grid gap-3 sm:grid-cols-[1fr_190px]">
         <label className="flex items-center gap-3 text-[0.65rem] font-medium">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#edf2e8] text-lg text-[#526d43]">◉</span>
-          <span>Profile photo
+          <span>Profile photo <span className="font-normal text-[#84907a]">(optional)</span>
             <input type="file" name="profilePhoto" accept="image/*" className="mt-1 block w-full text-[0.55rem] font-normal" />
             <span className="mt-1 block text-[0.5rem] font-normal text-[#84907a]">JPG or PNG, up to 5 MB</span>
           </span>

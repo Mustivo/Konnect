@@ -11,6 +11,7 @@ import ReviewStep from "./steps/ReviewStep";
 import EmailVerification from "./screens/EmailVerification";
 import ApplicationStatus from "./screens/ApplicationStatus";
 import { apiErrorMessage, login, register, updateTeacherProfile } from "@/lib/api";
+import AuthMessage from "@/components/ui/AuthMessage";
 
 type TeacherSignupProps = {
   role: "learner" | "teacher";
@@ -99,14 +100,18 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
       const profile = new FormData();
       profile.set("bio", String(values.get("bio") ?? ""));
       profile.set("qualifications", [
+        `Display name: ${String(values.get("displayName") ?? "")}`,
         String(values.get("headline") ?? ""),
-        String(values.get("experience") ?? ""),
-        String(values.get("educationLevel") ?? ""),
-        String(values.get("institution") ?? ""),
-        String(values.get("languages") ?? ""),
-        String(values.get("teachingMode") ?? ""),
-        String(values.get("availability") ?? ""),
-      ].filter(Boolean).join(" · "));
+        `Experience: ${String(values.get("experience") ?? "")}`,
+        `Education: ${String(values.get("educationLevel") ?? "")}`,
+        `Institution: ${String(values.get("institution") ?? "")}`,
+        `Languages: ${String(values.get("languages") ?? "")}`,
+        `Teaching mode: ${String(values.get("teachingMode") ?? "")}`,
+        `Availability: ${String(values.get("availability") ?? "")}`,
+        `Country: ${String(values.get("country") ?? "")}`,
+        `Timezone: ${String(values.get("timezone") ?? "")}`,
+        `Portfolio: ${String(values.get("portfolio") ?? "")}`,
+      ].filter((value) => !value.endsWith(": ")).join(" · "));
       profile.set("expertise_subjects", String(values.get("subjects") ?? ""));
       profile.set("verification_notes", `Legal name on documents: ${String(values.get("documentName") ?? "")}`);
       const certificate = values.get("degree-certificate");
@@ -182,6 +187,14 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
       <p className="mt-2 text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
         {stepDescriptions[step]}
       </p>
+      <p className="mt-2 text-[0.58rem] text-[#70786d] dark:text-[#b0b8aa]">Fields are required unless marked optional.</p>
+
+      {/* Prominent Auth Alert / Return Message */}
+      <AuthMessage
+        notice={notice}
+        onDismiss={() => setNotice("")}
+        className="my-3.5"
+      />
 
       <form ref={applicationForm} onSubmit={(event) => event.preventDefault()} className="mt-4">
         <AccountStep
@@ -208,8 +221,12 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
           onSubmit={submitApplication}
         />
       </form>
-      <p aria-live="polite" className="mt-2 min-h-4 text-center text-[0.58rem] text-[#526d43] dark:text-[#b7cc9d]">{submitting ? "Submitting your application…" : notice}</p>
-      <p className="mt-2 text-center text-[0.62rem] text-[#70786d] dark:text-[#b0b8aa]">
+      {submitting && (
+        <p aria-live="polite" className="mt-2 min-h-4 text-center text-xs text-[#526d43] dark:text-[#b7cc9d]">
+          Submitting your application…
+        </p>
+      )}
+      <p className="mt-3 text-center text-[0.62rem] text-[#70786d] dark:text-[#b0b8aa]">
         Already have an account? <Link href="/login" className="font-semibold text-[#263d21] dark:text-[#c5d6bc]">Log in</Link>
       </p>
     </div>

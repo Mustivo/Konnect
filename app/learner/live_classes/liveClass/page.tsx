@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { leaveSession } from "@/lib/api/sessions";
+import { useSessionChat } from "@/lib/useSessionChat";
 import {
   ArrowDown,
   Bell,
@@ -28,20 +30,6 @@ import {
   X,
 } from "lucide-react";
 
-type ChatMessage = {
-  name: string;
-  time: string;
-  text: string;
-  self?: boolean;
-};
-
-const initialMessages: ChatMessage[] = [
-  { name: "Amara Okafor", time: "14:14", text: "What makes a design system useful in a real product team?" },
-  { name: "James Wilson", time: "14:15", text: "It keeps the UI consistent across pages and teams." },
-  { name: "Aisha Noor", time: "14:16", text: "And it helps us reuse components instead of rebuilding them." },
-  { name: "You", time: "14:17", text: "Does the system include documentation for the team?", self: true },
-];
-
 const participants = [
   { initials: "GI", name: "Gabriella Igabe", caption: "Camera off" },
   { initials: "JW", name: "James Wilson", caption: "" },
@@ -56,6 +44,8 @@ function stopStream(stream: MediaStream | null) {
 
 export default function LiveClassRoomPage() {
   const router = useRouter();
+  const [sessionId, setSessionId] = useState("");
+  const { messages, chatError, sending, send } = useSessionChat(sessionId);
   const [microphoneOn, setMicrophoneOn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -70,7 +60,6 @@ export default function LiveClassRoomPage() {
   const [meetingPolicyOpen, setMeetingPolicyOpen] = useState(false);
   const [fullscreenOn, setFullscreenOn] = useState(false);
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState(initialMessages);
   const [reaction, setReaction] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -84,8 +73,10 @@ export default function LiveClassRoomPage() {
   });
 
   useEffect(() => {
-    if (sessionStorage.getItem("konnect-live-class-admitted:uiux") !== "true") {
-      router.replace("/learner/live_classes/waiting-room?session=uiux");
+    const activeSessionId = new URLSearchParams(window.location.search).get("session") || "uiux";
+    setSessionId(activeSessionId);
+    if (sessionStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) !== "true") {
+      router.replace(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeSessionId)}`);
       return;
     }
 
@@ -205,21 +196,22 @@ export default function LiveClassRoomPage() {
 
   function leaveClass() {
     stopStream(screenShareStream);
-    router.push("/learner/live_classes/class-complete");
+    if (sessionId) void leaveSession(sessionId).catch(() => undefined);
+    sessionStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
+    router.push(`/learner/live_classes/class-complete?session=${encodeURIComponent(sessionId)}`);
   }
 
-  function sendMessage(event: FormEvent<HTMLFormElement>) {
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
 
-    setMessages((current) => [...current, { name: "You", time: "14:18", text, self: true }]);
-    setDraft("");
+    if (await send(text)) setDraft("");
   }
 
   function sendReaction(emoji: string) {
     setReaction(emoji);
-    setMessages((current) => [...current, { name: "You", time: "14:18", text: `Reacted ${emoji}`, self: true }]);
+    void send(`Reacted ${emoji}`);
     if (reactionTimeoutRef.current !== null) window.clearTimeout(reactionTimeoutRef.current);
     reactionTimeoutRef.current = window.setTimeout(() => setReaction(null), 2600);
   }
@@ -476,6 +468,8 @@ export default function LiveClassRoomPage() {
                       <p className={`rounded-md px-2 py-1.5 text-[7px] leading-relaxed ${message.self ? "bg-[#eaf0e3] text-[#3f4939] dark:bg-[#293522] dark:text-[#d5dfce]" : "bg-[#f3f4ef] text-[#50594b] dark:bg-[#20271e] dark:text-[#c1cbb9]"}`}>{message.text}</p>
                     </article>
                   ))}
+                  {!messages.length && !chatError && <p className="py-4 text-center text-[7px] text-[#788172]">No messages yet. Start the conversation.</p>}
+                  {chatError && <p role="status" className="py-1 text-[6px] text-[#a7463a] dark:text-[#f09a8e]">{chatError}</p>}
                   <div className="pt-1">
                     <p className="text-[6px] font-semibold uppercase text-[#737c70] dark:text-[#9da897]">Reactions · Stickers</p>
                     <div className="mt-1 grid grid-cols-5 gap-1">
@@ -484,14 +478,14 @@ export default function LiveClassRoomPage() {
                       ))}
                     </div>
                     <div className="mt-1.5 flex gap-1">
-                      {["Got it!", "Great idea"].map((phrase) => <button key={phrase} type="button" onClick={() => setMessages((current) => [...current, { name: "You", time: "14:18", text: phrase, self: true }])} className="flex-1 rounded bg-[#edf2e8] py-1 text-[6px] font-medium text-[#526744] dark:bg-[#2b3627] dark:text-[#c2d2b5]">{phrase}</button>)}
+                      {["Got it!", "Great idea"].map((phrase) => <button key={phrase} type="button" onClick={() => void send(phrase)} className="flex-1 rounded bg-[#edf2e8] py-1 text-[6px] font-medium text-[#526744] dark:bg-[#2b3627] dark:text-[#c2d2b5]">{phrase}</button>)}
                     </div>
                   </div>
                 </div>
 
                 <form onSubmit={sendMessage} className="flex shrink-0 items-center gap-1.5 border-t border-[#e9ede5] p-2 dark:border-[#293127]">
                   <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message your class..." className="h-7 min-w-0 flex-1 rounded-md border border-[#e1e6dc] bg-white px-2 text-[7px] outline-none placeholder:text-[#92998d] focus:border-[#9aab8c] dark:border-[#303b2d] dark:bg-[#171d16] dark:text-[#edf1e9]" />
-                  <button type="submit" aria-label="Send message" title="Send message" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#263d21] text-white hover:bg-[#1c3019]"><Send size={11} /></button>
+                  <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message" title="Send message" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#263d21] text-white hover:bg-[#1c3019] disabled:cursor-not-allowed disabled:opacity-50"><Send size={11} /></button>
                 </form>
                 <div className="flex shrink-0 items-center gap-1.5 px-2 pb-2 text-[6px] text-[#92998d]">
                   <Bell size={9} /> Class chat · Follow the meeting policies

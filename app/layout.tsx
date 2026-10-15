@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Mrs_Saint_Delafield } from "next/font/google";
+import ReduxProvider from "@/components/providers/ReduxProvider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -52,7 +53,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <ReduxProvider>{children}</ReduxProvider>
+      </body>
     </html>
   );
 }
