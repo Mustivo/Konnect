@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
@@ -9,10 +9,11 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Copy,
   Download,
   FileText,
   MoreVertical,
-  Star,
+  Search,
   ThumbsUp,
   Users,
   X,
@@ -27,9 +28,20 @@ const assignmentStats = [
 ];
 
 const initialApprovals = [
-  { name: "Oliver James", meta: "G1 / Class - A · 5 mins ago" },
-  { name: "David Peter", meta: "G1 / Class - B · 12 mins ago" },
-  { name: "Lilly Paul", meta: "G1 / Class - B" },
+  { name: "Sophie Bennett", meta: "G1 / Class - A · 5 mins ago" },
+  { name: "Oscar Hughes", meta: "G1 / Class - A · 12 mins ago" },
+  { name: "Freya Cooper", meta: "G1 / Class - A" },
+];
+
+const rosterStudents = [
+  { name: "Oliver James", id: "KA-001", email: "oliver.james@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
+  { name: "David Peter", id: "KA-002", email: "david.peter@student.school.edu", joined: "07 Sep 2026", attendance: "96.4%" },
+  { name: "Lilly Paul", id: "KA-003", email: "lilly.paul@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
+  { name: "Emma Wilson", id: "KA-004", email: "emma.wilson@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
+  { name: "Noah Williams", id: "KA-005", email: "noah.williams@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
+  { name: "Ava Thompson", id: "KA-006", email: "ava.thompson@student.school.edu", joined: "07 Sep 2026", attendance: "96.4%" },
+  { name: "Ethan Brown", id: "KA-007", email: "ethan.brown@student.school.edu", joined: "07 Sep 2026", attendance: "85.7%" },
+  { name: "Mia Davis", id: "KA-008", email: "mia.davis@student.school.edu", joined: "07 Sep 2026", attendance: "89.3%" },
 ];
 
 const initialNotes = [
@@ -53,6 +65,43 @@ export default function TeacherDashboardPage() {
   const [notes, setNotes] = useState(initialNotes);
   const [addingNote, setAddingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
+  const [rosterClass, setRosterClass] = useState("Algebra I · Grade 9 · Class A");
+  const [rosterTab, setRosterTab] = useState<"enrolled" | "requests">("enrolled");
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [copyMessage, setCopyMessage] = useState("");
+  const [isRosterView, setIsRosterView] = useState(false);
+
+  useEffect(() => {
+    function syncDashboardSection() {
+      const hash = window.location.hash;
+      setIsRosterView(hash === "#students");
+      if (hash === "#approvals") {
+        setRosterTab("requests");
+      }
+    }
+
+    function handleDashboardSection(event: Event) {
+      const section = (event as CustomEvent<string>).detail;
+      setIsRosterView(section === "students");
+      if (section === "approvals") {
+        setRosterTab("requests");
+      }
+    }
+
+    syncDashboardSection();
+    window.addEventListener("hashchange", syncDashboardSection);
+    window.addEventListener("konnect-dashboard-section", handleDashboardSection);
+    return () => {
+      window.removeEventListener("hashchange", syncDashboardSection);
+      window.removeEventListener("konnect-dashboard-section", handleDashboardSection);
+    };
+  }, []);
+
+  const filteredStudents = rosterStudents.filter((student) =>
+    `${student.name} ${student.id} ${student.email}`
+      .toLowerCase()
+      .includes(rosterSearch.toLowerCase()),
+  );
 
   function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,6 +118,15 @@ export default function TeacherDashboardPage() {
 
   function dismissApproval(name: string) {
     setApprovals((current) => current.filter((student) => student.name !== name));
+  }
+
+  async function copyInviteCode() {
+    try {
+      await navigator.clipboard.writeText("ALG-9A-26");
+      setCopyMessage("Invite code copied.");
+    } catch {
+      setCopyMessage("Could not copy the code. Please copy ALG-9A-26 manually.");
+    }
   }
 
   return (
@@ -113,88 +171,150 @@ export default function TeacherDashboardPage() {
 
         <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
           <section
-            aria-label="Student performance"
-            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
+            id="students"
+            aria-label="Students roster"
+            className="min-w-0 rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] lg:col-span-3 dark:border-[#212f1f] dark:bg-[#141d13]"
           >
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students<br />Performance</h2>
-              <span className="rounded-full bg-[#f1f4ed] px-2 py-1 text-[7px] font-semibold text-[#52634b] dark:bg-[#20271e] dark:text-[#c5d6b8]">
-                Mastery
-              </span>
-            </div>
-            <div className="space-y-2">
-              {[
-                { name: "Oliver James", className: "G1 / Class - B", score: "97%" },
-                { name: "David Peter", className: "G1 / Class - B", score: "95%" },
-                { name: "Lilly Paul", className: "G1 / Class - B", score: "92%" },
-              ].map((student, index) => (
-                <div key={student.name} className="flex items-center gap-2">
-                  <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[7px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index]}`}>
-                    {student.name.split(" ").map((part) => part[0]).join("")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[8px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p>
-                    <p className="text-[7px] text-[#7c8776] dark:text-[#9ca797]">{student.className}</p>
-                  </div>
-                  <span className="text-[8px] font-bold text-[#273423] dark:text-[#d6dfd2]">{student.score}</span>
-                  <Star size={10} className="text-[#e78648]" />
-                </div>
-              ))}
-            </div>
-            <Link href="/teacher/classes" className="mt-3 block text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
-              View All Students <span aria-hidden="true">›</span>
-            </Link>
-          </section>
-
-          <section
-            id="approvals"
-            aria-label="Students pending approval"
-            className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
-          >
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <h2 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students<br />Pending<br className="sm:hidden" /> Approval</h2>
-              <div className="text-right">
-                <span className="rounded-full bg-[#fce9dc] px-2 py-1 text-[7px] font-semibold text-[#bc612a]">{approvals.length} Waiting</span>
-                <p className="mt-1 text-[6px] text-[#7c8776] dark:text-[#9ca797]">3/3 Classes<br />Active</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[14px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students Roster</h2>
+                <p className="mt-0.5 text-[7px] text-[#74806f] dark:text-[#9ca797]">Get to know your students and make room for new learners.</p>
               </div>
+              <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#f1f4ed] px-2.5 text-[7px] font-semibold text-[#43543a] dark:bg-[#20271e] dark:text-[#c5d6b8]">
+                <Download size={10} /> Export roster
+              </button>
             </div>
-            <div className="space-y-1.5">
-              {approvals.map((student, index) => (
-                <div key={student.name} className="flex items-center gap-1.5 rounded-full bg-[#f6f7f3] p-1 dark:bg-[#20271e]">
-                  <span className={`grid size-6 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>
-                    {student.name.split(" ").map((part) => part[0]).join("")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p>
-                    <p className="truncate text-[6px] text-[#7c8776] dark:text-[#9ca797]">{student.meta}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => dismissApproval(student.name)}
-                    className="flex h-5 items-center gap-1 rounded-full bg-[#23351f] px-2 text-[6px] font-semibold text-white hover:bg-[#30472b]"
-                    aria-label={`Approve ${student.name}`}
-                  >
-                    <Check size={9} /> Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => dismissApproval(student.name)}
-                    className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[#72806c] hover:bg-[#f0f3ed] dark:bg-[#161b17] dark:text-[#c5d6b8]"
-                    aria-label={`Dismiss ${student.name}`}
-                  >
-                    <X size={9} />
-                  </button>
-                </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="teacher-roster-class">Select class</label>
+              <select
+                id="teacher-roster-class"
+                value={rosterClass}
+                onChange={(event) => setRosterClass(event.target.value)}
+                className="h-7 min-w-0 flex-1 rounded-md border border-[#e2e7dd] bg-[#f8f9f6] px-2 text-[7px] text-[#35402f] outline-none dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc] sm:max-w-[240px]"
+              >
+                <option>Algebra I · Grade 9 · Class A</option>
+                <option>Geometry · Grade 10 · Class B</option>
+                <option>Precalculus · Grade 11 · Class C</option>
+              </select>
+              <span className="rounded-full bg-[#e5efdf] px-2 py-1 text-[6px] font-semibold text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">28/100</span>
+              <span className="flex-1" />
+              <label className="relative min-w-[160px] flex-1 sm:max-w-[220px]">
+                <span className="sr-only">Search students</span>
+                <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#83907d]" />
+                <input
+                  type="search"
+                  value={rosterSearch}
+                  onChange={(event) => setRosterSearch(event.target.value)}
+                  placeholder="Search students..."
+                  className="h-7 w-full rounded-full border border-[#e2e7dd] bg-white pl-6 pr-2 text-[7px] outline-none focus:border-[#8ca47e] dark:border-[#303b2d] dark:bg-[#161b17] dark:text-[#e1e8dc]"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 rounded-xl bg-[#e7f0e2] px-3 py-2.5 text-[#43543a] dark:bg-[#202b1d] dark:text-[#c5d6b8]">
+              <p className="text-[7px] font-bold">28 enrolled · 72 seats available</p>
+              <p className="mt-0.5 text-[6px] leading-relaxed">Share class code ALG-9A-26 with your students. New learners will appear under Join Requests for your approval.</p>
+            </div>
+
+            <div className="mt-3 flex gap-1 border-b border-[#edf0e9] dark:border-[#2a312a]" role="tablist" aria-label="Roster status">
+              {(["enrolled", "requests"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  id={tab === "requests" ? "approvals" : undefined}
+                  role="tab"
+                  aria-selected={rosterTab === tab}
+                  onClick={() => setRosterTab(tab)}
+                  className={`rounded-full px-2.5 py-1.5 text-[7px] font-semibold ${rosterTab === tab ? "bg-[#23351f] text-white" : "text-[#687564] hover:bg-[#f1f4ed] dark:text-[#a5b19f] dark:hover:bg-[#20271e]"}`}
+                >
+                  {tab === "enrolled" ? "Enrolled (28)" : `Join Requests (${approvals.length})`}
+                </button>
               ))}
-              {!approvals.length && <p className="py-5 text-center text-[8px] text-[#7c8776]">No pending approvals.</p>}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[7px] text-[#71806b] dark:text-[#9ca797]">
-              <span>Class capacity alert: 28/30 seats filled</span>
-              <Link href="/teacher/classes" className="font-semibold text-[#263d21] dark:text-[#c5d6b8]">View All Requests <span aria-hidden="true">›</span></Link>
+
+            {rosterTab === "enrolled" ? (
+              <>
+                <div className="mt-2">
+                  <h3 className="text-[9px] font-bold text-[#243020] dark:text-[#ecf1ea]">Enrolled students</h3>
+                  <p className="mt-0.5 text-[6px] text-[#74806f] dark:text-[#9ca797]">{rosterClass}</p>
+                </div>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[600px] text-left text-[7px]">
+                    <thead className="bg-[#f1f4ed] text-[6px] font-semibold text-[#75806f] dark:bg-[#20271e] dark:text-[#b1bba9]">
+                      <tr>
+                        {["Student", "Email address", "Joined", "Attendance", "Status"].map((heading) => (
+                          <th key={heading} className="px-2 py-2 first:rounded-l-md last:rounded-r-md">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student, index) => (
+                        <tr key={student.id} className="border-b border-[#edf0e9] last:border-0 dark:border-[#2a312a]">
+                          <td className="px-2 py-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`grid size-5 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>{student.name.split(" ").map((part) => part[0]).join("")}</span>
+                              <span>
+                                <span className="block font-semibold text-[#35402f] dark:text-[#e1e8dc]">{student.name}</span>
+                                <span className="block text-[6px] text-[#84907e] dark:text-[#9ca797]">{student.id}</span>
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5 text-[#52634b] dark:text-[#c5d6b8]">{student.email}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-[#52634b] dark:text-[#c5d6b8]">{student.joined}</td>
+                          <td className="px-2 py-1.5 text-[#52634b] dark:text-[#c5d6b8]">{student.attendance}</td>
+                          <td className="px-2 py-1.5"><span className="rounded-full bg-[#e5efdf] px-2 py-1 text-[6px] font-semibold text-[#45683b]">Enrolled</span></td>
+                        </tr>
+                      ))}
+                      {!filteredStudents.length && (
+                        <tr><td colSpan={5} className="py-6 text-center text-[7px] text-[#74806f]">No students match your search.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[6px] text-[#74806f] dark:text-[#9ca797]">
+                  <span>Showing {filteredStudents.length ? 1 : 0}–{filteredStudents.length} of 28 students</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="font-semibold text-[#405c35] dark:text-[#c5d6b8]">Prev</button>
+                    <span className="grid size-4 place-items-center rounded-full bg-[#e5efdf] font-bold text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">1</span>
+                    <span>2</span><span>3</span><span>4</span>
+                    <button type="button" className="rounded-full bg-[#f1f4ed] px-2 py-1 font-semibold text-[#405c35] dark:bg-[#20271e] dark:text-[#c5d6b8]">Next</button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                {approvals.map((student, index) => (
+                  <div key={student.name} className="flex items-center gap-2 rounded-lg bg-[#f6f7f3] p-2 dark:bg-[#20271e]">
+                    <span className={`grid size-6 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>{student.name.split(" ").map((part) => part[0]).join("")}</span>
+                    <div className="min-w-0 flex-1"><p className="text-[7px] font-semibold text-[#35402f] dark:text-[#e1e8dc]">{student.name}</p><p className="text-[6px] text-[#74806f] dark:text-[#9ca797]">{student.meta}</p></div>
+                    <button type="button" onClick={() => dismissApproval(student.name)} className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2.5 py-1 text-[6px] font-semibold text-white"><Check size={8} /> Approve</button>
+                    <button type="button" onClick={() => dismissApproval(student.name)} aria-label={`Dismiss ${student.name}`} className="grid size-5 place-items-center rounded-full bg-white text-[#71806b] dark:bg-[#161b17]"><X size={9} /></button>
+                  </div>
+                ))}
+                {!approvals.length && <p className="py-6 text-center text-[7px] text-[#74806f]">No join requests are waiting.</p>}
+              </div>
+            )}
+
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              <article className="rounded-xl border border-[#edf0e9] p-3 dark:border-[#2a312a]">
+                <h3 className="text-[8px] font-bold text-[#243020] dark:text-[#ecf1ea]">Invite students</h3>
+                <p className="mt-0.5 text-[6px] text-[#74806f] dark:text-[#9ca797]">One code, a connected classroom.</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <code className="text-[12px] font-bold tracking-wide text-[#253322] dark:text-[#e1e8dc]">ALG-9A-26</code>
+                  <button type="button" onClick={copyInviteCode} className="inline-flex items-center gap-1 rounded-full bg-[#f1f4ed] px-2.5 py-1.5 text-[6px] font-semibold text-[#43543a] dark:bg-[#20271e] dark:text-[#c5d6b8]"><Copy size={9} /> Copy code</button>
+                </div>
+                <p role="status" className="mt-1 text-[6px] text-[#74806f] dark:text-[#9ca797]">{copyMessage || "Students can request to join from their Konnect account."}</p>
+              </article>
+              <article className="rounded-xl border border-[#edf0e9] p-3 dark:border-[#2a312a]">
+                <h3 className="text-[8px] font-bold text-[#243020] dark:text-[#ecf1ea]">{approvals.length} join requests waiting</h3>
+                <p className="mt-0.5 text-[6px] text-[#74806f] dark:text-[#9ca797]">{approvals.map((student) => student.name).join(", ") || "No requests are waiting."}</p>
+                <button type="button" onClick={() => setRosterTab("requests")} className="mt-2 rounded-full bg-[#e5efdf] px-2.5 py-1.5 text-[6px] font-semibold text-[#405c35] dark:bg-[#263722] dark:text-[#c5d6b8]">Review requests</button>
+              </article>
             </div>
           </section>
 
-          <section
+          {!isRosterView && <section
             aria-label="My notes"
             className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
           >
@@ -239,10 +359,10 @@ export default function TeacherDashboardPage() {
             <button type="button" className="mt-2 block w-full text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
               View All Notes <span aria-hidden="true">›</span>
             </button>
-          </section>
+          </section>}
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(235px,1fr)]">
+        {!isRosterView && <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(235px,1fr)]">
           <section aria-label="My active classes">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[9px] font-bold text-[#253322] dark:text-[#e1e8dc]">
@@ -310,7 +430,7 @@ export default function TeacherDashboardPage() {
               <CalendarDays size={9} /> View assignments <ArrowRight size={8} />
             </Link>
           </section>
-        </div>
+        </div>}
       </div>
     </DashboardShell>
   );

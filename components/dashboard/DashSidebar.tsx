@@ -193,6 +193,11 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => {
                   setActiveLink({ name: item.name, href: normalizedHref });
+                  if (item.href.startsWith("/teacher/dashboard#")) {
+                    window.dispatchEvent(new CustomEvent("konnect-dashboard-section", {
+                      detail: item.href.split("#")[1],
+                    }));
+                  }
                   onNavigate?.();
                 }}
                 style={{
