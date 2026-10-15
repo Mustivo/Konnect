@@ -30,6 +30,7 @@ import {
   marginTop = extra gap above the item (the screenshot's rhythm is uneven)
 */
 type DashboardRole = "learner" | "teacher" | "admin";
+type DashboardRole = "learner" | "teacher" | "admin";
 type MenuItem = {
   name: string;
   href: string;
@@ -63,8 +64,8 @@ const learnerMenuItems: MenuItem[] = [
 
 const teacherMenuItems: MenuItem[] = [
   { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
-  { name: "Classes", href: "/teacher/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
-  { name: "Attendance", href: "/teacher/dashboard#attendance", icon: CalendarDays, left: 20, marginTop: 1 },
+  { name: "Classes", href: "/teacher/classes", icon: BookOpen, left: 20, marginTop: 1, badge: "3/3" },
+  { name: "Attendance", href: "/teacher/attendance", icon: CalendarDays, left: 20, marginTop: 1 },
   { name: "Students Roster", href: "/teacher/dashboard#students", icon: Users, left: 20, marginTop: 1 },
   { name: "Activities", href: "/teacher/activities", icon: ClipboardList, left: 20, marginTop: 0, nested: [
     { name: "Assignments", href: "/teacher/activities/assignments", icon: ClipboardList, left: 20 },
@@ -143,7 +144,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
   }
 
   return (
-    <aside className="flex h-full w-[252px] flex-col overflow-hidden rounded-none bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors">
+    <aside className="flex h-full w-[min(252px,85vw)] flex-col overflow-hidden rounded-l-[14px] bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors md:w-[252px]">
       <div className="h-[92px] shrink-0 pl-[64px] pt-[28px]">
         <Image
           src="/konnect-wordmark.png"
@@ -181,14 +182,9 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                   <div key={item.name} className="pt-0">
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveLink({ name: item.name, href: normalizedHref });
-                        setTasksOpen((open) => !open);
-                      }}
-                      className={`ml-1 flex w-[calc(100%-0.25rem)] items-center px-[18px] transition-colors ${isActive
-                        ? "h-12 rounded-l-md rounded-r-none bg-[#f2f3ed] font-semibold text-[#40522c] dark:bg-[#111510] dark:text-[#e4efe0]"
-                        : "h-10 rounded-l-lg text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
-                      }`}
+                      onClick={() => setTasksOpen((open) => !open)}
+                      aria-expanded={tasksOpen}
+                      className="ml-1 flex h-10 w-[calc(100%-0.25rem)] items-center rounded-l-lg px-[18px] text-[#596052] transition-colors hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
                       style={{ marginTop: item.marginTop }}
                     >
                       <Icon size={14} className="shrink-0" />
@@ -214,7 +210,10 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                                 key={subItem.name}
                                 href={subItem.href}
                                 aria-current={isSubItemActive ? "page" : undefined}
-                                onClick={() => setActiveLink({ name: subItem.name, href: subItem.href.split("#")[0] })}
+                                onClick={() => {
+                                  setActiveLink({ name: subItem.name, href: subItem.href });
+                                  onNavigate?.();
+                                }}
                                 className={`flex h-8 items-center rounded-l-lg px-2 transition-colors ${isSubItemActive
                                   ? "bg-[#f2f3ed] font-bold text-[#40522c] dark:bg-[#111510] dark:text-[#e4efe0]"
                                   : "text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
@@ -236,7 +235,10 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                 key={item.name}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => setActiveLink({ name: item.name, href: normalizedHref })}
+                onClick={() => {
+                  setActiveLink({ name: item.name, href: normalizedHref });
+                  onNavigate?.();
+                }}
                 style={{
                   marginTop: item.marginTop,
                   paddingLeft: item.left - 4,

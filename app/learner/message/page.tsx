@@ -212,7 +212,7 @@ export default function LearnerMessagesPage() {
                       <ArrowDownToLine size={13} className="shrink-0 text-[#718064]" />
                     </div>}
                     {message.link && <a href={message.link.url} target="_blank" rel="noreferrer" className="mt-2 block rounded-md border border-[#e4e8df] bg-white p-2 hover:border-[#b8c4ad]">
-                      <span className="flex items-center gap-1.5 text-[8px] font-bold"><Link2 size={11} className="text-[#6c805e]" />{message.link.title}<ArrowUpRight size={10} /></span>
+                      <span className="flex items-center gap-1.5 text-[8px] font-bold"><Link2 size={11} className="shrink-0 text-[#6c805e]" /><span className="min-w-0 break-words">{message.link.title}</span><ArrowUpRight size={10} className="shrink-0" /></span>
                       <span className="mt-1 block truncate text-[7px] text-[#73816a]">{message.link.url}</span>
                       <span className="mt-1 block text-[7px] text-[#8a9187]">{message.link.site}</span>
                     </a>}
