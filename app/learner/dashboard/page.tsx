@@ -119,8 +119,9 @@ export default function LearnerDashboardPage() {
 
       try {
         const user = await currentUser();
-        if (user.role !== "LEARNER") {
-          router.replace(user.role === "TEACHER" ? "/teacher/dashboard" : "/admin/dashboard");
+        const normalizedRole = String(user.role ?? "").trim().toUpperCase();
+        if (normalizedRole !== "LEARNER" && normalizedRole !== "STUDENT") {
+          router.replace(normalizedRole === "TEACHER" ? "/teacher/dashboard" : "/admin/dashboard");
           return;
         }
 
@@ -136,7 +137,7 @@ export default function LearnerDashboardPage() {
         const classes = classesResult.status === "fulfilled" ? classesResult.value : [];
         const submissions = submissionsResult.status === "fulfilled" ? submissionsResult.value : [];
         const profile = profileResult.status === "fulfilled" ? profileResult.value : {};
-        const fullName = `${user.first_name} ${user.last_name}`.trim();
+        const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Learner";
 
         setData({
           name: fullName || user.username || "Learner",

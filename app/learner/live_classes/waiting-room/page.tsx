@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiJson } from "@/lib/api";
+import { apiJson, currentUser } from "@/lib/api";
 import { getSession, joinSession } from "@/lib/api/sessions";
 import {
   ArrowLeft,
@@ -46,7 +46,18 @@ function LiveClassWaitingRoomContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") || "";
   const [session, setSession] = useState({ ...fallbackSession, id: sessionId || fallbackSession.id });
+  const [userName, setUserName] = useState("Learner");
+  const [userInitials, setUserInitials] = useState("L");
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    currentUser().then((u) => {
+      const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
+      setUserName(full);
+      const initials = full.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "L";
+      setUserInitials(initials);
+    }).catch(() => undefined);
+  }, []);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [microphoneOn, setMicrophoneOn] = useState(false);
@@ -244,11 +255,11 @@ function LiveClassWaitingRoomContent() {
               <video ref={videoRef} autoPlay muted playsInline className="h-full w-full -scale-x-100 object-cover" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#263426] text-[#e1e8dc]">
-                <span className="grid h-20 w-20 place-items-center rounded-full bg-[#496342] text-2xl font-semibold">GI</span>
+                <span className="grid h-20 w-20 place-items-center rounded-full bg-[#496342] text-2xl font-semibold">{userInitials}</span>
                 <span className="text-[11px] font-medium">Camera is off</span>
               </div>
             )}
-            <div className="absolute left-3 top-3 rounded-md bg-black/45 px-2.5 py-1.5 text-[9px] font-medium text-white">Gabriella Igabe</div>
+            <div className="absolute left-3 top-3 rounded-md bg-black/45 px-2.5 py-1.5 text-[9px] font-medium text-white">{userName}</div>
             <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
               <button type="button" aria-label={microphoneOn ? "Turn microphone off" : "Turn microphone on"} aria-pressed={microphoneOn} onClick={() => toggleDevice("microphone")} className={`grid h-10 w-10 place-items-center rounded-full shadow ${microphoneOn ? "bg-white text-[#263d21]" : "bg-[#a7463a] text-white"}`}>{microphoneOn ? <Mic size={16} /> : <MicOff size={16} />}</button>
               <button type="button" aria-label={cameraOn ? "Turn camera off" : "Turn camera on"} aria-pressed={cameraOn} onClick={() => toggleDevice("camera")} className={`grid h-10 w-10 place-items-center rounded-full shadow ${cameraOn ? "bg-white text-[#263d21]" : "bg-[#a7463a] text-white"}`}>{cameraOn ? <Video size={16} /> : <VideoOff size={16} />}</button>

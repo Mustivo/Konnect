@@ -5,7 +5,7 @@ import Link from "next/link";
 import { apiJson, createTeacherClass } from "@/lib/api";
 import { createClassSession, startSession } from "@/lib/api/sessions";
 import { ApiError, apiErrorMessage } from "@/lib/api/client";
-import { Check, Copy, ExternalLink, X } from "lucide-react";
+import { ArrowRight, Check, Copy, ExternalLink, X } from "lucide-react";
 
 type CreatedClass = { id: string; title: string };
 type CreatedSession = { id: string; title: string; meeting_url: string };
@@ -41,14 +41,18 @@ export default function TeacherClassCreator() {
     const startValue = String(form.get("scheduledStart") ?? "");
     const endValue = String(form.get("scheduledEnd") ?? "");
     const maxStudents = Number(form.get("maxStudents"));
-    let meetingUrl: URL;
+    const rawMeetingUrl = String(form.get("meetingUrl") ?? "").trim();
+    let meetingUrl = "";
 
-    try {
-      meetingUrl = new URL(String(form.get("meetingUrl") ?? "").trim());
-      if (!['https:', 'http:'].includes(meetingUrl.protocol)) throw new Error("Use a valid HTTPS meeting link.");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Enter a valid meeting link.");
-      return;
+    if (rawMeetingUrl) {
+      try {
+        const parsed = new URL(rawMeetingUrl);
+        if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("Use a valid HTTPS meeting link.");
+        meetingUrl = parsed.toString();
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Enter a valid meeting link.");
+        return;
+      }
     }
 
     const startDate = new Date(startValue);
@@ -78,18 +82,21 @@ export default function TeacherClassCreator() {
         setCreatedClass(newClass);
       }
 
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+      const finalMeetingUrl = meetingUrl || `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(newClass.id)}`;
+
       const session = await apiJson<CreatedSession>(await createClassSession(newClass.id, {
         class_room: newClass.id,
         title: sessionTitle,
         agenda: description,
         scheduled_start: startDate.toISOString(),
         scheduled_end: endDate.toISOString(),
-        status: "SCHEDULED",
+        status: "LIVE",
         room_id: crypto.randomUUID(),
-        meeting_url: meetingUrl.toString(),
+        meeting_url: finalMeetingUrl,
       }));
       setCreatedSession(session);
-      setNotice("Class and live session created. Enrolled learners can join using this link.");
+      setNotice("Class and live session created! Share the learner join link below.");
       formElement.reset();
     } catch (error) {
       const message = apiErrorMessage(error instanceof ApiError ? error.payload : error, "The class could not be created. Please try again.");
@@ -103,9 +110,9 @@ export default function TeacherClassCreator() {
     if (!createdSession?.meeting_url) return;
     try {
       await navigator.clipboard.writeText(createdSession.meeting_url);
-      setNotice("Meeting link copied.");
+      setNotice("Learner join link copied to clipboard!");
     } catch {
-      setNotice("Could not copy the link. Use the open link button instead.");
+      setNotice("Could not copy the link. Please select and copy manually.");
     }
   }
 
@@ -115,7 +122,7 @@ export default function TeacherClassCreator() {
     setNotice("");
     try {
       await startSession(createdSession.id);
-      setNotice("Session is live. Open the meeting link to admit learners and share your screen.");
+      setNotice("Session is live! Open the classroom studio to broadcast and admit learners.");
     } catch (error) {
       setNotice(apiErrorMessage(error instanceof ApiError ? error.payload : error, "Could not start the session."));
     } finally {
@@ -132,25 +139,38 @@ export default function TeacherClassCreator() {
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#657a55] dark:text-[#a8be97]">Teacher workspace</p>
             <h2 id="create-class-title" className="mt-1 text-lg font-bold text-[#172115] dark:text-[#ecf1ea]">Create a class and live session</h2>
-            <p className="mt-1 text-[11px] text-[#707c6c] dark:text-[#a6aea0]">Add a class, schedule its first session, and attach a meeting link.</p>
+            <p className="mt-1 text-[11px] text-[#707c6c] dark:text-[#a6aea0]">Add a class, schedule its live session, and generate the learner invite link.</p>
           </div>
           <button type="button" aria-label="Close create class" disabled={saving} onClick={() => setOpen(false)} className="grid size-8 shrink-0 place-items-center rounded border border-[#e0e5dd] text-[#596552] hover:bg-[#f3f6ef] disabled:opacity-60 dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]"><X size={16} /></button>
         </header>
 
         {createdClass && createdSession ? (
           <div className="mt-5 space-y-4">
-            <div className="rounded border border-[#d7e5cf] bg-[#f1f6ed] p-3 dark:border-[#303b2d] dark:bg-[#20291e]">
+            <div className="rounded border border-[#d7e5cf] bg-[#f1f6ed] p-3.5 dark:border-[#303b2d] dark:bg-[#20291e]">
               <p className="flex items-center gap-2 text-[12px] font-semibold text-[#334b2c] dark:text-[#c5d6bc]"><Check size={15} /> {createdClass.title}</p>
               <p className="mt-1 text-[10px] text-[#64745a] dark:text-[#a6b39e]">{createdSession.title}</p>
+              <div className="mt-3 rounded border border-[#d4e2cc] bg-white p-2.5 dark:border-[#2a3627] dark:bg-[#151d14]">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-[#527045] dark:text-[#a2be94]">Learner Join Link</p>
+                <p className="mt-1 select-all break-all font-mono text-[10px] text-[#1c2719] dark:text-[#e5ece2]">{createdSession.meeting_url}</p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={starting} onClick={() => void startLiveSession()} className="inline-flex min-h-9 items-center gap-2 rounded bg-[#263d21] px-3 text-[10px] font-semibold text-white hover:bg-[#344f2c] disabled:opacity-60">{starting ? "Starting…" : "Start class"}</button>
-              <Link href={`/teacher/live-classes/${encodeURIComponent(createdSession.id)}`} className="inline-flex min-h-9 items-center gap-2 rounded border border-[#dfe5d8] px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]">Open class chat</Link>
-              <a href={createdSession.meeting_url} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-2 rounded bg-[#263d21] px-3 text-[10px] font-semibold text-white hover:bg-[#344f2c]"><ExternalLink size={13} /> Open meeting</a>
-              <button type="button" onClick={() => void copyMeetingLink()} className="inline-flex min-h-9 items-center gap-2 rounded border border-[#dfe5d8] px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]"><Copy size={13} /> Copy meeting link</button>
+              <Link
+                href={`/teacher/live-classes/${encodeURIComponent(createdSession.id)}`}
+                className="inline-flex min-h-9 items-center gap-2 rounded bg-[#263d21] px-3.5 text-[10px] font-semibold text-white shadow-sm hover:bg-[#344f2c]"
+              >
+                Enter Teacher Live Room <ArrowRight size={13} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => void copyMeetingLink()}
+                className="inline-flex min-h-9 items-center gap-2 rounded border border-[#dfe5d8] bg-white px-3 text-[10px] font-semibold text-[#40522c] shadow-sm hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:bg-[#1a2319] dark:text-[#c5d6bc] dark:hover:bg-[#202720]"
+              >
+                <Copy size={13} /> Copy Learner Link
+              </button>
             </div>
-            <p role="status" className="text-[10px] text-[#586b4d] dark:text-[#b6c6a9]">{notice}</p>
-            <p className="text-[9px] text-[#788173] dark:text-[#9aa592]">Meeting controls and screen sharing are provided by the linked meeting service.</p>
+            {notice && <p role="status" className="text-[10px] font-medium text-[#446b38] dark:text-[#b6c6a9]">{notice}</p>}
+            <p className="text-[9px] text-[#788173] dark:text-[#9aa592]">Learners can join the live class through the link and will enter the waiting room or live session.</p>
             <button type="button" onClick={() => setOpen(false)} className="min-h-9 rounded border border-[#dfe5d8] px-3 text-[10px] font-semibold text-[#40522c] hover:bg-[#f3f6ef] dark:border-[#303b2d] dark:text-[#c5d6bc] dark:hover:bg-[#202720]">Done</button>
           </div>
         ) : (
@@ -182,8 +202,14 @@ export default function TeacherClassCreator() {
                 <input name="scheduledEnd" type="datetime-local" required className="mt-1 block h-9 w-full rounded border border-[#e1e6dc] bg-white px-2 text-[11px] font-normal text-[#30392d] outline-none focus:border-[#8ca47e] dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]" />
               </label>
             </div>
-            <label className="block text-[10px] font-semibold text-[#34402f] dark:text-[#d8e0d2]">Meeting link (Google Meet, Zoom, or Teams)
-              <input name="meetingUrl" type="url" required placeholder="https://..." className="mt-1 block h-9 w-full rounded border border-[#e1e6dc] bg-white px-2.5 text-[12px] font-normal text-[#30392d] outline-none focus:border-[#8ca47e] dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]" />
+            <label className="block text-[10px] font-semibold text-[#34402f] dark:text-[#d8e0d2]">
+              Live Class Meeting link (optional)
+              <input
+                name="meetingUrl"
+                type="url"
+                placeholder="Leave blank to auto-generate Konnect Live Class link"
+                className="mt-1 block h-9 w-full rounded border border-[#e1e6dc] bg-white px-2.5 text-[12px] font-normal text-[#30392d] outline-none focus:border-[#8ca47e] dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]"
+              />
             </label>
             <p role="status" className="min-h-4 text-[10px] text-[#8b4138] dark:text-[#f09a8e]">{notice}</p>
             <button type="submit" disabled={saving} className="min-h-10 w-full rounded bg-[#233c20] px-4 text-[11px] font-semibold text-white hover:bg-[#304d2b] disabled:cursor-wait disabled:opacity-60">{saving ? "Creating class and session…" : "Create class and live session"}</button>

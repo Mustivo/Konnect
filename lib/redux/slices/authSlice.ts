@@ -49,15 +49,22 @@ function getBaseUrl(): string {
   }
 }
 
+function getApiEndpoint(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  if (typeof window !== "undefined") {
+    return cleanEndpoint;
+  }
+  const baseUrl = getBaseUrl();
+  return `${baseUrl}${cleanEndpoint}`;
+}
+
 export const loginWithRedux = createAsyncThunk<
   { tokens: TokenPair; user: ApiUser },
   LoginCredentials,
   { rejectValue: AuthMessageState }
 >("auth/loginWithRedux", async (credentials, { rejectWithValue }) => {
-  const baseUrl = getBaseUrl();
-
   try {
-    const tokenResponse = await fetch(`${baseUrl}/api/auth/token/`, {
+    const tokenResponse = await fetch(getApiEndpoint("/api/auth/token/"), {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -89,7 +96,15 @@ export const loginWithRedux = createAsyncThunk<
       });
     }
 
-    const tokens = tokenData as TokenPair;
+    const tokens = tokenData as TokenPair | null;
+
+    if (!tokens || typeof tokens !== "object" || !tokens.access) {
+      return rejectWithValue({
+        type: "error",
+        title: "Authentication error",
+        message: "Invalid response received from the authentication server.",
+      });
+    }
 
     if (typeof window !== "undefined") {
       window.localStorage.setItem("konnect-access-token", tokens.access);
@@ -97,7 +112,7 @@ export const loginWithRedux = createAsyncThunk<
     }
 
     // Fetch user profile
-    const userResponse = await fetch(`${baseUrl}/api/users/me/`, {
+    const userResponse = await fetch(getApiEndpoint("/api/users/me/"), {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${tokens.access}`,
@@ -118,6 +133,14 @@ export const loginWithRedux = createAsyncThunk<
     }
 
     const user = (await userResponse.json()) as ApiUser;
+    if (!user.first_name && user.name) {
+      const parts = user.name.split(" ");
+      user.first_name = parts[0] || "";
+      user.last_name = parts.slice(1).join(" ") || "";
+    }
+    user.first_name = user.first_name || "";
+    user.last_name = user.last_name || "";
+    user.username = user.username || user.email.split("@")[0];
     return { tokens, user };
   } catch (error) {
     return rejectWithValue({
@@ -133,10 +156,8 @@ export const registerWithRedux = createAsyncThunk<
   RegisterData,
   { rejectValue: AuthMessageState }
 >("auth/registerWithRedux", async (payload, { rejectWithValue }) => {
-  const baseUrl = getBaseUrl();
-
   try {
-    const response = await fetch(`${baseUrl}/api/auth/register/`, {
+    const response = await fetch(getApiEndpoint("/api/auth/register/"), {
       method: "POST",
       headers: {
         Accept: "application/json",

@@ -167,7 +167,8 @@ export default function LearnerCoursesPage() {
             const status = course.enrollmentStatus;
             const isTaking = status === "ENROLLED" || status === "COMPLETED";
             const isPending = status === "PENDING";
-            return <article key={course.id} className="flex min-h-[190px] flex-col rounded-lg border border-[#dfe5da] bg-white p-3.5 dark:border-[#212f1f] dark:bg-[#141d13]">
+            return (
+              <article key={course.id} className="flex min-h-[190px] flex-col rounded-lg border border-[#dfe5da] bg-white p-3.5 dark:border-[#212f1f] dark:bg-[#141d13]">
               <div className="relative -mx-3.5 -mt-3.5 mb-3 h-28 overflow-hidden rounded-t-lg bg-[#e8eee3] dark:bg-[#263521]">
                 {course.banner_image ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -185,14 +186,47 @@ export default function LearnerCoursesPage() {
               </div>
               <p className="mt-3 line-clamp-3 flex-1 text-[10px] leading-relaxed text-[#58645b] dark:text-[#a6aea0]">{course.description || "No course description has been added yet."}</p>
               <p className="mt-3 text-[9px] text-[#687463] dark:text-[#9aa592]">{course.teacher_name || "Instructor not listed"}</p>
-              {isTaking ? <Link href="/learner/dashboard" className="mt-3 flex min-h-9 items-center justify-center rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#1b2219] hover:bg-[#f3f6ef] dark:border-[#273724] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]">Open learner dashboard</Link> : isPending ? <button type="button" disabled className="mt-3 min-h-9 rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:text-[#9aa592]">Enrollment pending</button> : <button type="button" disabled={enrollingId === course.id} onClick={() => void enroll(course.id)} className="mt-3 min-h-9 rounded-md bg-[#1b2d1a] text-[10px] font-semibold text-white hover:bg-[#111e10] disabled:cursor-wait disabled:opacity-60 dark:bg-[#273d23]">{enrollingId === course.id ? "Enrolling…" : "Take this course"}</button>}
-            </article>;
-          })}
-+        </div>
-  ) : <div className="mt-4 rounded-lg border border-dashed border-[#d5ddce] px-4 py-10 text-center dark:border-[#303b2d]">
-+        <p className="text-[11px] font-semibold text-[#33412e] dark:text-[#e1e8dc]">{courses.length ? "No courses match these filters." : "No courses are available for your account yet."}</p>
-+        {!courses.length && <p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">Courses will appear here when they are published to the API.</p>}
-+      </div>}
-+    </div>
+              {isTaking ? (
+                <Link
+                  href="/learner/dashboard"
+                  className="mt-3 flex min-h-9 items-center justify-center rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#1b2219] hover:bg-[#f3f6ef] dark:border-[#273724] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]"
+                >
+                  Open learner dashboard
+                </Link>
+              ) : isPending ? (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-3 min-h-9 rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:text-[#9aa592]"
+                >
+                  Enrollment pending
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={enrollingId === course.id}
+                  onClick={() => void enroll(course.id)}
+                  className="mt-3 min-h-9 rounded-md bg-[#1b2d1a] text-[10px] font-semibold text-white hover:bg-[#111e10] disabled:cursor-wait disabled:opacity-60 dark:bg-[#273d23]"
+                >
+                  {enrollingId === course.id ? "Enrolling…" : "Take this course"}
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-dashed border-[#d5ddce] px-4 py-10 text-center dark:border-[#303b2d]">
+          <p className="text-[11px] font-semibold text-[#33412e] dark:text-[#e1e8dc]">
+            {courses.length ? "No courses match these filters." : "No courses are available for your account yet."}
+          </p>
+          {!courses.length && (
+            <p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">
+              Courses will appear here when they are published to the API.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

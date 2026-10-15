@@ -109,7 +109,7 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
         className="my-3.5"
       />
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+      <form onSubmit={handleSubmit} method="POST" className="mt-4 space-y-3">
         <RoleSelector role="learner" onChange={onRoleChange} />
 
         <label className="block text-[0.65rem] font-medium">

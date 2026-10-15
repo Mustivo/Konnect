@@ -403,3 +403,30 @@ html[data-theme="dark"] .learner-page [class*="rounded"] {
   border-color: #2a312a !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18) !important;
 }
+
+/* ================= AUTH NOTIFICATION BANNER ANIMATIONS ================= */
+@keyframes auth-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+@keyframes banner-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-auth-shake {
+  animation: banner-in 0.22s ease-out, auth-shake 0.38s ease-in-out 0.1s;
+}
+
+.animate-banner-in {
+  animation: banner-in 0.22s ease-out;
+}
+

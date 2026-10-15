@@ -118,11 +118,11 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
     setAccountMenuOpen(false);
   }, [isTeacher, pathname]);
 
-  const displayName = user ? `${user.first_name} ${user.last_name}`.trim() || user.username : isAdmin ? "Admin" : isTeacher ? "Teacher" : "Learner";
+  const displayName = user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Learner" : isAdmin ? "Admin" : isTeacher ? "Teacher" : "Learner";
   const profile = {
-    initials: displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "K",
+    initials: displayName.split(/\s+/).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? "").join("") || "K",
     name: displayName,
-    meta: user?.email ?? (user ? user.role.toLowerCase() : "Account"),
+    meta: user?.email ?? (user ? String(user.role).toLowerCase() : "Account"),
   };
   const profileHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=profile";
   const settingsHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=account";

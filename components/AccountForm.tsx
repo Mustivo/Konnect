@@ -106,7 +106,7 @@ export default function AccountForm() {
           className="my-4"
         />
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+        <form onSubmit={handleSubmit} method="POST" className="mt-4 space-y-3">
           <label className="block text-[0.65rem] font-medium">
             Email address
             <input

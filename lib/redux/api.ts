@@ -13,6 +13,10 @@ import type {
 } from "./types";
 
 function getBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    // In browser, use same-origin relative URL so Next.js catch-all proxy routes smoothly without CORS
+    return "";
+  }
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!envUrl) return "https://konnect-classroomvirtual.onrender.com";
   try {

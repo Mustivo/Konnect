@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { leaveSession } from "@/lib/api/sessions";
+import { apiJson } from "@/lib/api";
+import { getSession, leaveSession } from "@/lib/api/sessions";
 import { useSessionChat } from "@/lib/useSessionChat";
 import {
   ArrowDown,
@@ -46,6 +47,17 @@ export default function LiveClassRoomPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
   const { messages, chatError, sending, send } = useSessionChat(sessionId);
+  const [sessionDetails, setSessionDetails] = useState<{
+    title: string;
+    courseTitle: string;
+    teacherName: string;
+    agenda: string;
+  }>({
+    title: "Live Class Session",
+    courseTitle: "Interactive Course",
+    teacherName: "Instructor",
+    agenda: "A structured session connecting lecture, interactive Q&A, and practical exercises.",
+  });
   const [microphoneOn, setMicrophoneOn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -83,6 +95,20 @@ export default function LiveClassRoomPage() {
     setMounted(true);
     setAdmissionVerified(true);
     setDarkMode(window.localStorage.getItem("konnect-theme") === "dark");
+
+    void getSession(activeSessionId)
+      .then((res) => apiJson<Record<string, unknown>>(res))
+      .then((data) => {
+        if (!data) return;
+        const classRoom = typeof data.class_room === "object" && data.class_room ? (data.class_room as Record<string, unknown>) : null;
+        setSessionDetails({
+          title: String(data.title || "Live Class Session"),
+          courseTitle: String(data.course_title || classRoom?.title || classRoom?.subject || "Course"),
+          teacherName: String(data.teacher_name || classRoom?.teacher_name || "Instructor"),
+          agenda: String(data.agenda || "A structured session connecting lecture, interactive Q&A, and practical exercises."),
+        });
+      })
+      .catch(() => undefined);
   }, [router]);
 
   useEffect(() => {
@@ -224,12 +250,12 @@ export default function LiveClassRoomPage() {
             <Video size={16} />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-[12px] font-bold sm:text-[14px]">Design systems &amp; component libraries</h1>
-            <p className="truncate text-[8px] text-[#747c70] dark:text-[#a0aa99]">UI/UX Design · From Wireframes to Prototypes · Amara Okafor · Tue, 6 Oct 2026</p>
+            <h1 className="truncate text-[12px] font-bold sm:text-[14px]">{sessionDetails.title}</h1>
+            <p className="truncate text-[8px] text-[#747c70] dark:text-[#a0aa99]">{sessionDetails.courseTitle} · Host: {sessionDetails.teacherName} · Live Interactive Class</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          <span className="rounded-full bg-[#e8f0df] px-2 py-1 text-[7px] font-semibold text-[#526a40] dark:bg-[#293823] dark:text-[#c2d2b5]">LIVE · 14:18 BST</span>
+          <span className="rounded-full bg-[#e8f0df] px-2 py-1 text-[7px] font-semibold text-[#526a40] dark:bg-[#293823] dark:text-[#c2d2b5]">LIVE · Konnect Classroom</span>
           <button type="button" onClick={() => { setParticipantsOpen(true); setChatOpen(false); }} aria-label="Open participants" title="Participants" className="hidden items-center gap-1.5 text-[8px] text-[#65705d] hover:text-[#40522c] dark:text-[#a0aa99] dark:hover:text-white sm:inline-flex">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef2e9] text-[7px] font-semibold text-[#526744] dark:bg-[#2b3627] dark:text-[#c2d2b5]">19</span>
             19 participants
@@ -262,7 +288,7 @@ export default function LiveClassRoomPage() {
         <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <div className="flex shrink-0 items-center justify-between px-1">
             <p className="text-[8px] text-[#737c70] dark:text-[#a0aa99]">
-              {teacherPresenting ? "Amara Okafor is presenting" : "No presentation · Showing participants"}
+              {teacherPresenting ? `${sessionDetails.teacherName} is presenting` : "No presentation · Showing participants"}
             </p>
             <button
               type="button"
@@ -280,12 +306,12 @@ export default function LiveClassRoomPage() {
               <video ref={screenSharePreviewRef} autoPlay muted playsInline aria-label="Your shared screen preview" className="h-full w-full rounded-md object-contain" />
             ) : teacherPresenting ? (
             <article className="flex h-full min-h-[260px] w-full flex-col overflow-hidden rounded-md bg-[#fafaf5] p-5 sm:p-8">
-              <div className="mb-2 text-[7px] font-semibold uppercase tracking-wide text-[#586a4c]">UI/UX Design / Lesson 6 / Design systems</div>
-              <h2 className="text-[18px] font-bold leading-tight text-[#22291f] sm:text-[24px]">Design systems &amp; component libraries</h2>
+              <div className="mb-2 text-[7px] font-semibold uppercase tracking-wide text-[#586a4c]">{sessionDetails.courseTitle} · Interactive Live Classroom</div>
+              <h2 className="text-[18px] font-bold leading-tight text-[#22291f] sm:text-[24px]">{sessionDetails.title}</h2>
               <div className="mt-3 grid min-h-0 flex-1 gap-4 md:grid-cols-[0.85fr_1.15fr]">
                 <div className="flex flex-col justify-between gap-2">
                   <p className="max-w-sm text-[9px] leading-relaxed text-[#6d7569] sm:text-[10px]">
-                    A design system connects the interface, the language, and the process so teams can ship faster without losing consistency.
+                    {sessionDetails.agenda}
                   </p>
                   <div className="rounded-md bg-[#eaf0e3] p-3">
                     <h3 className="text-[9px] font-semibold text-[#34432d]">Component library</h3>

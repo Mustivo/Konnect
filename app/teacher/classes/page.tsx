@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
 import {
   ArrowRight,
   BookOpen,
+  Check,
   ClipboardList,
   Clock3,
+  Copy,
   Info,
   Plus,
   Users,
+  Video,
 } from "lucide-react";
 
 const initialClasses = [
@@ -72,6 +76,17 @@ export default function TeacherClassesPage() {
   const [completedClassIds, setCompletedClassIds] = useState(completedClasses.map((item) => item.id));
   const [classTab, setClassTab] = useState<"active" | "completed">("active");
   const [loadNotice, setLoadNotice] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function copyLearnerLink(classId: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const link = `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(classId)}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(link).catch(() => undefined);
+    }
+    setCopiedId(classId);
+    setTimeout(() => setCopiedId(null), 2500);
+  }
 
   useEffect(() => {
     if (!window.localStorage.getItem("konnect-access-token")) return;
@@ -144,9 +159,12 @@ export default function TeacherClassesPage() {
             Your classes <span className="ml-1 rounded-full bg-[#e5efdf] px-2 py-1 text-[8px] text-[#34522a] dark:bg-[#263722] dark:text-[#b8c9af]">{activeClassIds.length}/3 active</span>
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-[8px] text-[#707c6c] dark:text-[#9aa592]">Finish a class first to create a new one.</p>
-            <button type="button" disabled className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#dfe9d8] px-3 text-[8px] font-semibold text-[#50664a] disabled:cursor-not-allowed dark:bg-[#263722] dark:text-[#b8c9af]" title="Finish a class first to create a new one">
-              <Plus size={11} /> Create Class
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("konnect-open-create-class"))}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#23351f] px-3.5 text-[8px] font-semibold text-white shadow-sm hover:bg-[#30472b] transition-colors"
+            >
+              <Plus size={11} /> Create Class &amp; Live Room
             </button>
           </div>
         </div>
@@ -203,10 +221,25 @@ export default function TeacherClassesPage() {
                   <p className="mt-1.5 flex items-center gap-1.5"><ClipboardList size={11} />{item.activities} {item.activities === 1 ? "activity" : "activities"} to review</p>
                   <p className="mt-1.5 text-[7px] text-[#879282]">Join code · {item.joinCode}</p>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <button type="button" className="inline-flex items-center gap-1.5 rounded-full bg-[#23351f] px-3 py-1.5 text-[8px] font-semibold text-white hover:bg-[#30472b]">
-                    <ArrowRight size={11} /> Manage
-                  </button>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#edf0e9] pt-2.5 dark:border-[#212f1f]">
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/teacher/live-classes/${item.id}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2.5 py-1.5 text-[8px] font-semibold text-white hover:bg-[#30472b] transition-colors"
+                      title="Enter teacher live studio"
+                    >
+                      <Video size={10} className="text-[#86efac]" /> Studio
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => copyLearnerLink(item.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#dce3d7] bg-[#f8faf6] px-2 py-1.5 text-[8px] font-semibold text-[#405439] hover:bg-[#edf2ea] dark:border-[#2b3a28] dark:bg-[#1a2518] dark:text-[#c2d3bd] transition-colors"
+                      title="Copy join link for learners"
+                    >
+                      {copiedId === item.id ? <Check size={10} className="text-[#2c6e21]" /> : <Copy size={10} />}
+                      {copiedId === item.id ? "Copied!" : "Learner Link"}
+                    </button>
+                  </div>
                   {isActive ? (
                     <button type="button" onClick={() => finishClass(item.id)} className="rounded-lg px-2 py-1.5 text-[8px] font-semibold text-[#34482d] hover:bg-[#f1f5ed] dark:text-[#c9d7c1] dark:hover:bg-[#1b2819]">Mark as Finished</button>
                   ) : (

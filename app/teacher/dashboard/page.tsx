@@ -19,6 +19,7 @@ import {
   Search,
   ThumbsUp,
   Users,
+  Video,
   X,
 } from "lucide-react";
 
@@ -87,6 +88,17 @@ export default function TeacherDashboardPage() {
   const [apiClassCount, setApiClassCount] = useState<number | null>(null);
   const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
   const [loadNotice, setLoadNotice] = useState("");
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
+  function copyClassLink(classId: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const link = `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(classId)}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(link).catch(() => undefined);
+    }
+    setCopiedSessionId(classId);
+    setTimeout(() => setCopiedSessionId(null), 2500);
+  }
 
   function dismissApproval(name: string) {
     setApprovals((current) => current.filter((approval) => approval.name !== name));
@@ -413,12 +425,27 @@ export default function TeacherDashboardPage() {
                     <span className="flex items-center gap-1"><Users size={9} />{item.students} Students</span>
                     <span className="flex items-center gap-1"><FileText size={9} />{item.tasks} Pending Tasks</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between border-t border-[#edf0e9] pt-2 dark:border-[#2a312a]">
-                    <div className="text-[6px] text-[#7c8776] dark:text-[#9ca797]">
-                      <p>{item.schedule}</p><p>({item.time})</p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 border-t border-[#edf0e9] pt-2 dark:border-[#2a312a]">
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/teacher/live-classes/${item.id}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white hover:bg-[#30472b] transition-colors"
+                        title="Enter teacher studio"
+                      >
+                        <Video size={8} className="text-[#86efac]" /> Studio
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => copyClassLink(item.id)}
+                        className="inline-flex items-center gap-1 rounded-full border border-[#dce3d7] bg-[#f8faf6] px-1.5 py-1 text-[6px] font-semibold text-[#405439] hover:bg-[#edf2ea] dark:border-[#2b3a28] dark:bg-[#1a2518] dark:text-[#c2d3bd] transition-colors"
+                        title="Copy learner link"
+                      >
+                        {copiedSessionId === item.id ? <Check size={8} className="text-[#2c6e21]" /> : <Copy size={8} />}
+                        {copiedSessionId === item.id ? "Copied" : "Link"}
+                      </button>
                     </div>
-                    <Link href="/teacher/classes" className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white hover:bg-[#30472b]">
-                      Manage Class <ArrowRight size={8} />
+                    <Link href="/teacher/classes" className="inline-flex items-center gap-1 text-[6px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">
+                      Manage <ArrowRight size={7} />
                     </Link>
                   </div>
                 </article>

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import DashNav from "@/components/dashboard/DashNav";
 import DashSidebar from "@/components/dashboard/DashSidebar";
+import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
 import { Menu, X } from "lucide-react";
 
 type DashboardShellProps = {
@@ -62,6 +63,8 @@ export default function DashboardShell({ children, role = "learner", teacherDash
 					</div>
 				</main>
 			</div>
+
+			{isTeacher && <TeacherClassCreator />}
 		</div>
 	);
 }

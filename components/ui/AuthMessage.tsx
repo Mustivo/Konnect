@@ -117,7 +117,9 @@ export default function AuthMessage({
     <aside
       role={currentType === "error" ? "alert" : "status"}
       aria-live={currentType === "error" ? "assertive" : "polite"}
-      className={`relative my-3.5 w-full overflow-hidden rounded-xl border px-3.5 py-3 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-1.5 ${style.container} ${className}`}
+      className={`relative my-3.5 w-full overflow-hidden rounded-xl border px-3.5 py-3 transition-all duration-300 ease-out ${
+        currentType === "error" ? "animate-auth-shake" : "animate-banner-in"
+      } ${style.container} ${className}`}
     >
       <div className="flex items-start gap-3">
         {/* Rounded Icon Badge */}

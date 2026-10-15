@@ -1,8 +1,8 @@
 import { apiJson, apiRequest } from "./client";
 
-export type ApiRole = "ADMIN" | "TEACHER" | "LEARNER";
+export type ApiRole = "ADMIN" | "TEACHER" | "LEARNER" | "STUDENT" | "admin" | "teacher" | "student" | string;
 export type TokenPair = { access: string; refresh: string };
-export type ApiUser = { id: string; email: string; username: string; first_name: string; last_name: string; phone_number?: string | null; role: ApiRole; is_verified: boolean; avatar: string | null };
+export type ApiUser = { id: string | number; email: string; name?: string; username: string; first_name: string; last_name: string; phone_number?: string | null; role: ApiRole; is_verified?: boolean; avatar?: string | null };
 export type RegisterPayload = { email: string; username: string; password: string; password_confirm: string; role: ApiRole; first_name?: string; last_name?: string; phone_number?: string };
 
 export async function login(email: string, password: string) {
@@ -21,7 +21,18 @@ export async function register(payload: RegisterPayload) {
     body: JSON.stringify(payload),
   }));
 }
-export async function currentUser() { return apiJson<ApiUser>(await apiRequest("/api/users/me/", { fallbackPaths: ["/api/auth/me/"] })); }
+export async function currentUser() {
+  const user = await apiJson<ApiUser>(await apiRequest("/api/users/me/", { fallbackPaths: ["/api/auth/me/"] }));
+  if (!user.first_name && user.name) {
+    const parts = user.name.split(" ");
+    user.first_name = parts[0] || "";
+    user.last_name = parts.slice(1).join(" ") || "";
+  }
+  user.first_name = user.first_name || "";
+  user.last_name = user.last_name || "";
+  user.username = user.username || user.email.split("@")[0];
+  return user;
+}
 export async function updateCurrentUser(payload: FormData | Record<string, unknown>) {
   const user = await apiJson<ApiUser>(await apiRequest("/api/users/me/", {
     method: "PATCH",

@@ -26,7 +26,9 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}) 
     const headers = new Headers(requestHeaders);
     headers.set("Accept", "application/json");
     if (requestOptions.body && !(requestOptions.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    const url = `${apiBaseUrl}${candidatePath.startsWith("/") ? candidatePath : `/${candidatePath}`}`;
+    const url = typeof window !== "undefined"
+      ? (candidatePath.startsWith("/") ? candidatePath : `/${candidatePath}`)
+      : `${apiBaseUrl}${candidatePath.startsWith("/") ? candidatePath : `/${candidatePath}`}`;
     const send = () => fetch(url, { ...requestOptions, headers, credentials: "include" });
 
     if (!auth || typeof window === "undefined") {
