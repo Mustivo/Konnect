@@ -20,6 +20,7 @@ import {
   ChevronRight,
   BarChart3,
   Users,
+  FileText,
 } from "lucide-react";
 
 /*
@@ -74,7 +75,12 @@ const teacherMenuItems: MenuItem[] = [
 ];
 
 const adminMenuItems: MenuItem[] = [
+  { name: "Analytics", href: "/admin/analytics", icon: BarChart3, left: 20, marginTop: 0 },
+  { name: "Approval", href: "/admin/approval", icon: UserCheck, left: 20, marginTop: 1 },
+  { name: "Classes", href: "/admin/classes", icon: BookOpen, left: 20, marginTop: 1 },
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
+  { name: "Management", href: "/admin/management", icon: Users, left: 20, marginTop: 1 },
+  { name: "Reports", href: "/admin/reports", icon: FileText, left: 20, marginTop: 1 },
   { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
@@ -119,7 +125,12 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
               ? selectedLinkName === item.name || isNestedItemActive
               : role === "admin"
                 ? (item.name === "Dashboard" && pathname.startsWith("/admin/dashboard")) ||
-                  (item.name === "Settings" && pathname.startsWith("/admin/settings"))
+                    (item.name === "Analytics" && pathname.startsWith("/admin/analytics")) ||
+                    (item.name === "Approval" && pathname.startsWith("/admin/approval")) ||
+                    (item.name === "Classes" && pathname.startsWith("/admin/classes")) ||
+                    (item.name === "Management" && pathname.startsWith("/admin/management")) ||
+                    (item.name === "Reports" && pathname.startsWith("/admin/reports")) ||
+                    (item.name === "Settings" && pathname.startsWith("/admin/settings"))
                 : isTeacher
                 ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") ||
                   (item.name === "Classes" && pathname.startsWith("/teacher/classes")) ||
