@@ -23,6 +23,7 @@ import {
   UserRound,
   BarChart3,
   Users,
+  FileText,
 } from "lucide-react";
 
 /*
@@ -77,12 +78,12 @@ const teacherMenuItems: MenuItem[] = [
 ];
 
 const adminMenuItems: MenuItem[] = [
+  { name: "Analytics", href: "/admin/analytics", icon: BarChart3, left: 20, marginTop: 0 },
+  { name: "Approval", href: "/admin/approval", icon: UserCheck, left: 20, marginTop: 1 },
+  { name: "Classes", href: "/admin/classes", icon: BookOpen, left: 20, marginTop: 1 },
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
-  { name: "Teachers", href: "/admin/dashboard#teachers", icon: Users, left: 20, marginTop: 1, badge: "4" },
-  { name: "Learners", href: "/admin/dashboard#learners", icon: GraduationCap, left: 20, marginTop: 1, badge: "1,248" },
-  { name: "Classes", href: "/admin/dashboard#classes", icon: BookOpen, left: 20, marginTop: 1, badge: "62" },
-  { name: "Reports & Permissions", href: "/admin/dashboard#reports", icon: BarChart3, left: 20, marginTop: 1 },
-  { name: "Analytics", href: "/admin/dashboard#analytics", icon: BarChart3, left: 20, marginTop: 1 },
+  { name: "Management", href: "/admin/management", icon: Users, left: 20, marginTop: 1 },
+  { name: "Reports", href: "/admin/reports", icon: FileText, left: 20, marginTop: 1 },
   { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
@@ -164,8 +165,14 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
             const isNestedItemActive = item.nested?.some((subItem) => subItem.name === selectedLinkName) ?? false;
             const isActive = selectedLinkName
               ? selectedLinkName === item.name || isNestedItemActive
-              : isAdmin
-                ? (item.name === "Dashboard" && pathname === "/admin/dashboard") || (item.name === "Teachers" && pathname === "/admin/dashboard") || (item.name === "Learners" && pathname === "/admin/dashboard") || (item.name === "Classes" && pathname === "/admin/dashboard") || (item.name === "Reports & Permissions" && pathname === "/admin/dashboard") || (item.name === "Analytics" && pathname === "/admin/dashboard") || (item.name === "Settings" && pathname === "/admin/dashboard")
+              : role === "admin"
+                ? (item.name === "Dashboard" && pathname.startsWith("/admin/dashboard")) ||
+                    (item.name === "Analytics" && pathname.startsWith("/admin/analytics")) ||
+                    (item.name === "Approval" && pathname.startsWith("/admin/approval")) ||
+                    (item.name === "Classes" && pathname.startsWith("/admin/classes")) ||
+                    (item.name === "Management" && pathname.startsWith("/admin/management")) ||
+                    (item.name === "Reports" && pathname.startsWith("/admin/reports")) ||
+                    (item.name === "Settings" && pathname.startsWith("/admin/settings"))
                 : isTeacher
                   ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Students Roster" && pathname === "/teacher/student") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
                   : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
