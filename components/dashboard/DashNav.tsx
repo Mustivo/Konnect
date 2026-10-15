@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Bell, CalendarDays, Plus } from "lucide-react";
@@ -15,7 +16,7 @@ const teacherPageHeaders: Record<string, { title: string; description: string; s
   "/teacher/settings": { title: "Settings", description: "Make Konnect feel right for you and your classroom.", searchPlaceholder: "Search settings..." },
 };
 
-export default function DashNav({ role = "learner" }: { role?: DashboardRole }) {
+export default function DashNav({ role = "learner", menuButton }: { role?: DashboardRole; menuButton?: ReactNode }) {
   const pathname = usePathname();
   const [currentDate, setCurrentDate] = useState("Today");
   const isTeacher = role === "teacher";
@@ -39,6 +40,7 @@ export default function DashNav({ role = "learner" }: { role?: DashboardRole }) 
 
   return (
     <header className={`${isTeacher ? "h-14 px-5" : "h-16 pl-3 pr-3"} flex min-w-0 items-center justify-between gap-3`}>
+      {menuButton}
       {teacherPageHeader ? (
         <div className="min-w-0 flex-1 leading-tight">
           <h1 className="text-[20px] font-bold text-[#172115] dark:text-[#ecf1ea]">{teacherPageHeader.title}</h1>

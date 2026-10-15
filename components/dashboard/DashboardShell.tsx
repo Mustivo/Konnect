@@ -13,7 +13,9 @@ type DashboardShellProps = {
 };
 
 export default function DashboardShell({ children, role = "learner", teacherDashboard = false }: DashboardShellProps) {
+	const isTeacher = role === "teacher";
 	const useTeacherPagePadding = role === "teacher" && !teacherDashboard;
+	const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
 	return (
 		<div className={`learner-page ${isTeacher ? "teacher-page" : ""} flex h-screen overflow-hidden bg-[#f2f3ed] dark:bg-[#111510] text-[#171d15] dark:text-[#ecf1ea] transition-colors`}>

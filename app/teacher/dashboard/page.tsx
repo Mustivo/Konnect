@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
@@ -26,10 +27,12 @@ const stats = [
   { label: "Approvals", value: "3", note: "New requests today", icon: Check, tone: "bg-[#fef4e8] text-[#c2781b]" },
 ];
 
-const classes = [
-  { code: "MATH 101", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, time: "Mon, Wed, Fri (09:00 AM)" },
-  { code: "ALG 201", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, time: "Tue, Thu (11:00 AM)" },
-  { code: "GEOM 301", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, time: "Mon, Wed (02:00 PM)" },
+type TeacherClassSummary = { id: string; code: string; subject: string; title: string; group: string; students: number; tasks: number; schedule: string; time: string };
+
+const classes: TeacherClassSummary[] = [
+  { id: "algebra", code: "MATH 101", subject: "MATH 101 · GRADE 1", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
+  { id: "geometry", code: "ALG 201", subject: "ALG 201 · GRADE 1", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, schedule: "Tue, Thu", time: "11:00 AM" },
+  { id: "trigonometry", code: "GEOM 301", subject: "GEOM 301 · GRADE 2", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, schedule: "Mon, Wed", time: "02:00 PM" },
 ];
 
 type ApiClassRoom = { id: string; title: string; subject?: string; enrolled_count?: string | number; max_students?: number; start_date?: string | null };
@@ -59,9 +62,16 @@ const plannerItems = [
 
 export default function TeacherDashboardPage() {
   const [activeClasses, setActiveClasses] = useState(classes);
+  const [approvals, setApprovals] = useState(initialApprovals);
+  const [notes] = useState(initialNotes);
+  const [, setAddingNote] = useState(false);
   const [apiClassCount, setApiClassCount] = useState<number | null>(null);
   const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
   const [loadNotice, setLoadNotice] = useState("");
+
+  function dismissApproval(name: string) {
+    setApprovals((current) => current.filter((approval) => approval.name !== name));
+  }
 
   useEffect(() => {
     if (!window.localStorage.getItem("konnect-access-token")) return;
@@ -81,12 +91,15 @@ export default function TeacherDashboardPage() {
             taskCount = 0;
           }
           return {
+            id: classRoom.id,
             code: (classRoom.subject || `CLASS ${index + 1}`).toUpperCase().slice(0, 12),
+            subject: `${(classRoom.subject || `CLASS ${index + 1}`).toUpperCase()} · CLASS`,
             title: classRoom.title,
             group: classRoom.subject || `Class ${index + 1}`,
             students: Number(classRoom.enrolled_count) || 0,
             tasks: taskCount,
-            time: classRoom.start_date ? `Starts ${new Date(classRoom.start_date).toLocaleDateString("en-GB")}` : "Schedule to be announced",
+            schedule: classRoom.start_date ? "Starts" : "Schedule",
+            time: classRoom.start_date ? new Date(classRoom.start_date).toLocaleDateString("en-GB") : "To be announced",
           };
         }));
 
@@ -140,11 +153,9 @@ export default function TeacherDashboardPage() {
                 <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`}>
                   <Icon size={14} />
                 </span>
-                <strong className="text-[16px] leading-none text-[#172115] dark:text-[#ecf1ea]">{value}</strong>
-                <span className="mt-1 text-[7px] text-[#778171] dark:text-[#a4af9e]">{label}</span>
               </div>
-            ))}
-          </div>
+            </article>
+          ))}
         </section>
 
         <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
@@ -247,14 +258,12 @@ export default function TeacherDashboardPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              {activeClasses.map((item) => (
-                <article key={item.title} className="rounded-xl border border-[#e2e7dd] bg-white p-3.5 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
-                  <div className="mb-2.5 flex items-center justify-between">
-                    <span className="text-[9.5px] font-bold tracking-wider text-[#707c6c]">{item.code}</span>
-                    <span className="rounded-full bg-[#eaf4e6] px-2 py-0.5 text-[9px] font-bold text-[#2c6e21]">Active</span>
-                  </div>
-                  <button type="button" aria-label={`More options for ${note.title}`} className="text-[#889382]"><MoreVertical size={11} /></button>
+            <div className="space-y-2">
+              {notes.map((note) => (
+                <article key={note.title} className="rounded-lg bg-[#f6f7f3] p-2.5 dark:bg-[#20271e]">
+                  <h3 className="text-[8px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{note.title}</h3>
+                  <p className="mt-1 text-[7px] text-[#7c8776] dark:text-[#9ca797]">{note.text}</p>
+                  <p className="mt-1 text-[6px] text-[#7c8776] dark:text-[#9ca797]">{note.date}</p>
                 </article>
               ))}
             </div>

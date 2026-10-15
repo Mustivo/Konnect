@@ -30,7 +30,6 @@ import {
   marginTop = extra gap above the item (the screenshot's rhythm is uneven)
 */
 type DashboardRole = "learner" | "teacher" | "admin";
-type DashboardRole = "learner" | "teacher" | "admin";
 type MenuItem = {
   name: string;
   href: string;
@@ -87,7 +86,7 @@ const adminMenuItems: MenuItem[] = [
   { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
-export default function DashSidebar({ role = "learner" }: { role?: DashboardRole }) {
+export default function DashSidebar({ role = "learner", onNavigate }: { role?: DashboardRole; onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const isTeacher = role === "teacher";
