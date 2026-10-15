@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
 import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
 import {
   ArrowRight,
@@ -118,8 +119,9 @@ export default function TeacherDashboardPage() {
   });
 
   return (
-    <DashboardShell role="teacher">
-      <div className="space-y-5 pb-8 pt-1">
+    <DashboardShell role="teacher" teacherDashboard>
+      <TeacherClassCreator />
+      <div className="space-y-5 pt-1 pb-8">
         <header className="flex flex-col gap-1.5">
           <div>
             <p className="text-[12px] font-medium leading-5 text-[#707c6c]">Good afternoon,</p>

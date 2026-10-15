@@ -192,7 +192,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                       style={{ marginTop: item.marginTop }}
                     >
                       <Icon size={14} className="shrink-0" />
-                      <span className="ml-[35px] flex-1 text-left text-[11.5px] font-medium leading-none">
+                      <span className="ml-[35px] flex-1 text-left text-[14px] font-medium leading-none">
                         {item.name}
                       </span>
                       <ChevronRight
@@ -220,7 +220,7 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
                                   : "text-[#596052] hover:bg-[#f2f3ed] hover:text-[#40522c] dark:text-[#849480] dark:hover:bg-[#141b13] dark:hover:text-[#ecf1ea]"
                                 }`}
                               >
-                                <span className="text-[11.5px] font-semibold leading-none">{subItem.name}</span>
+                                <span className="text-[14px] font-semibold leading-none">{subItem.name}</span>
                               </Link>
                             );
                           })()
@@ -249,11 +249,11 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
               >
                 <Icon size={14} className="shrink-0" />
 
-                <span className={`ml-[33px] text-[11.5px] ${isActive ? "font-bold" : "font-semibold"}`}>
+                <span className={`ml-[33px] text-[14px] ${isActive ? "font-bold" : "font-semibold"}`}>
                   {item.name}
                 </span>
                 {"badge" in item && item.badge ? (
-                  <span className="ml-auto mr-3 rounded-full bg-[#f2f3ed] px-2 py-0.5 text-[9px] font-bold text-[#40522c] dark:bg-[#111510] dark:text-[#b4e3a8]">
+                  <span className="ml-auto mr-3 rounded-full bg-[#f2f3ed] px-2 py-0.5 text-[12px] font-bold text-[#40522c] dark:bg-[#111510] dark:text-[#b4e3a8]">
                     {item.badge}
                   </span>
                 ) : null}
@@ -265,23 +265,23 @@ export default function DashSidebar({ role = "learner" }: { role?: DashboardRole
 
       <div className="relative mt-auto shrink-0 border-t border-[#dae3d0] p-3 dark:border-[#212f1f]">
         {accountMenuOpen && <div id="dashboard-account-menu" className="absolute bottom-[calc(100%-4px)] left-3 right-3 z-30 rounded-md border border-[#d5dfca] bg-white p-1.5 shadow-lg dark:border-[#303b2d] dark:bg-[#1b2419]">
-          <Link href={profileHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "profile" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[11px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
+          <Link href={profileHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "profile" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[14px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
             <UserRound size={13} /> View profile
           </Link>
-          <Link href={settingsHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "account" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[11px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
+          <Link href={settingsHref} onClick={() => { setAccountMenuOpen(false); if (!isTeacher && !isAdmin) window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "account" })); }} className="flex min-h-9 items-center gap-2 rounded px-2 text-[14px] font-medium text-[#33412e] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">
             <Settings size={13} /> Account settings
           </Link>
-          <button type="button" disabled={loggingOut} onClick={handleLogout} className="flex min-h-9 w-full items-center gap-2 rounded px-2 text-left text-[11px] font-medium text-[#9c3434] hover:bg-[#fbefed] disabled:opacity-60 dark:hover:bg-[#35211f]">
+          <button type="button" disabled={loggingOut} onClick={handleLogout} className="flex min-h-9 w-full items-center gap-2 rounded px-2 text-left text-[14px] font-medium text-[#9c3434] hover:bg-[#fbefed] disabled:opacity-60 dark:hover:bg-[#35211f]">
             <LogOut size={13} /> {loggingOut ? "Signing out…" : "Log out"}
           </button>
         </div>}
         <button type="button" aria-expanded={accountMenuOpen} aria-controls="dashboard-account-menu" onClick={() => setAccountMenuOpen((open) => !open)} className="flex min-h-[48px] w-full items-center rounded px-1 text-left hover:bg-black/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43] dark:hover:bg-white/[0.05]">
-          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#eaf0e3] text-[10px] font-semibold text-[#3a4a30] dark:bg-[#1e2d1d] dark:text-[#aee09f]">
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#eaf0e3] text-[12px] font-semibold text-[#3a4a30] dark:bg-[#1e2d1d] dark:text-[#aee09f]">
             {profile.initials}
           </span>
           <span className="ml-2.5 min-w-0 flex-1 leading-none">
-            <span className="block truncate text-[11px] font-semibold text-[#171d15] dark:text-[#ecf1ea]">{profile.name}</span>
-            <span className="mt-[7px] block truncate text-[9.5px] text-[#67705f] dark:text-[#849480]">{profile.meta}</span>
+            <span className="block truncate text-[14px] font-semibold text-[#171d15] dark:text-[#ecf1ea]">{profile.name}</span>
+            <span className="mt-[7px] block truncate text-[12px] text-[#67705f] dark:text-[#849480]">{profile.meta}</span>
           </span>
           <ChevronDown size={14} className={`shrink-0 text-[#444c3f] transition-transform dark:text-[#849480] ${accountMenuOpen ? "rotate-180" : ""}`} />
         </button>

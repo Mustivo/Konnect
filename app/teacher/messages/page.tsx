@@ -117,13 +117,8 @@ export default function TeacherMessagesPage() {
 
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-3 py-1">
-        <header>
-          <h1 className="text-[20px] font-bold leading-tight text-[#172115] dark:text-[#ecf1ea]">Messages</h1>
-          <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">A connected classroom starts with a conversation.</p>
-        </header>
-
-        <section className="grid h-[min(660px,calc(100dvh-175px))] min-h-0 min-w-0 grid-cols-1 overflow-hidden rounded-xl border border-[#e3e8df] bg-white shadow-[0_2px_8px_rgba(35,49,28,0.04)] md:grid-cols-[230px_minmax(0,1fr)]" aria-label="Teacher messages">
+      <div className="flex min-h-[calc(100dvh-88px)] flex-col md:min-h-0">
+        <section className="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[#e3e8df] bg-white shadow-[0_2px_8px_rgba(35,49,28,0.04)] md:fixed md:left-[268px] md:right-4 md:top-[72px] md:bottom-4 md:z-10 md:grid-cols-[290px_minmax(0,1fr)]" aria-label="Teacher messages">
           <aside className="flex min-h-0 flex-col border-b border-[#edf0e9] md:border-b-0 md:border-r">
             <div className="space-y-2.5 p-3">
               <div className="flex items-center justify-between gap-2"><h2 className="text-[11px] font-bold text-[#273124] dark:text-[#e5ebdf]">Inbox</h2><span className="rounded-full bg-[#e5f0df] px-2 py-1 text-[7px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">{unreadCount} unread</span></div>

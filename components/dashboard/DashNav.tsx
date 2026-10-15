@@ -2,16 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Search, Bell, CalendarDays, Plus } from "lucide-react";
 
 type DashboardRole = "learner" | "teacher" | "admin";
+const teacherPageHeaders: Record<string, { title: string; description: string; searchPlaceholder: string }> = {
+  "/teacher/activities": { title: "Activities", description: "Assignments and exams for your classes.", searchPlaceholder: "Search activities..." },
+  "/teacher/activities/assignments": { title: "Assignments", description: "Practice, check understanding and keep learning on track.", searchPlaceholder: "Search assignments..." },
+  "/teacher/activities/exams": { title: "Exams", description: "Thoughtful assessments. Clear expectations. Confident learners.", searchPlaceholder: "Search exams..." },
+  "/teacher/analytics": { title: "Analytics", description: "See the progress. Spot the patterns. Support the next step.", searchPlaceholder: "Search analytics..." },
+  "/teacher/messages": { title: "Messages", description: "A connected classroom starts with a conversation.", searchPlaceholder: "Search messages..." },
+  "/teacher/settings": { title: "Settings", description: "Make Konnect feel right for you and your classroom.", searchPlaceholder: "Search settings..." },
+};
 
 export default function DashNav({ role = "learner" }: { role?: DashboardRole }) {
+  const pathname = usePathname();
   const [currentDate, setCurrentDate] = useState("Today");
   const isTeacher = role === "teacher";
   const isAdmin = role === "admin";
+  const teacherPageHeader = isTeacher ? teacherPageHeaders[pathname] : undefined;
 
   useEffect(() => {
+    if (isTeacher) return;
+
     const updateDate = () => setCurrentDate(new Intl.DateTimeFormat("en-GB", {
       weekday: "short",
       day: "numeric",
@@ -22,31 +35,52 @@ export default function DashNav({ role = "learner" }: { role?: DashboardRole }) 
     updateDate();
     const interval = window.setInterval(updateDate, 60_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [isTeacher]);
 
   return (
     <header className={`${isTeacher ? "h-14 px-5" : "h-16 pl-3 pr-3"} flex min-w-0 items-center justify-between gap-3`}>
-      <div className="relative h-9 min-w-0 max-w-[335px] flex-1">
-        <Search
-          size={13}
-          className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]"
-        />
+      {teacherPageHeader ? (
+        <div className="min-w-0 flex-1 leading-tight">
+          <h1 className="text-[20px] font-bold text-[#172115] dark:text-[#ecf1ea]">{teacherPageHeader.title}</h1>
+          <p className="truncate text-[9px] text-[#707c6c] dark:text-[#9aa592]">{teacherPageHeader.description}</p>
+        </div>
+      ) : (
+        <div className="relative h-9 min-w-0 max-w-[335px] flex-1">
+          <Search
+            size={13}
+            className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]"
+          />
 
-        <input
-          type="text"
-          placeholder={isAdmin ? "Search teachers, classes, incidents..." : isTeacher ? "Search classes, students, approvals..." : "Search courses, topics, teachers..."}
-          className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors"
-        />
-      </div>
+          <input
+            type="text"
+            placeholder={isAdmin ? "Search teachers, classes, incidents..." : isTeacher ? "Search classes, students, approvals..." : "Search courses, topics, teachers..."}
+            className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors"
+          />
+        </div>
+      )}
 
       <div className="flex shrink-0 items-center gap-2">
-        <button type="button" aria-label={`Current date: ${currentDate}`} className="flex h-8 min-w-[132px] items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2.5 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors">
+        {!isTeacher && <button type="button" aria-label={`Current date: ${currentDate}`} className="flex h-8 min-w-[132px] items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2.5 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors">
           <CalendarDays size={13} />
           <span>{currentDate}</span>
-        </button>
+        </button>}
 
-        {isTeacher ? (
-          <button type="button" className="hidden h-8 items-center gap-1.5 rounded-md bg-[#23351f] px-3 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#182615] sm:flex">
+        {teacherPageHeader && (
+          <div className="relative h-9 w-[min(260px,24vw)] min-w-[150px]">
+            <Search
+              size={13}
+              className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]"
+            />
+            <input
+              type="text"
+              placeholder={teacherPageHeader.searchPlaceholder}
+              className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors"
+            />
+          </div>
+        )}
+
+        {isTeacher && !teacherPageHeader ? (
+          <button type="button" onClick={() => window.dispatchEvent(new Event("konnect-open-create-class"))} className="hidden h-8 items-center gap-1.5 rounded-md bg-[#23351f] px-3 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#182615] sm:flex">
             <Plus size={13} />
             <span>Create Class</span>
           </button>

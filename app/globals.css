@@ -4,7 +4,6 @@
 
 :root {
   --font-sans: "Manrope", sans-serif;
-  --display-font-scale: 1;
 
   /* ================= LIGHT MODE ================= */
 
@@ -29,29 +28,11 @@
   --cta-button-text: #ffffff;
 }
 
-@media (min-resolution: 1.2dppx) and (max-resolution: 1.3dppx) {
-  :root {
-    --display-font-scale: 0.8;
-  }
-}
-
-@media (min-resolution: 1.4dppx) and (max-resolution: 1.6dppx) {
-  :root {
-    --display-font-scale: 0.666667;
-  }
-}
-
 html {
   scroll-behavior: smooth;
-  font-size: calc(18px * var(--display-font-scale));
+  font-size: 16px;
   color-scheme: light;
   background: var(--background);
-}
-
-@media (min-width: 1280px) {
-  html {
-    font-size: calc(19px * var(--display-font-scale));
-  }
 }
 
 html[data-theme="dark"] {
@@ -118,13 +99,44 @@ html:not(:has(.learner-page)) main .mx-auto[class~="max-w-[1440px]"] {
 }
 
 .signup-page [class*="text-[0."] {
-  font-size: 0.78rem !important;
+  font-size: 0.8125rem !important;
   line-height: 1.4;
 }
 
 .signup-page .text-xs {
   font-size: 0.875rem;
   line-height: 1.35rem;
+}
+
+.text-xs {
+  font-size: 0.8125rem !important;
+}
+
+[class*="text-[0."] {
+  font-size: 0.8125rem !important;
+}
+
+[class~="text-[6px]"],
+[class~="text-[7px]"] {
+  font-size: 0.75rem !important;
+}
+
+[class~="text-[8px]"] {
+  font-size: 0.8125rem !important;
+}
+
+[class~="text-[9px]"],
+[class~="text-[9.5px]"],
+[class~="text-[10px]"] {
+  font-size: 0.875rem !important;
+}
+
+[class~="text-[11px]"] {
+  font-size: 0.9375rem !important;
+}
+
+[class~="text-[12px]"] {
+  font-size: 1rem !important;
 }
 
 * {

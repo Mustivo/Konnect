@@ -79,12 +79,7 @@ export default function TeacherExamsPage() {
 
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-3 py-1">
-        <header>
-          <h1 className="text-[20px] font-bold leading-tight text-[#172115] dark:text-[#ecf1ea]">Exams</h1>
-          <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">Thoughtful assessments. Clear expectations. Confident learners.</p>
-        </header>
-
+      <div className="space-y-3">
         <div className={`grid items-start gap-3 ${panelOpen ? "grid-cols-1 md:grid-cols-[minmax(0,1.55fr)_minmax(240px,0.95fr)]" : "grid-cols-1"}`}>
           <div className="min-w-0 space-y-3">
             <section aria-label="Your assessments" className="space-y-2">

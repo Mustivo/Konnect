@@ -111,9 +111,9 @@ export default function InstructionsPage() {
   }, [activeCategory, search]);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-
+    <>
       <Navbar />
+      <main className="min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
 
       <section
         id="home"
@@ -430,6 +430,7 @@ export default function InstructionsPage() {
           </span>
         </div>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }

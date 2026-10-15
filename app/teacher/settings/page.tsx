@@ -134,9 +134,7 @@ export default function TeacherSettingsPage() {
 
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-3 py-1">
-        <header><h1 className="text-[20px] font-bold leading-tight text-[#172115] dark:text-[#ecf1ea]">Settings</h1><p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">Make Konnect feel right for you and your classroom.</p></header>
-
+      <div className="space-y-3">
         <nav className="flex gap-1.5 overflow-x-auto border-b border-[#e5e9e1] pb-2 dark:border-[#2a312a]" role="tablist" aria-label="Settings sections">
           {tabs.map(({ id, label }) => <button key={id} type="button" role="tab" aria-selected={activeTab === id} onClick={() => setActiveTab(id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[8px] font-semibold transition ${activeTab === id ? "bg-[#263d21] text-white" : "text-[#65715f] hover:bg-white dark:text-[#a8b39f] dark:hover:bg-[#202720]"}`}>{label}</button>)}
         </nav>

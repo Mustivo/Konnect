@@ -58,12 +58,7 @@ export default function TeacherAnalyticsPage() {
 
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-3 py-1">
-        <header>
-          <h1 className="text-[20px] font-bold leading-tight text-[#172115] dark:text-[#ecf1ea]">Analytics</h1>
-          <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">See the progress. Spot the patterns. Support the next step.</p>
-        </header>
-
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap gap-2">
             <label className="sr-only" htmlFor="analytics-class">Class</label>

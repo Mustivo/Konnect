@@ -17,12 +17,7 @@ const exams = [
 export default function TeacherActivitiesPage() {
   return (
     <DashboardShell role="teacher">
-      <div className="space-y-4 py-1">
-        <header>
-          <h1 className="text-[20px] font-bold leading-tight text-[#172115] dark:text-[#ecf1ea]">Activities</h1>
-          <p className="text-[9px] text-[#707c6c] dark:text-[#9aa592]">Assignments and exams for your classes.</p>
-        </header>
-
+      <div className="space-y-4">
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <section className="min-w-0 rounded-lg border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]" aria-labelledby="activity-assignments-title">
             <div className="mb-3 flex items-center justify-between gap-2">
