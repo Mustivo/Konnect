@@ -26,7 +26,7 @@ import {
   left      = icon's left edge from the sidebar's left edge (px)
   marginTop = extra gap above the item (the screenshot's rhythm is uneven)
 */
-type DashboardRole = "learner" | "teacher";
+type DashboardRole = "learner" | "teacher" | "admin";
 type MenuItem = {
   name: string;
   href: string;
@@ -73,10 +73,15 @@ const teacherMenuItems: MenuItem[] = [
   { name: "Settings", href: "/teacher/dashboard#settings", icon: Settings, left: 20, marginTop: 1 },
 ];
 
+const adminMenuItems: MenuItem[] = [
+  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
+  { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
+];
+
 export default function DashSidebar({ role = "learner", onNavigate }: { role?: DashboardRole; onNavigate?: () => void }) {
   const pathname = usePathname();
   const isTeacher = role === "teacher";
-  const menuItems = isTeacher ? teacherMenuItems : learnerMenuItems;
+  const menuItems = isTeacher ? teacherMenuItems : role === "admin" ? adminMenuItems : learnerMenuItems;
   const [tasksOpen, setTasksOpen] = useState(() => !isTeacher && pathname.startsWith("/learner/tasks"));
   const [activeLink, setActiveLink] = useState<{ name: string; href: string } | null>(null);
 
@@ -86,7 +91,9 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
 
   const profile = isTeacher
     ? { initials: "EF", name: "Edna Francis", meta: "Lead Mathematics Teacher" }
-    : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
+    : role === "admin"
+      ? { initials: "AD", name: "Administrator", meta: "Admin workspace" }
+      : { initials: "GT", name: "Gabriella Igabe", meta: "View Profile" };
 
   return (
     <aside className="flex h-full w-[min(252px,85vw)] flex-col overflow-hidden rounded-l-[14px] bg-[#cddbbd] dark:bg-[#152014] dark:border-r dark:border-[#212f1f] transition-colors md:w-[252px]">
@@ -110,7 +117,10 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
             const isNestedItemActive = item.nested?.some((subItem) => subItem.name === selectedLinkName) ?? false;
             const isActive = selectedLinkName
               ? selectedLinkName === item.name || isNestedItemActive
-              : isTeacher
+              : role === "admin"
+                ? (item.name === "Dashboard" && pathname.startsWith("/admin/dashboard")) ||
+                  (item.name === "Settings" && pathname.startsWith("/admin/settings"))
+                : isTeacher
                 ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") ||
                   (item.name === "Classes" && pathname.startsWith("/teacher/classes")) ||
                     (item.name === "Attendance" && pathname.startsWith("/teacher/attendance")) ||

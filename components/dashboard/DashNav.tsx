@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Search, Bell, CalendarDays, Plus } from "lucide-react";
 
-type DashboardRole = "learner" | "teacher";
+type DashboardRole = "learner" | "teacher" | "admin";
 
 export default function DashNav({ role = "learner", menuButton }: { role?: DashboardRole; menuButton?: ReactNode }) {
   const [currentDate, setCurrentDate] = useState("Today");

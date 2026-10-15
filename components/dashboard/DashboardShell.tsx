@@ -8,7 +8,7 @@ import { Menu, X } from "lucide-react";
 
 type DashboardShellProps = {
 	children: ReactNode;
-	role?: "learner" | "teacher";
+	role?: "learner" | "teacher" | "admin";
 };
 
 export default function DashboardShell({ children, role = "learner" }: DashboardShellProps) {
