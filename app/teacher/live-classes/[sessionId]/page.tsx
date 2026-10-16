@@ -147,6 +147,66 @@ export default function TeacherLiveClassPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Broadcast teacher live presence to learners and portals
+  useEffect(() => {
+    function publishLiveState() {
+      try {
+        const payload = {
+          sessionId,
+          classId: sessionId,
+          courseTitle: session.course_title || session.title || "Virtual Classroom",
+          sessionTitle: session.title || "Live Course Session",
+          teacherName: session.teacher_name || "Mwizerwa Stiven",
+          status: "LIVE",
+          startedAt: new Date().toISOString(),
+          lastHeartbeat: Date.now(),
+          meetingUrl: `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(sessionId)}&autoRequest=1`,
+        };
+        window.localStorage.setItem("konnect-active-live-session", JSON.stringify(payload));
+        if (typeof BroadcastChannel !== "undefined") {
+          const liveChannel = new BroadcastChannel("konnect-live-classes");
+          liveChannel.postMessage({ type: "session-started", session: payload });
+          liveChannel.close();
+        }
+        window.dispatchEvent(new CustomEvent("konnect-active-live-session-updated", { detail: payload }));
+      } catch {}
+    }
+
+    publishLiveState();
+    const heartbeatTimer = setInterval(publishLiveState, 3000);
+
+    let queryChannel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        queryChannel = new BroadcastChannel("konnect-live-classes");
+        queryChannel.onmessage = (event) => {
+          if (event.data?.type === "is-teacher-live-query") {
+            publishLiveState();
+          }
+        };
+      } catch {}
+    }
+
+    function handleBeforeUnload() {
+      try {
+        window.localStorage.removeItem("konnect-active-live-session");
+        if (typeof BroadcastChannel !== "undefined") {
+          const ch = new BroadcastChannel("konnect-live-classes");
+          ch.postMessage({ type: "session-ended", sessionId });
+          ch.close();
+        }
+      } catch {}
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      clearInterval(heartbeatTimer);
+      queryChannel?.close();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, [origin, session.course_title, session.teacher_name, session.title, sessionId]);
+
   // Listen for waiting learners & admission via BroadcastChannel & Storage
   useEffect(() => {
     const channel = typeof BroadcastChannel !== "undefined"
@@ -158,11 +218,12 @@ export default function TeacherLiveClassPage() {
         // Automatically admit if teacher enabled auto-admit
         channel?.postMessage({
           sessionId,
+          learnerId,
           status: "admitted",
         });
         localStorage.setItem(
           `konnect-live-class-admission:${sessionId}`,
-          JSON.stringify({ sessionId, status: "admitted" })
+          JSON.stringify({ sessionId, learnerId, status: "admitted", timestamp: Date.now() })
         );
         setConnectedLearners((prev) => {
           if (prev.some((l) => l.id === learnerId)) return prev;
@@ -573,6 +634,15 @@ export default function TeacherLiveClassPage() {
     if (confirm("Are you sure you want to end this live session for all participants?")) {
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+      try {
+        window.localStorage.removeItem("konnect-active-live-session");
+        if (typeof BroadcastChannel !== "undefined") {
+          const ch = new BroadcastChannel("konnect-live-classes");
+          ch.postMessage({ type: "session-ended", sessionId });
+          ch.close();
+        }
+        window.dispatchEvent(new CustomEvent("konnect-active-live-session-updated", { detail: null }));
+      } catch {}
       await endSession(sessionId).catch(() => undefined);
       router.push("/teacher/dashboard");
     }
