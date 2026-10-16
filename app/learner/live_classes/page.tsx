@@ -36,6 +36,18 @@ type ApiEnrollment = { class_room: string; class_title: string; class_subject: s
 type ApiSession = { id: string | number; title?: string; scheduled_start?: string; scheduled_end?: string; status?: string };
 type ApiCollection<T> = T[] | { results?: T[]; sessions?: T[] };
 
+type ActiveLiveSession = {
+  sessionId: string;
+  classId?: string;
+  courseTitle: string;
+  sessionTitle: string;
+  teacherName?: string;
+  meetingUrl?: string;
+  status?: string;
+  startedAt?: string;
+  lastHeartbeat?: number;
+};
+
 const previewLessons: LiveLesson[] = [
   {
     id: "algebra",
@@ -153,9 +165,78 @@ export default function LiveClassesPage() {
   const [joinLessonId, setJoinLessonId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState("Learner");
   const [checkedItems, setCheckedItems] = useState(["topic", "notes", "question", "room"]);
+  const [activeLiveSession, setActiveLiveSession] = useState<ActiveLiveSession | null>(null);
   const monthLabel = calendarMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const calendarCells = getCalendarCells(calendarMonth);
   const joinLesson = lessons.find((lesson) => lesson.id === joinLessonId);
+
+  // Monitor whether a teacher is currently live in a studio session
+  useEffect(() => {
+    function checkLiveSession() {
+      try {
+        const stored = window.localStorage.getItem("konnect-active-live-session");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ActiveLiveSession;
+          if (parsed && parsed.sessionId && parsed.status !== "ENDED") {
+            // Check if heartbeat is reasonably recent (< 45s)
+            if (!parsed.lastHeartbeat || Date.now() - parsed.lastHeartbeat < 45000) {
+              setActiveLiveSession(parsed);
+              return;
+            }
+          }
+        }
+      } catch {}
+      setActiveLiveSession(null);
+    }
+
+    checkLiveSession();
+
+    let liveChannel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        liveChannel = new BroadcastChannel("konnect-live-classes");
+        liveChannel.onmessage = (event) => {
+          if (event.data?.type === "session-started" && event.data.session) {
+            setActiveLiveSession(event.data.session);
+          } else if (event.data?.type === "session-ended") {
+            setActiveLiveSession(null);
+          }
+        };
+        // Query if any teacher is already live
+        liveChannel.postMessage({ type: "is-teacher-live-query" });
+      } catch {}
+    }
+
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "konnect-active-live-session") {
+        checkLiveSession();
+      }
+    }
+
+    const onCustomUpdate = (event: Event) => {
+      const custom = event as CustomEvent<ActiveLiveSession>;
+      if (custom.detail) setActiveLiveSession(custom.detail);
+      else checkLiveSession();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("konnect-active-live-session-updated", onCustomUpdate);
+
+    // Fast poll to catch teacher entering studio in another tab
+    const interval = setInterval(() => {
+      checkLiveSession();
+      try {
+        liveChannel?.postMessage({ type: "is-teacher-live-query" });
+      } catch {}
+    }, 2500);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("konnect-active-live-session-updated", onCustomUpdate);
+      clearInterval(interval);
+      liveChannel?.close();
+    };
+  }, []);
 
   useEffect(() => {
     currentUser()
@@ -229,6 +310,52 @@ export default function LiveClassesPage() {
         </button>
       </header>
 
+      {activeLiveSession && (
+        <section
+          aria-label="Active teacher live session alert"
+          className="relative overflow-hidden rounded-xl border-2 border-[#418330] bg-gradient-to-r from-[#edf7ea] via-[#f7fcf5] to-[#eaf5e7] p-3.5 shadow-[0_4px_24px_rgba(40,110,25,0.12)] transition-all dark:border-[#3a5e30] dark:from-[#182618] dark:via-[#1c2e1b] dark:to-[#172416]"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="relative mt-1 flex h-3.5 w-3.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39882a] opacity-75" />
+                <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#2c6e20]" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#244f1c] px-2.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-white shadow-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#86efac] animate-pulse" />
+                    Teacher is on live now
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#3b632e] dark:text-[#a5d697]">
+                    {activeLiveSession.courseTitle || "Live Course Session"}
+                  </span>
+                </div>
+                <h2 className="mt-1 text-[14px] font-extrabold text-[#172714] dark:text-[#ecf3e9]">
+                  {activeLiveSession.sessionTitle || "Interactive Live Class"}
+                </h2>
+                <p className="mt-0.5 text-[9.5px] text-[#55694f] dark:text-[#9bb094]">
+                  Instructor: <strong className="font-semibold text-[#1f4216] dark:text-[#c4e3b7]">{activeLiveSession.teacherName || "Instructor"}</strong> · Teacher is streaming live in the studio right now.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveSession.sessionId)}&autoRequest=1`);
+                }}
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow-md hover:bg-[#346627] hover:shadow-lg transition-all active:scale-[0.98]"
+              >
+                <Video size={13} className="text-[#86efac] animate-pulse" />
+                <span>Ask to Join Live Class →</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1.85fr)_minmax(220px,1fr)]">
         <div className="space-y-3">
           <section className="rounded-lg border border-[#e0e5dd] bg-white p-3 dark:border-[#2a312a] dark:bg-[#161b17]">
@@ -247,33 +374,68 @@ export default function LiveClassesPage() {
             </div>
 
             <div>
-              {lessons.map((lesson) => (
-                <div key={lesson.id} className="flex min-h-[48px] items-center gap-2 border-b border-[#dce6d4] py-1.5 last:border-0 dark:border-[#303b2d]">
-                  <div className="flex w-6 shrink-0 flex-col items-center leading-none">
-                    <span className="text-[6px] font-semibold text-[#66705f] dark:text-[#9aa693]">{lesson.weekday}</span>
-                    <span className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${lesson.join ? "bg-[#263d21] text-white" : "text-[#263226] dark:text-[#e3e9df]"}`}>
-                      {lesson.day}
-                    </span>
-                  </div>
+              {lessons.map((lesson) => {
+                const isThisLive = Boolean(
+                  activeLiveSession &&
+                  (activeLiveSession.sessionId === lesson.id ||
+                   activeLiveSession.classId === lesson.id ||
+                   lesson.id === "algebra")
+                );
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[8px] font-semibold" style={{ color: lesson.color }}>{lesson.time}</p>
-                    <p className="text-[9px] font-semibold text-[#22291f] dark:text-[#ecf1e9]">{lesson.subject}</p>
-                    <p className="truncate text-[8px] text-[#768071] dark:text-[#98a393]">{lesson.detail}</p>
-                  </div>
+                return (
+                  <div
+                    key={lesson.id}
+                    className={`flex min-h-[48px] items-center gap-2 border-b border-[#dce6d4] py-1.5 last:border-0 dark:border-[#303b2d] ${
+                      isThisLive ? "rounded-lg bg-[#f0f8ed] p-2 border border-[#428031] dark:bg-[#182618] dark:border-[#3a5e30] my-1" : ""
+                    }`}
+                  >
+                    <div className="flex w-6 shrink-0 flex-col items-center leading-none">
+                      <span className="text-[6px] font-semibold text-[#66705f] dark:text-[#9aa693]">{lesson.weekday}</span>
+                      <span className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
+                        isThisLive ? "bg-[#25491d] text-white" : lesson.join ? "bg-[#263d21] text-white" : "text-[#263226] dark:text-[#e3e9df]"
+                      }`}>
+                        {lesson.day}
+                      </span>
+                    </div>
 
-                  {lesson.join && (
-                    <button
-                      type="button"
-                      disabled={joinedLesson === lesson.id}
-                      onClick={() => setJoinLessonId(lesson.id)}
-                      className="shrink-0 rounded bg-[#263d21] px-2 py-1 text-[8px] font-semibold text-white hover:bg-[#1b2d18]"
-                    >
-                      {joinedLesson === lesson.id ? "Joined ✓" : "Join →"}
-                    </button>
-                  )}
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[8px] font-semibold" style={{ color: lesson.color }}>{lesson.time}</p>
+                        {isThisLive && (
+                          <span className="inline-flex items-center gap-1 rounded bg-[#254b1d] px-1.5 py-0.2 text-[7px] font-bold uppercase text-white shadow-xs">
+                            <span className="h-1 w-1 rounded-full bg-[#86efac] animate-pulse" />
+                            Live Now
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[9px] font-semibold text-[#22291f] dark:text-[#ecf1e9]">{lesson.subject}</p>
+                      <p className="truncate text-[8px] text-[#768071] dark:text-[#98a393]">{lesson.detail}</p>
+                    </div>
+
+                    {isThisLive ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveSession?.sessionId || lesson.id)}&autoRequest=1`);
+                        }}
+                        className="shrink-0 flex items-center gap-1 rounded bg-[#25491d] px-2.5 py-1 text-[8.5px] font-bold text-white shadow hover:bg-[#326127] transition animate-pulse"
+                      >
+                        <Video size={10} className="text-[#86efac]" />
+                        Ask to Join (Live) →
+                      </button>
+                    ) : lesson.join ? (
+                      <button
+                        type="button"
+                        disabled={joinedLesson === lesson.id}
+                        onClick={() => setJoinLessonId(lesson.id)}
+                        className="shrink-0 rounded bg-[#263d21] px-2 py-1 text-[8px] font-semibold text-white hover:bg-[#1b2d18]"
+                      >
+                        {joinedLesson === lesson.id ? "Joined ✓" : "Join →"}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
               {!lessons.length && <p className="py-6 text-center text-[8px] text-[#788173] dark:text-[#95a18f]">No upcoming live sessions are available for your enrolled classes.</p>}
             </div>
           </section>

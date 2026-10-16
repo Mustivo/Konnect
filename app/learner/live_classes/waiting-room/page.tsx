@@ -49,6 +49,7 @@ function LiveClassWaitingRoomContent() {
   const [userName, setUserName] = useState("Learner");
   const [userInitials, setUserInitials] = useState("L");
   const [mounted, setMounted] = useState(false);
+  const [isTeacherLive, setIsTeacherLive] = useState(false);
 
   useEffect(() => {
     currentUser().then((u) => {
@@ -56,8 +57,31 @@ function LiveClassWaitingRoomContent() {
       setUserName(full);
       const initials = full.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "L";
       setUserInitials(initials);
+      try {
+        localStorage.setItem("konnect-user", JSON.stringify(u));
+      } catch {}
+
+      // Re-broadcast updated request if waiting
+      if (requestIdRef.current) {
+        const updatedPayload = {
+          type: "join-request",
+          sessionId: session.id,
+          learnerId: requestIdRef.current,
+          learnerName: full,
+          requestId: requestIdRef.current,
+          requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        try {
+          window.localStorage.setItem(requestStorageKey, JSON.stringify(updatedPayload));
+          if (typeof BroadcastChannel !== "undefined") {
+            const channel = new BroadcastChannel("konnect-live-class-admission");
+            channel.postMessage(updatedPayload);
+            channel.close();
+          }
+        } catch {}
+      }
     }).catch(() => undefined);
-  }, []);
+  }, [requestStorageKey, session.id]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [microphoneOn, setMicrophoneOn] = useState(false);
@@ -122,6 +146,47 @@ function LiveClassWaitingRoomContent() {
     void loadSession();
     return () => { active = false; };
   }, [router, sessionId]);
+
+  // Monitor teacher live presence
+  useEffect(() => {
+    function checkLive() {
+      try {
+        const stored = window.localStorage.getItem("konnect-active-live-session");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.sessionId === sessionId || parsed.status === "LIVE")) {
+            if (!parsed.lastHeartbeat || Date.now() - parsed.lastHeartbeat < 45000) {
+              setIsTeacherLive(true);
+              return;
+            }
+          }
+        }
+      } catch {}
+      setIsTeacherLive(false);
+    }
+    checkLive();
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel("konnect-live-classes");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "session-started") {
+            setIsTeacherLive(true);
+          } else if (event.data?.type === "session-ended") {
+            setIsTeacherLive(false);
+          }
+        };
+        channel.postMessage({ type: "is-teacher-live-query" });
+      } catch {}
+    }
+
+    const interval = setInterval(checkLive, 2500);
+    return () => {
+      clearInterval(interval);
+      channel?.close();
+    };
+  }, [sessionId]);
 
   // Handle autoRequest parameter from live_classes page
   useEffect(() => {

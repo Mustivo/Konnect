@@ -155,6 +155,7 @@ export default function LearnerDashboardPage() {
             setActiveLiveClass(null);
           }
         };
+        channel.postMessage({ type: "is-teacher-live-query" });
       } catch {}
     }
 
@@ -167,9 +168,17 @@ export default function LearnerDashboardPage() {
     window.addEventListener("storage", handleStorage);
     window.addEventListener("konnect-active-live-session-updated", onCustomUpdate);
 
+    const pollInterval = setInterval(() => {
+      checkActiveSession();
+      try {
+        channel?.postMessage({ type: "is-teacher-live-query" });
+      } catch {}
+    }, 2500);
+
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("konnect-active-live-session-updated", onCustomUpdate);
+      clearInterval(pollInterval);
       channel?.close();
     };
   }, []);
@@ -278,11 +287,11 @@ export default function LearnerDashboardPage() {
 
             <div className="flex shrink-0 items-center gap-2">
               <Link
-                href={`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveClass.sessionId)}`}
+                href={`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveClass.sessionId)}&autoRequest=1`}
                 className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow hover:bg-[#346627] transition"
               >
-                <Video size={13} />
-                <span>Join Live Meeting</span>
+                <Video size={13} className="text-[#86efac] animate-pulse" />
+                <span>Ask to Join Live Class →</span>
               </Link>
             </div>
           </div>
