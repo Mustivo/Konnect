@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
   CalendarDays,
   Camera,
@@ -75,7 +76,8 @@ export default function ExamsPage() {
   const showUpcomingExams = activeTab !== "Available now · 1";
 
   return (
-    <div className="space-y-3 py-3">
+    <DashboardShell role="learner">
+      <div className="space-y-4 pb-8 pt-1">
       <header>
         <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#35452e] dark:text-[#a4b49e]">
           YOUR LEARNING SPACE
@@ -208,7 +210,7 @@ export default function ExamsPage() {
           <a href="mailto:support@konnect.example" className="font-semibold text-[#35452e] dark:text-[#c3d7ad]">Get help</a>
         </div>
       </div>
-
     </div>
-  );
+  </DashboardShell>
+);
 }
