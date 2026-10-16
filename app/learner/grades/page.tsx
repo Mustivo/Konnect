@@ -216,13 +216,10 @@ function formatDate(year: number, month: number, day: number) {
 }
 
 export default function CalendarPage() {
-  const today = new Date();
   const [currentDate, setCurrentDate] = useState(
-    () => new Date(today.getFullYear(), today.getMonth(), 1)
+    new Date(2026, 9, 1)
   );
-  const [selectedDate, setSelectedDate] = useState(
-    () => `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
-  );
+  const [selectedDate, setSelectedDate] = useState("2026-9-6");
   const [view, setView] = useState<"Week" | "Month">("Month");
   const [filter, setFilter] = useState("All classes");
   const [responses, setResponses] = useState<Record<string, string>>({});
@@ -248,7 +245,6 @@ export default function CalendarPage() {
     month: "long",
     year: "numeric",
   });
-  const todayLabel = today.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 
   const selectedHeading = formatDate(
     selectedYear,
@@ -296,9 +292,8 @@ export default function CalendarPage() {
   }
 
   function goToday() {
-    const now = new Date();
-    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(`${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`);
+    setCurrentDate(new Date(2026, 9, 1));
+    setSelectedDate("2026-9-6");
     setView("Month");
   }
 
@@ -334,7 +329,7 @@ export default function CalendarPage() {
           className="flex h-[30px] items-center gap-1.5 rounded-md border border-[#e0e4db] bg-white px-3 text-[9px] font-semibold text-[#4b5b3d] hover:bg-[#eaf0e3]"
         >
           <CalendarDays size={12} />
-          Today · {todayLabel}
+          Today · 6 October
         </button>
       </div>
 

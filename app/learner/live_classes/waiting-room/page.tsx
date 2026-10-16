@@ -74,7 +74,23 @@ function LiveClassWaitingRoomContent() {
   const admissionStorageKey = `konnect-live-class-admission:${session.id}`;
   const requestStorageKey = `konnect-live-class-request:${session.id}`;
 
+  const [waitingSeconds, setWaitingSeconds] = useState(0);
+
   useEffect(() => setMounted(true), []);
+
+  // Restore waiting state from previous request if present
+  useEffect(() => {
+    try {
+      const existingReq = window.localStorage.getItem(requestStorageKey);
+      if (existingReq) {
+        const parsed = JSON.parse(existingReq);
+        if (parsed && parsed.sessionId === session.id && parsed.requestId) {
+          requestIdRef.current = parsed.requestId;
+          setAdmissionState("waiting");
+        }
+      }
+    } catch {}
+  }, [requestStorageKey, session.id]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -107,6 +123,49 @@ function LiveClassWaitingRoomContent() {
     return () => { active = false; };
   }, [router, sessionId]);
 
+  // Handle autoRequest parameter from live_classes page
+  useEffect(() => {
+    if (!mounted) return;
+    const autoReq = searchParams.get("autoRequest") === "1" || searchParams.get("request") === "1";
+    if (autoReq && admissionState === "ready") {
+      void sendJoinRequest();
+    }
+  }, [mounted, searchParams, admissionState]);
+
+  // Waiting elapsed timer ticker
+  useEffect(() => {
+    if (admissionState !== "waiting") {
+      setWaitingSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setWaitingSeconds((sec) => sec + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [admissionState]);
+
+  // Periodic heartbeat broadcast while waiting so teacher studio always picks up waiting request
+  useEffect(() => {
+    if (admissionState !== "waiting" || !session.id) return;
+    const interval = setInterval(() => {
+      try {
+        if (typeof BroadcastChannel !== "undefined") {
+          const channel = new BroadcastChannel("konnect-live-class-admission");
+          channel.postMessage({
+            type: "join-request",
+            sessionId: session.id,
+            learnerId: requestIdRef.current,
+            learnerName: userName,
+            requestId: requestIdRef.current,
+            requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          });
+          channel.close();
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [admissionState, session.id, userName]);
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = stream;
   }, [stream]);
@@ -121,21 +180,41 @@ function LiveClassWaitingRoomContent() {
       ? null
       : new BroadcastChannel("konnect-live-class-admission");
 
-    function applyAdmission(message: AdmissionMessage) {
+    function applyAdmission(message: AdmissionMessage & { learnerId?: string }) {
       if (message.sessionId !== session.id) return;
       if (message.requestId && message.requestId !== requestIdRef.current) return;
+      if (message.learnerId && message.learnerId !== requestIdRef.current && message.learnerId !== "all") return;
       setAdmissionState(message.status);
       setRequestError("");
+
+      if (message.status === "admitted") {
+        try {
+          sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
+          localStorage.setItem(`konnect-live-class-connected:${session.id}`, JSON.stringify({
+            learnerId: requestIdRef.current || "learner",
+            name: userName,
+            connectedAt: new Date().toISOString(),
+          }));
+          localStorage.removeItem(requestStorageKey);
+        } catch {}
+
+        // Automatically enter classroom after 1.2 seconds of positive confirmation
+        const timer = setTimeout(() => {
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(session.id)}`);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
     }
 
     if (channel) {
-      channel.onmessage = (event: MessageEvent<AdmissionMessage>) => applyAdmission(event.data);
+      channel.onmessage = (event: MessageEvent<AdmissionMessage & { learnerId?: string }>) => applyAdmission(event.data);
     }
 
     function handleStorage(event: StorageEvent) {
       if (event.key !== admissionStorageKey || !event.newValue) return;
       try {
-        applyAdmission(JSON.parse(event.newValue) as AdmissionMessage);
+        applyAdmission(JSON.parse(event.newValue) as AdmissionMessage & { learnerId?: string });
       } catch {
         setRequestError("We couldn't confirm your admission. Please request to join again.");
       }
@@ -146,7 +225,7 @@ function LiveClassWaitingRoomContent() {
       channel?.close();
       window.removeEventListener("storage", handleStorage);
     };
-  }, [admissionStorageKey]);
+  }, [admissionStorageKey, requestStorageKey, router, session.id, userName]);
 
   async function refreshDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -210,25 +289,49 @@ function LiveClassWaitingRoomContent() {
       : `${Date.now()}`;
     requestIdRef.current = requestId;
     setRequestError("");
+    setAdmissionState("waiting");
+
+    const joinPayload = {
+      type: "join-request",
+      sessionId: session.id,
+      learnerId: requestId,
+      learnerName: userName,
+      requestId,
+      requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
 
     try {
-      await apiJson(await joinSession(sessionId));
-      setAdmissionState("admitted");
-    } catch {
-      setRequestError("You could not join this session. Check your enrollment and try again.");
-    }
+      window.localStorage.setItem(requestStorageKey, JSON.stringify(joinPayload));
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("konnect-live-class-admission");
+        channel.postMessage(joinPayload);
+        channel.close();
+      }
+    } catch {}
+
+    // Also notify backend if supported, but do not block UI
+    void joinSession(sessionId).catch(() => undefined);
   }
 
   function cancelJoinRequest() {
-    localStorage.removeItem(requestStorageKey);
-    localStorage.removeItem(admissionStorageKey);
+    try {
+      localStorage.removeItem(requestStorageKey);
+      localStorage.removeItem(admissionStorageKey);
+    } catch {}
     requestIdRef.current = "";
     setAdmissionState("ready");
     setRequestError("");
   }
 
   function enterClass() {
-    sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
+    try {
+      sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
+      localStorage.setItem(`konnect-live-class-connected:${session.id}`, JSON.stringify({
+        learnerId: requestIdRef.current || "learner",
+        name: userName,
+        connectedAt: new Date().toISOString(),
+      }));
+    } catch {}
     streamRef.current?.getTracks().forEach((track) => track.stop());
     router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(session.id)}`);
   }
@@ -296,21 +399,65 @@ function LiveClassWaitingRoomContent() {
 
           {admissionState === "waiting" ? (
             <>
-              <div className="mt-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#f6f0e3] text-[#9b7430]"><LoaderCircle size={19} className="animate-spin" /></div>
-              <h1 className="mt-4 text-[22px] font-semibold leading-tight">Waiting to be admitted</h1>
-              <p className="mt-2 text-[12px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">Amara will let you into the class when she is ready.</p>
-              <div className="mt-5 rounded-lg bg-[#f3f5ef] p-3 dark:bg-[#20271e]">
-                <p className="text-[10px] font-semibold">{session.teacher}</p>
+              <div className="mt-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f6f0e3] text-[#9b7430] dark:bg-[#2b2416] dark:text-[#f0c56e]">
+                  <LoaderCircle size={20} className="animate-spin" />
+                </div>
+                <div>
+                  <span className="inline-block rounded-full bg-[#f5ede0] px-2 py-0.5 text-[8.5px] font-bold text-[#8a5d1a] dark:bg-[#342713] dark:text-[#f4cb76]">
+                    Request Sent · Waiting for Approval
+                  </span>
+                  <p className="mt-0.5 text-[8.5px] font-mono text-[#788172] dark:text-[#a0aa99]">
+                    Waiting time: {String(Math.floor(waitingSeconds / 60)).padStart(2, "0")}:{String(waitingSeconds % 60).padStart(2, "0")}
+                  </p>
+                </div>
+              </div>
+
+              <h1 className="mt-4 text-[22px] font-semibold leading-tight text-[#1b2318] dark:text-[#edf2ea]">
+                Waiting to be admitted
+              </h1>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">
+                {session.teacher || "Your instructor"} has received your request and will admit you into the live class when ready.
+              </p>
+
+              <div className="mt-5 rounded-lg border border-[#e1e6db] bg-[#f3f5ef] p-3 dark:border-[#303b2d] dark:bg-[#20271e]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-[#232c20] dark:text-[#edf2ea]">{session.teacher}</p>
+                  <span className="flex items-center gap-1 text-[8px] font-semibold text-[#426135] dark:text-[#aee09f]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#426135] animate-ping" />
+                    Teacher alerted
+                  </span>
+                </div>
                 <p className="mt-1 text-[9px] text-[#788172] dark:text-[#a0aa99]">{session.title}</p>
               </div>
+
               {requestError && <p role="status" className="mt-3 text-[9px] text-[#a7463a]">{requestError}</p>}
-              <button type="button" onClick={cancelJoinRequest} className="mt-5 h-10 w-full rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#536447] hover:bg-[#f5f7f2] dark:border-[#303b2d] dark:text-[#c2ccb9] dark:hover:bg-[#20271e]">Cancel request</button>
+              <button
+                type="button"
+                onClick={cancelJoinRequest}
+                className="mt-5 h-10 w-full rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#536447] hover:bg-[#f5f7f2] dark:border-[#303b2d] dark:text-[#c2ccb9] dark:hover:bg-[#20271e]"
+              >
+                Cancel request
+              </button>
             </>
           ) : admissionState === "admitted" ? (
             <>
-              <h1 className="mt-5 text-[22px] font-semibold leading-tight">You&apos;re ready to join</h1>
-              <p className="mt-2 text-[12px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">{session.teacher} admitted you to the class.</p>
-              <button type="button" onClick={enterClass} className="mt-6 h-11 w-full rounded-full bg-[#263d21] text-[11px] font-semibold text-white hover:bg-[#1c3019]">Join class</button>
+              <div className="mt-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#eef7ec] text-[#346827] dark:bg-[#202f1d] dark:text-[#aee09f]">
+                <Check size={22} className="stroke-[3]" />
+              </div>
+              <h1 className="mt-4 text-[22px] font-semibold leading-tight text-[#222d1f] dark:text-[#edf2ea]">
+                You are admitted!
+              </h1>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">
+                {session.teacher} accepted your request. Entering classroom now…
+              </p>
+              <button
+                type="button"
+                onClick={enterClass}
+                className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#263d21] text-[11px] font-semibold text-white shadow hover:bg-[#1c3019]"
+              >
+                <Video size={14} /> Enter classroom now
+              </button>
             </>
           ) : (
             <>

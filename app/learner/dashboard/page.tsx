@@ -3,9 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, ClipboardList, GraduationCap } from "lucide-react";
+import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, ClipboardList, GraduationCap, Video } from "lucide-react";
 import { apiJson, getLearnerClasses, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
 import { currentUser, getLearnerProfile } from "@/lib/api/auth";
+
+type ActiveLiveSession = {
+  sessionId: string;
+  classId?: string;
+  courseTitle: string;
+  sessionTitle: string;
+  teacherName?: string;
+  meetingUrl?: string;
+  status?: string;
+  startedAt?: string;
+};
 
 type Enrollment = {
   id: string;
@@ -108,6 +119,60 @@ export default function LearnerDashboardPage() {
   const [data, setData] = useState(initialData);
   const [loading, setLoading] = useState(true);
   const [loadNotice, setLoadNotice] = useState("");
+  const [activeLiveClass, setActiveLiveClass] = useState<ActiveLiveSession | null>(null);
+
+  useEffect(() => {
+    function checkActiveSession() {
+      try {
+        const stored = window.localStorage.getItem("konnect-active-live-session");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ActiveLiveSession;
+          if (parsed && parsed.sessionId && parsed.status !== "ENDED") {
+            setActiveLiveClass(parsed);
+            return;
+          }
+        }
+      } catch {}
+      setActiveLiveClass(null);
+    }
+
+    checkActiveSession();
+
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "konnect-active-live-session") {
+        checkActiveSession();
+      }
+    }
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel("konnect-live-classes");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "session-started" && event.data.session) {
+            setActiveLiveClass(event.data.session);
+          } else if (event.data?.type === "session-ended") {
+            setActiveLiveClass(null);
+          }
+        };
+      } catch {}
+    }
+
+    const onCustomUpdate = (event: Event) => {
+      const custom = event as CustomEvent<ActiveLiveSession>;
+      if (custom.detail) setActiveLiveClass(custom.detail);
+      else checkActiveSession();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("konnect-active-live-session-updated", onCustomUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("konnect-active-live-session-updated", onCustomUpdate);
+      channel?.close();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -181,6 +246,48 @@ export default function LearnerDashboardPage() {
           Edit profile <ArrowRight size={12} />
         </Link>
       </header>
+
+      {activeLiveClass && (
+        <section
+          aria-label="Active live class alert"
+          className="relative overflow-hidden rounded-xl border border-[#b9dfb2] bg-gradient-to-r from-[#eef8eb] via-[#f7fbf5] to-[#ebf6e7] p-4 shadow-sm"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="relative mt-1 flex h-3 w-3 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39882a] opacity-75" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-[#2c6e20]" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-[#28571e] px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-white">
+                    Live Class In Session
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#416834]">
+                    {activeLiveClass.courseTitle}
+                  </span>
+                </div>
+                <h2 className="mt-1 text-[13px] font-bold text-[#1a2e16]">
+                  {activeLiveClass.sessionTitle}
+                </h2>
+                <p className="mt-0.5 text-[10px] text-[#586c52]">
+                  Host: {activeLiveClass.teacherName || "Instructor"} · Classroom studio is open now
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href={`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveClass.sessionId)}`}
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow hover:bg-[#346627] transition"
+              >
+                <Video size={13} />
+                <span>Join Live Meeting</span>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {loadNotice && <p role="status" className="rounded border border-[#ead9b7] bg-[#fbf7ed] px-3 py-2 text-[10px] text-[#705a30]">{loadNotice}</p>}
 

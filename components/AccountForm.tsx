@@ -23,7 +23,8 @@ export default function AccountForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("registered") === "1") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("registered") === "1") {
       dispatch(
         setNotice({
           type: "success",
@@ -31,8 +32,19 @@ export default function AccountForm() {
           message: "Welcome to Konnect. You can now log in with your credentials to access your courses.",
         })
       );
+    } else if (params.get("logged_out") === "1" || params.get("logout") === "1") {
+      dispatch(
+        setNotice({
+          type: "info",
+          title: "Signed out successfully",
+          message: "You have been safely logged out. Please sign in to access your classes and courses.",
+        })
+      );
+    } else if (notice?.title === "Welcome back!") {
+      // Clear previous login success message when arriving on the login screen
+      dispatch(clearNotice());
     }
-  }, [dispatch]);
+  }, [dispatch, notice?.title]);
 
   const hasAuthError = notice?.type === "error";
 

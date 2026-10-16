@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashNav from "@/components/dashboard/DashNav";
 import DashSidebar from "@/components/dashboard/DashSidebar";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
@@ -18,8 +18,29 @@ export default function DashboardShell({ children, role = "learner", teacherDash
 	const useTeacherPagePadding = role === "teacher" && !teacherDashboard;
 	const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+	useEffect(() => {
+		const wasDark = document.documentElement.classList.contains("dark");
+		const prevTheme = document.documentElement.getAttribute("data-theme");
+		const prevBg = document.body.style.backgroundColor;
+
+		// Keep all dashboard views in light mode
+		document.documentElement.classList.remove("dark");
+		document.documentElement.setAttribute("data-theme", "light");
+		document.body.style.backgroundColor = "#f2f3ed";
+
+		return () => {
+			if (wasDark) {
+				document.documentElement.classList.add("dark");
+			}
+			if (prevTheme) {
+				document.documentElement.setAttribute("data-theme", prevTheme);
+			}
+			document.body.style.backgroundColor = prevBg;
+		};
+	}, []);
+
 	return (
-		<div className={`learner-page ${isTeacher ? "teacher-page" : ""} flex h-screen overflow-hidden bg-[#f2f3ed] dark:bg-[#111510] text-[#171d15] dark:text-[#ecf1ea] transition-colors`}>
+		<div className={`learner-page ${isTeacher ? "teacher-page" : ""} flex h-screen overflow-hidden bg-[#f2f3ed] text-[#171d15]`}>
 			<div className={isTeacher ? "hidden h-screen shrink-0 py-0 pl-0 pr-0 md:block" : "hidden h-screen shrink-0 pb-px pl-[7px] pt-[11px] md:block"}>
 				<DashSidebar role={role} />
 			</div>

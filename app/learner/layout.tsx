@@ -13,16 +13,10 @@ function LearnerThemeInitializer() {
     const main = document.querySelector<HTMLElement>(".learner-main-scroll");
     if (main) main.scrollTop = 0;
 
-    const savedTheme = window.localStorage.getItem("konnect-theme");
-    const shouldUseLight = savedTheme !== "dark";
-
-    document.documentElement.setAttribute("data-theme", shouldUseLight ? "light" : "dark");
-    document.documentElement.classList.toggle("dark", !shouldUseLight);
-    document.body.style.backgroundColor = shouldUseLight ? "#f2f3ed" : "#111510";
-
-    if (!savedTheme) {
-      window.localStorage.setItem("konnect-theme", "light");
-    }
+    // Always keep dashboard in light mode
+    document.documentElement.setAttribute("data-theme", "light");
+    document.documentElement.classList.remove("dark");
+    document.body.style.backgroundColor = "#f2f3ed";
 
     return () => {
       root.style.scrollBehavior = previousScrollBehavior;

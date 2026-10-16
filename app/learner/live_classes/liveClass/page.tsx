@@ -5,16 +5,16 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { apiJson } from "@/lib/api";
 import { getSession, leaveSession } from "@/lib/api/sessions";
+import { currentUser } from "@/lib/api/auth";
 import { useSessionChat } from "@/lib/useSessionChat";
 import {
-  ArrowDown,
   Bell,
   Camera,
-  Captions,
   Check,
   ChevronDown,
   Hand,
   Maximize,
+  Minimize,
   MessageCircle,
   Mic,
   MicOff,
@@ -31,13 +31,7 @@ import {
   X,
 } from "lucide-react";
 
-const participants = [
-  { initials: "GI", name: "Gabriella Igabe", caption: "Camera off" },
-  { initials: "JW", name: "James Wilson", caption: "" },
-  { initials: "AN", name: "Aisha Noor", caption: "" },
-  { initials: "+15", name: "Other learners", caption: "" },
-];
-const reactionEmojis = ["💖", "👍", "🎉", "👏", "😂", "😮", "😢", "🤔", "👎"];
+const reactionEmojis = ["👍", "👏", "💖", "🎉", "💡", "🤔", "✋"];
 
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
@@ -47,6 +41,7 @@ export default function LiveClassRoomPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
   const { messages, chatError, sending, send } = useSessionChat(sessionId);
+
   const [sessionDetails, setSessionDetails] = useState<{
     title: string;
     courseTitle: string;
@@ -54,39 +49,44 @@ export default function LiveClassRoomPage() {
     agenda: string;
   }>({
     title: "Live Class Session",
-    courseTitle: "Interactive Course",
+    courseTitle: "Classroom Studio",
     teacherName: "Instructor",
-    agenda: "A structured session connecting lecture, interactive Q&A, and practical exercises.",
+    agenda: "A structured 1-on-1 session connecting lecture, interactive Q&A, and practical exercises.",
   });
+
+  const [currentUserName, setCurrentUserName] = useState("Learner");
   const [microphoneOn, setMicrophoneOn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [teacherPresenting, setTeacherPresenting] = useState(true);
   const [handRaised, setHandRaised] = useState(false);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [reactionsOpen, setReactionsOpen] = useState(false);
-  const [captionsEnabled, setCaptionsEnabled] = useState(false);
-  const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
-  const [meetingMenuOpen, setMeetingMenuOpen] = useState(false);
-  const [meetingPolicyOpen, setMeetingPolicyOpen] = useState(false);
+  const [teacherSharingScreen, setTeacherSharingScreen] = useState(false);
   const [fullscreenOn, setFullscreenOn] = useState(false);
   const [draft, setDraft] = useState("");
   const [reaction, setReaction] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [admissionVerified, setAdmissionVerified] = useState(false);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
+  const [remoteScreenFrame, setRemoteScreenFrame] = useState<string | null>(null);
+
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
-  const screenSharePreviewRef = useRef<HTMLVideoElement>(null);
+  const teacherLiveScreenRef = useRef<HTMLVideoElement>(null);
+  const learnerPcRef = useRef<RTCPeerConnection | null>(null);
+  const learnerIdRef = useRef<string>("learner-" + Math.random().toString(36).slice(2, 9));
   const reactionTimeoutRef = useRef<number | null>(null);
   const mediaStreamsRef = useRef<{ camera: MediaStream | null; microphone: MediaStream | null }>({
     camera: null,
     microphone: null,
   });
 
+  // Verify admission & load session + user info
   useEffect(() => {
-    const activeSessionId = new URLSearchParams(window.location.search).get("session") || "uiux";
+    const activeSessionId = new URLSearchParams(window.location.search).get("session") || "algebra";
     setSessionId(activeSessionId);
+
     if (sessionStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) !== "true") {
       router.replace(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeSessionId)}`);
       return;
@@ -95,6 +95,13 @@ export default function LiveClassRoomPage() {
     setMounted(true);
     setAdmissionVerified(true);
     setDarkMode(window.localStorage.getItem("konnect-theme") === "dark");
+
+    currentUser()
+      .then((u) => {
+        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
+        setCurrentUserName(full);
+      })
+      .catch(() => undefined);
 
     void getSession(activeSessionId)
       .then((res) => apiJson<Record<string, unknown>>(res))
@@ -105,12 +112,179 @@ export default function LiveClassRoomPage() {
           title: String(data.title || "Live Class Session"),
           courseTitle: String(data.course_title || classRoom?.title || classRoom?.subject || "Course"),
           teacherName: String(data.teacher_name || classRoom?.teacher_name || "Instructor"),
-          agenda: String(data.agenda || "A structured session connecting lecture, interactive Q&A, and practical exercises."),
+          agenda: String(data.agenda || "Live interactive teaching session."),
         });
       })
       .catch(() => undefined);
   }, [router]);
 
+  // Synchronize teacher screen sharing detection and WebRTC / Frame streaming
+  useEffect(() => {
+    if (!sessionId) return;
+
+    function checkScreenShare() {
+      try {
+        const stored = window.localStorage.getItem(`konnect-live-screen-share:${sessionId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.sharing) {
+            setTeacherSharingScreen(true);
+            return;
+          }
+        }
+      } catch {}
+      setTeacherSharingScreen(false);
+    }
+
+    checkScreenShare();
+
+    let channel: BroadcastChannel | null = null;
+    let streamChannel: BroadcastChannel | null = null;
+    let framesChannel: BroadcastChannel | null = null;
+
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel("konnect-live-screen-share");
+        streamChannel = new BroadcastChannel("konnect-live-webrtc-stream");
+        framesChannel = new BroadcastChannel("konnect-live-screen-frames");
+
+        channel.onmessage = (event) => {
+          if (event.data?.sessionId === sessionId) {
+            const isSharing = Boolean(event.data.sharing);
+            setTeacherSharingScreen(isSharing);
+            if (isSharing) {
+              streamChannel?.postMessage({
+                type: "request-stream",
+                sessionId,
+                learnerId: learnerIdRef.current,
+              });
+            } else {
+              setRemoteScreenStream(null);
+              setRemoteScreenFrame(null);
+            }
+          }
+        };
+
+        streamChannel.onmessage = async (event) => {
+          const data = event.data;
+          if (!data || data.sessionId !== sessionId) return;
+
+          if (data.type === "stream-available") {
+            setTeacherSharingScreen(true);
+            streamChannel?.postMessage({
+              type: "request-stream",
+              sessionId,
+              learnerId: learnerIdRef.current,
+            });
+          }
+
+          if (data.type === "webrtc-offer" && data.learnerId === learnerIdRef.current && data.sdp) {
+            try {
+              learnerPcRef.current?.close();
+              const pc = new RTCPeerConnection({
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+              });
+              learnerPcRef.current = pc;
+
+              pc.ontrack = (trackEvent) => {
+                const stream = trackEvent.streams[0];
+                setRemoteScreenStream(stream);
+                if (teacherLiveScreenRef.current) {
+                  teacherLiveScreenRef.current.srcObject = stream;
+                }
+              };
+
+              pc.onicecandidate = (iceEvent) => {
+                if (iceEvent.candidate) {
+                  streamChannel?.postMessage({
+                    type: "ice-candidate",
+                    sessionId,
+                    learnerId: learnerIdRef.current,
+                    candidate: iceEvent.candidate,
+                    sender: "learner",
+                  });
+                }
+              };
+
+              await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+
+              streamChannel?.postMessage({
+                type: "webrtc-answer",
+                sessionId,
+                learnerId: learnerIdRef.current,
+                sdp: pc.localDescription,
+              });
+            } catch (err) {
+              console.error("Learner WebRTC answer error:", err);
+            }
+          }
+
+          if (data.type === "ice-candidate" && data.learnerId === learnerIdRef.current && data.sender === "teacher") {
+            if (learnerPcRef.current && data.candidate) {
+              try {
+                await learnerPcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+              } catch {}
+            }
+          }
+
+          if (data.type === "stream-ended") {
+            setRemoteScreenStream(null);
+            setRemoteScreenFrame(null);
+            if (teacherLiveScreenRef.current) teacherLiveScreenRef.current.srcObject = null;
+            learnerPcRef.current?.close();
+            learnerPcRef.current = null;
+          }
+        };
+
+        framesChannel.onmessage = (event) => {
+          const data = event.data;
+          if (!data || data.sessionId !== sessionId) return;
+
+          if (data.type === "live-frame" && data.frame) {
+            setRemoteScreenFrame(data.frame);
+          }
+
+          if (data.type === "stream-ended") {
+            setRemoteScreenFrame(null);
+          }
+        };
+
+        // If screen sharing was already active when mounting, request stream immediately
+        streamChannel.postMessage({
+          type: "request-stream",
+          sessionId,
+          learnerId: learnerIdRef.current,
+        });
+      } catch {}
+    }
+
+    function handleStorage(e: StorageEvent) {
+      if (e.key === `konnect-live-screen-share:${sessionId}`) {
+        checkScreenShare();
+      }
+    }
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      channel?.close();
+      streamChannel?.close();
+      framesChannel?.close();
+      learnerPcRef.current?.close();
+      learnerPcRef.current = null;
+    };
+  }, [sessionId]);
+
+  // Ensure video element receives stream whenever state updates
+  useEffect(() => {
+    if (teacherLiveScreenRef.current && remoteScreenStream) {
+      teacherLiveScreenRef.current.srcObject = remoteScreenStream;
+    }
+  }, [remoteScreenStream]);
+
+  // Handle local camera preview
   useEffect(() => {
     const preview = cameraPreviewRef.current;
     const tracks = mediaStreamsRef.current.camera?.getVideoTracks() ?? [];
@@ -118,11 +292,7 @@ export default function LiveClassRoomPage() {
     return () => {
       if (preview) preview.srcObject = null;
     };
-  }, [cameraOn, teacherPresenting]);
-
-  useEffect(() => {
-    if (screenSharePreviewRef.current) screenSharePreviewRef.current.srcObject = screenShareStream;
-  }, [screenShareStream]);
+  }, [cameraOn]);
 
   useEffect(() => {
     const updateFullscreen = () => setFullscreenOn(Boolean(document.fullscreenElement));
@@ -136,14 +306,11 @@ export default function LiveClassRoomPage() {
     if (reactionTimeoutRef.current !== null) window.clearTimeout(reactionTimeoutRef.current);
   }, []);
 
-  useEffect(() => () => stopStream(screenShareStream), [screenShareStream]);
-
   function toggleTheme() {
     const nextDarkMode = !darkMode;
     const theme = nextDarkMode ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.classList.toggle("dark", nextDarkMode);
-    document.body.style.backgroundColor = nextDarkMode ? "#111510" : "#f2f3ed";
     window.localStorage.setItem("konnect-theme", theme);
     setDarkMode(nextDarkMode);
   }
@@ -166,7 +333,7 @@ export default function LiveClassRoomPage() {
       setCameraOn(true);
       setMediaError(null);
     } catch {
-      setMediaError("Camera access was blocked. Allow camera access in your browser settings and try again.");
+      setMediaError("Camera access was blocked. Please enable camera access in browser permissions.");
     }
   }
 
@@ -185,29 +352,7 @@ export default function LiveClassRoomPage() {
       setMicrophoneOn(true);
       setMediaError(null);
     } catch {
-      setMediaError("Microphone access was blocked. Allow microphone access in your browser settings and try again.");
-    }
-  }
-
-  async function toggleScreenShare() {
-    if (screenShareStream) {
-      stopStream(screenShareStream);
-      setScreenShareStream(null);
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      setMediaError("Screen sharing is not available in this browser.");
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      stream.getVideoTracks()[0]?.addEventListener("ended", () => setScreenShareStream(null), { once: true });
-      setScreenShareStream(stream);
-      setMediaError(null);
-    } catch {
-      setMediaError("Screen sharing was cancelled or blocked by the browser.");
+      setMediaError("Microphone access was blocked. Please enable microphone access in browser permissions.");
     }
   }
 
@@ -216,12 +361,11 @@ export default function LiveClassRoomPage() {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch {
-      setMediaError("Fullscreen is not available in this browser.");
+      setMediaError("Fullscreen is not supported on this device.");
     }
   }
 
   function leaveClass() {
-    stopStream(screenShareStream);
     if (sessionId) void leaveSession(sessionId).catch(() => undefined);
     sessionStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
     router.push(`/learner/live_classes/class-complete?session=${encodeURIComponent(sessionId)}`);
@@ -231,7 +375,6 @@ export default function LiveClassRoomPage() {
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
-
     if (await send(text)) setDraft("");
   }
 
@@ -239,310 +382,457 @@ export default function LiveClassRoomPage() {
     setReaction(emoji);
     void send(`Reacted ${emoji}`);
     if (reactionTimeoutRef.current !== null) window.clearTimeout(reactionTimeoutRef.current);
-    reactionTimeoutRef.current = window.setTimeout(() => setReaction(null), 2600);
+    reactionTimeoutRef.current = window.setTimeout(() => setReaction(null), 2500);
   }
 
+  const teacherInitials = sessionDetails.teacherName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || "")
+    .join("") || "TR";
+
+  const learnerInitials = currentUserName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || "")
+    .join("") || "LR";
+
   const meetingRoom = (
-    <div className="learner-live-class-room fixed inset-0 z-[100] flex min-h-0 flex-col overflow-hidden bg-[#f5f6f1] text-[#22291f] dark:bg-[#111510] dark:text-[#edf1e9]">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-[#e2e6dd] bg-white px-3 dark:border-[#293127] dark:bg-[#171d16] sm:px-5">
+    <div className="fixed inset-0 z-[100] flex h-screen w-screen flex-col overflow-hidden bg-[#0c100c] text-[#f0f4ee]">
+      {/* 1. Sleek Top Header */}
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-[#121712]/95 px-4 backdrop-blur">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#edf2e8] text-[#405a35] dark:bg-[#2b3627] dark:text-[#c2d2b5]">
-            <Video size={16} />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <Video size={15} />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-[12px] font-bold sm:text-[14px]">{sessionDetails.title}</h1>
-            <p className="truncate text-[8px] text-[#747c70] dark:text-[#a0aa99]">{sessionDetails.courseTitle} · Host: {sessionDetails.teacherName} · Live Interactive Class</p>
+            <h1 className="truncate text-xs font-bold text-white sm:text-sm">
+              {sessionDetails.title}
+            </h1>
+            <p className="truncate text-[8px] text-emerald-300/80">
+              {sessionDetails.courseTitle} · Teacher: <span className="text-white font-medium">{sessionDetails.teacherName}</span>
+            </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          <span className="rounded-full bg-[#e8f0df] px-2 py-1 text-[7px] font-semibold text-[#526a40] dark:bg-[#293823] dark:text-[#c2d2b5]">LIVE · Konnect Classroom</span>
-          <button type="button" onClick={() => { setParticipantsOpen(true); setChatOpen(false); }} aria-label="Open participants" title="Participants" className="hidden items-center gap-1.5 text-[8px] text-[#65705d] hover:text-[#40522c] dark:text-[#a0aa99] dark:hover:text-white sm:inline-flex">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef2e9] text-[7px] font-semibold text-[#526744] dark:bg-[#2b3627] dark:text-[#c2d2b5]">19</span>
-            19 participants
-          </button>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Live indicator badge */}
+          <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[8px] font-semibold text-emerald-300 border border-emerald-500/30">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            1-on-1 Live Class
+          </span>
+
+          {/* Participants toggle (2 people) */}
           <button
             type="button"
-            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            aria-pressed={darkMode}
+            onClick={() => {
+              setParticipantsOpen(!participantsOpen);
+              if (!participantsOpen) setChatOpen(false);
+            }}
+            title="Meeting participants"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[8px] font-medium transition ${
+              participantsOpen ? "bg-white/20 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
+            }`}
+          >
+            <Users size={12} />
+            <span>2 People</span>
+          </button>
+
+          {/* Fullscreen toggle */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={fullscreenOn ? "Exit fullscreen" : "Fullscreen"}
+            className="rounded-lg p-1.5 text-gray-300 hover:bg-white/10 hover:text-white transition"
+          >
+            {fullscreenOn ? <Minimize size={14} /> : <Maximize size={14} />}
+          </button>
+
+          {/* Dark / Light toggle */}
+          <button
+            type="button"
             onClick={toggleTheme}
-            className="rounded-md p-1.5 text-[#65705d] hover:bg-[#f0f3ec] dark:text-[#d0d8cb] dark:hover:bg-[#252c22]"
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            className="rounded-lg p-1.5 text-gray-300 hover:bg-white/10 hover:text-white transition"
           >
             {darkMode ? <Sun size={14} /> : <Moon size={14} />}
           </button>
-          <div className="relative">
-            <button type="button" aria-label="More meeting options" aria-expanded={meetingMenuOpen} onClick={() => setMeetingMenuOpen((open) => !open)} className="rounded p-1 text-[#65705d] hover:bg-[#f0f3ec] dark:text-[#b8c3b0] dark:hover:bg-[#252c22]">
-              <MoreHorizontal size={16} />
-            </button>
-            {meetingMenuOpen && (
-              <div role="menu" aria-label="Meeting options" className="absolute right-0 top-full z-20 mt-2 w-52 rounded-lg border border-[#e0e5dd] bg-white p-1.5 shadow-lg dark:border-[#303b2d] dark:bg-[#171d16]">
-                <button type="button" role="menuitem" onClick={() => { setMeetingMenuOpen(false); setMeetingPolicyOpen(true); }} className="w-full rounded px-2.5 py-2 text-left text-[8px] hover:bg-[#f1f3ed] dark:hover:bg-[#252c22]">Meeting safety &amp; policies</button>
-                <button type="button" role="menuitem" onClick={() => { setMeetingMenuOpen(false); void toggleFullscreen(); }} className="w-full rounded px-2.5 py-2 text-left text-[8px] hover:bg-[#f1f3ed] dark:hover:bg-[#252c22]">{fullscreenOn ? "Exit fullscreen" : "Enter fullscreen"}</button>
-                <a role="menuitem" href="mailto:support@konnect.example?subject=Live%20class%20report" className="block rounded px-2.5 py-2 text-[8px] hover:bg-[#f1f3ed] dark:hover:bg-[#252c22]">Report a problem</a>
-              </div>
-            )}
-          </div>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 sm:p-3 lg:flex-row">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-          <div className="flex shrink-0 items-center justify-between px-1">
-            <p className="text-[8px] text-[#737c70] dark:text-[#a0aa99]">
-              {teacherPresenting ? `${sessionDetails.teacherName} is presenting` : "No presentation · Showing participants"}
-            </p>
-            <button
-              type="button"
-              aria-label={teacherPresenting ? "Switch to participant view" : "Show teacher presentation"}
-              aria-pressed={!teacherPresenting}
-              onClick={() => setTeacherPresenting((presenting) => !presenting)}
-              className="inline-flex items-center gap-1 text-[7px] text-[#737c70] dark:text-[#a0aa99]"
-            >
-              {teacherPresenting ? "Show participants" : "Show presentation"} <ChevronDown size={10} />
-            </button>
-          </div>
+      {/* 2. Main Stage (Cinematic, Uncluttered Screen Focus) */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
+        <main className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl bg-[#080b08] border border-white/5 shadow-2xl">
+          {/* --- CASE A: TEACHER IS SHARING SCREEN --- */}
+          {teacherSharingScreen ? (
+            <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black">
+              {remoteScreenStream ? (
+                <video
+                  ref={teacherLiveScreenRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  aria-label="Teacher's shared screen stream"
+                  className="h-full w-full object-contain"
+                />
+              ) : remoteScreenFrame ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={remoteScreenFrame}
+                  alt="Teacher's live shared screen stream"
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+                    <span className="absolute h-full w-full rounded-full border-2 border-emerald-500/40 animate-ping" />
+                    <MonitorUp size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      Connecting to {sessionDetails.teacherName}&apos;s Screen
+                    </h3>
+                    <p className="mt-1 text-[9px] text-gray-400">
+                      Receiving high-definition screen broadcast stream...
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          <div className="relative flex min-h-[280px] flex-1 items-center justify-center rounded-lg bg-[#1c281c] p-1 sm:p-2">
-            {screenShareStream ? (
-              <video ref={screenSharePreviewRef} autoPlay muted playsInline aria-label="Your shared screen preview" className="h-full w-full rounded-md object-contain" />
-            ) : teacherPresenting ? (
-            <article className="flex h-full min-h-[260px] w-full flex-col overflow-hidden rounded-md bg-[#fafaf5] p-5 sm:p-8">
-              <div className="mb-2 text-[7px] font-semibold uppercase tracking-wide text-[#586a4c]">{sessionDetails.courseTitle} · Interactive Live Classroom</div>
-              <h2 className="text-[18px] font-bold leading-tight text-[#22291f] sm:text-[24px]">{sessionDetails.title}</h2>
-              <div className="mt-3 grid min-h-0 flex-1 gap-4 md:grid-cols-[0.85fr_1.15fr]">
-                <div className="flex flex-col justify-between gap-2">
-                  <p className="max-w-sm text-[9px] leading-relaxed text-[#6d7569] sm:text-[10px]">
+              {/* Floating Top Pill: Real-time broadcast status */}
+              <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-full bg-black/80 px-3 py-1 text-[8px] font-medium text-white backdrop-blur border border-white/15 shadow-xl">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-semibold text-emerald-300">🔴 LIVE SCREEN</span>
+                <span className="text-gray-300">· {sessionDetails.teacherName} is sharing</span>
+              </div>
+
+              {/* Learner Camera PIP (Bottom Right) */}
+              {cameraOn && (
+                <div className="absolute bottom-3 right-3 z-20 h-28 w-40 overflow-hidden rounded-xl border-2 border-emerald-500/50 bg-[#161c16] shadow-2xl transition hover:scale-105">
+                  <video
+                    ref={cameraPreviewRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-1 left-1.5 flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 text-[7px] text-white">
+                    <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                    <span>You</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* --- CASE B: 1-on-1 LIVE STAGE (TEACHER & LEARNER TILES) --- */
+            <div className="flex h-full w-full flex-col justify-between p-4 sm:p-6">
+              {/* Top lesson info banner */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-emerald-400">
+                    1-on-1 Virtual Classroom
+                  </span>
+                  <h2 className="text-base font-bold text-white sm:text-lg">
+                    {sessionDetails.title}
+                  </h2>
+                  <p className="mt-0.5 max-w-xl text-[9px] text-gray-400">
                     {sessionDetails.agenda}
                   </p>
-                  <div className="rounded-md bg-[#eaf0e3] p-3">
-                    <h3 className="text-[9px] font-semibold text-[#34432d]">Component library</h3>
-                    <p className="mt-1 text-[7px] text-[#697461]">Tokens + atoms + molecules + pages</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {["16px", "600", "#283821"].map((token) => <span key={token} className="rounded-full bg-white px-2 py-1 text-[7px] font-semibold text-[#53634a]">{token}</span>)}
-                    </div>
-                  </div>
-                  <ul className="space-y-1 text-[8px] text-[#485342]">
-                    <li className="flex items-start gap-1.5"><Check size={10} className="shrink-0 text-[#64844c]" /> Tokens define spacing, type, and color</li>
-                    <li className="flex items-start gap-1.5"><Check size={10} className="shrink-0 text-[#64844c]" /> Components reuse those tokens consistently</li>
-                    <li className="flex items-start gap-1.5"><Check size={10} className="shrink-0 text-[#64844c]" /> Documentation keeps the team aligned</li>
-                  </ul>
                 </div>
-
-                <div className="flex min-h-0 flex-col">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <h3 className="text-[8px] font-semibold text-[#343c30]">Component library example</h3>
-                    <span className="text-[6px] text-[#858c80]">Figma-style system board</span>
-                  </div>
-                  <div className="flex-1 rounded-md border border-[#e2e6dd] bg-white p-2.5">
-                    <div className="flex items-center justify-between border-b border-[#edf0e9] pb-2">
-                      <span className="text-[7px] font-semibold">Design system board</span>
-                      <span className="text-[6px] text-[#858c80]">12 components</span>
-                    </div>
-                    <div className="mt-2 grid grid-cols-3 gap-1.5">
-                      {[
-                        { label: "TYPE SCALE", sample: "16px", detail: "Body copy" },
-                        { label: "PRIMARY", sample: "#283821", detail: "Brand color" },
-                        { label: "SURFACE", sample: "#F9F8F1", detail: "Canvas" },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded border border-[#edf0e9] bg-[#f8f9f5] p-2">
-                          <p className="text-[6px] font-semibold text-[#7b8476]">{item.label}</p>
-                          <p className="mt-1 text-[10px] font-bold text-[#30382b]">{item.sample}</p>
-                          <p className="text-[6px] text-[#858c80]">{item.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                      {[
-                        { label: "BUTTON", content: "Join class" },
-                        { label: "INPUT", content: "Search courses..." },
-                        { label: "TABS", content: "Overview   Tokens" },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded border border-[#edf0e9] p-2">
-                          <p className="text-[6px] font-semibold text-[#7b8476]">{item.label}</p>
-                          <p className="mt-1 truncate rounded bg-[#eff2eb] px-1.5 py-1 text-[6px] text-[#4e5b45]">{item.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-1.5 flex justify-end gap-1 text-[7px] text-[#737c70]">
-                    <span className="rounded-full bg-white px-2 py-1">👏 3</span>
-                    <span className="rounded-full bg-white px-2 py-1">💡 2</span>
+                <div className="hidden sm:flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 border border-white/10">
+                  <MonitorUp size={16} className="text-emerald-400" />
+                  <div className="text-left">
+                    <p className="text-[7px] font-semibold text-white">Full Screen Sharing Ready</p>
+                    <p className="text-[6px] text-gray-400">When teacher shares, screen expands here automatically</p>
                   </div>
                 </div>
               </div>
-            </article>
-            ) : (
-              <div className="grid h-full min-h-[260px] w-full grid-cols-2 gap-2 rounded-md bg-[#111811] p-2 sm:grid-cols-3 sm:p-3">
-                <article className="relative flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-md bg-[#263426] p-2 text-center">
-                  <Video className="absolute right-2 top-2 text-[#bac5b0]" size={12} />
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#496342] text-sm font-semibold text-white">AO</span>
-                  <span className="text-[8px] font-semibold text-white">Amara Okafor</span>
-                  <span className="text-[7px] text-[#c2ccb9]">Teacher</span>
-                </article>
-                {participants.map((person) => (
-                  <article key={person.initials} className="relative flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-md bg-[#1b241b] p-2 text-center">
-                    {person.initials === "GI" && cameraOn ? (
-                      <video ref={cameraPreviewRef} autoPlay muted playsInline className="absolute inset-0 h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#324b2e] text-[10px] font-semibold text-[#d8e4cf]">{person.initials}</span>
-                    )}
-                    <span className="relative mt-auto text-[8px] font-medium text-white">{person.name}</span>
-                    {person.caption && <span className="relative text-[7px] text-[#c2ccb9]">{cameraOn ? "Camera on" : person.caption}</span>}
-                  </article>
-                ))}
-              </div>
-            )}
-            {reaction && <div aria-live="polite" className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 text-5xl drop-shadow-lg animate-bounce">{reaction}</div>}
-            {captionsEnabled && <div role="status" className="absolute bottom-3 left-1/2 max-w-[90%] -translate-x-1/2 rounded-md bg-black/75 px-3 py-2 text-center text-[8px] text-white">Waiting for the teacher&apos;s live captions</div>}
-          </div>
 
-          {reactionsOpen && (
-            <div aria-label="Send a reaction" className="flex shrink-0 items-center justify-center gap-1 overflow-x-auto rounded-full bg-[#e8ece4] px-2 py-1.5 dark:bg-[#20271e]">
-              {reactionEmojis.map((emoji) => <button key={emoji} type="button" aria-label={`Send ${emoji} reaction`} onClick={() => { sendReaction(emoji); setReactionsOpen(false); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[16px] hover:bg-white dark:hover:bg-[#30382e]">{emoji}</button>)}
+              {/* 1-on-1 Meeting Tiles Grid: Teacher & Learner only */}
+              <div className="my-auto grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* 1. Teacher Tile */}
+                <div className="relative flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#131b13] p-5 text-center shadow-lg transition">
+                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[7px] font-semibold text-emerald-300 border border-emerald-500/30">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Online &amp; Teaching
+                  </div>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-800 text-lg font-bold text-white shadow-inner">
+                    {teacherInitials}
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-white">
+                    {sessionDetails.teacherName}
+                  </h3>
+                  <p className="mt-0.5 text-[8px] text-emerald-300">
+                    Course Instructor · Session Host
+                  </p>
+                  <p className="mt-3 rounded-full bg-white/5 px-3 py-1 text-[7px] text-gray-300 border border-white/5">
+                    Ready to teach · Waiting to share screen
+                  </p>
+                </div>
+
+                {/* 2. Learner Tile (You) */}
+                <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#151c15] p-5 text-center shadow-lg transition">
+                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[7px] font-semibold text-gray-300">
+                    {cameraOn ? "Camera Active" : "Camera Off"}
+                  </div>
+
+                  {cameraOn ? (
+                    <video
+                      ref={cameraPreviewRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <>
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#2a3c27] text-lg font-bold text-emerald-200 shadow-inner">
+                        {learnerInitials}
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-white">
+                        {currentUserName} (You)
+                      </h3>
+                      <p className="mt-0.5 text-[8px] text-gray-400">
+                        Enrolled Learner
+                      </p>
+                    </>
+                  )}
+
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[7px] text-gray-200 backdrop-blur border border-white/10">
+                    {microphoneOn ? <Mic size={10} className="text-emerald-400" /> : <MicOff size={10} className="text-gray-400" />}
+                    <span>{microphoneOn ? "Microphone Unmuted" : "Microphone Muted"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom hint banner */}
+              <div className="text-center">
+                <p className="text-[8px] text-gray-400">
+                  💡 Tip: As soon as the teacher clicks <span className="font-semibold text-emerald-300">&ldquo;Share Screen&rdquo;</span>, this stage transforms into the full-view shared screen display.
+                </p>
+              </div>
             </div>
           )}
 
-          <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-4">
-            <div className="flex min-h-11 items-center gap-2 rounded-md bg-[#e8ece4] px-2 dark:bg-[#20271e]">
-              <span className="flex h-8 w-10 items-center justify-center rounded bg-[#d5d9d0] text-[8px] font-semibold text-[#54624c] dark:bg-[#30382e] dark:text-[#c1cbb9]">AO</span>
-              <span className="min-w-0"><span className="block truncate text-[7px] font-semibold">Amara Okafor · Teacher</span><span className="text-[6px] text-[#7a8277]">Presenting</span></span>
+          {/* Reaction animation overlay */}
+          {reaction && (
+            <div
+              aria-live="polite"
+              className="pointer-events-none absolute bottom-12 left-1/2 -translate-x-1/2 text-5xl drop-shadow-2xl animate-bounce"
+            >
+              {reaction}
             </div>
-            {participants.map((person) => (
-              <div key={person.initials} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#edf0e9] px-2 dark:bg-[#1b211a]">
-                {person.initials === "GI" && cameraOn && teacherPresenting ? (
-                  <video ref={cameraPreviewRef} autoPlay muted playsInline className="h-7 w-9 shrink-0 rounded object-cover" />
-                ) : (
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e2ead9] text-[7px] font-semibold text-[#4b5d3f] dark:bg-[#2b3627] dark:text-[#c2d2b5]">{person.initials}</span>
-                )}
-                <span className="min-w-0"><span className="block truncate text-[7px] font-medium">{person.name}</span>{person.caption && <span className="block truncate text-[6px] text-[#7a8277]">{person.caption}</span>}</span>
-              </div>
-            ))}
-          </div>
+          )}
+        </main>
 
-          <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-4">
-            {[
-              { title: screenShareStream ? "Stop sharing" : "Share screen", Icon: MonitorUp, active: !!screenShareStream, action: toggleScreenShare },
-              { title: "Captions", Icon: Captions, active: captionsEnabled, action: () => setCaptionsEnabled((enabled) => !enabled) },
-              { title: "Participants", Icon: Users, active: participantsOpen, action: () => { setParticipantsOpen((open) => !open); setChatOpen(false); } },
-              { title: "Chat", Icon: MessageCircle, active: chatOpen, action: () => { setChatOpen((open) => !open); setParticipantsOpen(false); } },
-              { title: "Raise hand", Icon: Hand, active: handRaised, action: () => setHandRaised((raised) => !raised) },
-              { title: "Reactions", Icon: Smile, active: reactionsOpen, action: () => setReactionsOpen((open) => !open) },
-              { title: fullscreenOn ? "Exit fullscreen" : "Fullscreen", Icon: Maximize, active: fullscreenOn, action: toggleFullscreen },
-            ].map(({ title, Icon, active, action }) => (
+        {/* 3. Sliding Side Drawers (Chat & Participants - overlay to never squish the main video) */}
+        {chatOpen && (
+          <aside className="absolute right-3 top-3 bottom-3 z-30 flex w-72 flex-col rounded-2xl border border-white/15 bg-[#141a14]/95 backdrop-blur shadow-2xl">
+            <div className="flex h-10 items-center justify-between border-b border-white/10 px-3">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={13} className="text-emerald-400" />
+                <h2 className="text-[9px] font-bold text-white">Live Session Chat</h2>
+              </div>
               <button
-                key={title}
                 type="button"
-                aria-label={title}
-                aria-pressed={active}
-                title={title}
-                onClick={action}
-                className={`flex h-8 items-center justify-center gap-1.5 rounded-md border text-[7px] font-medium ${active ? "border-[#718662] bg-[#e7eee0] text-[#3e5334] dark:border-[#526346] dark:bg-[#273122] dark:text-[#d1dfc5]" : "border-[#e0e5dd] bg-white text-[#58645b] hover:bg-[#f2f4ef] dark:border-[#303b2d] dark:bg-[#171d16] dark:text-[#b8c3b0]"}`}
+                onClick={() => setChatOpen(false)}
+                className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white"
               >
-                <Icon size={12} /> {title}
-              </button>
-            ))}
-          </div>
-
-          <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[#e0e5dd] px-1 pt-2 text-[7px] text-[#7a8277] dark:border-[#293127] dark:text-[#9da897]">
-            <span title={mediaError || undefined} className={mediaError ? "text-[#a7463a] dark:text-[#f09a8e]" : undefined}>
-              {mediaError || (microphoneOn ? "Microphone ready · local device" : "14:18 · Connected securely")}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button type="button" aria-label={microphoneOn ? "Turn microphone off" : "Turn microphone on"} aria-pressed={microphoneOn} onClick={toggleMicrophone} className="flex h-7 items-center gap-1 rounded-md border border-[#dfe5da] bg-white px-2 text-[7px] font-medium text-[#475341] dark:border-[#303b2d] dark:bg-[#171d16] dark:text-[#c2ccb9]">
-                {microphoneOn ? <Mic size={11} /> : <MicOff size={11} />}{microphoneOn ? "Mic on" : "Mic off"}
-              </button>
-              <button type="button" aria-label={cameraOn ? "Turn camera off" : "Turn camera on"} aria-pressed={cameraOn} onClick={toggleCamera} className="flex h-7 items-center gap-1 rounded-md border border-[#dfe5da] bg-white px-2 text-[7px] font-medium text-[#475341] dark:border-[#303b2d] dark:bg-[#171d16] dark:text-[#c2ccb9]">
-                {cameraOn ? <Camera size={11} /> : <VideoOff size={11} />}{cameraOn ? "Camera on" : "Camera off"}
-              </button>
-              <button type="button" onClick={leaveClass} className="flex h-7 items-center gap-1 rounded-md bg-[#a7463a] px-2.5 text-[7px] font-semibold text-white hover:bg-[#8f392f]">
-                <X size={10} /> Leave
+                <X size={13} />
               </button>
             </div>
-            <button type="button" aria-pressed={handRaised} onClick={() => setHandRaised((raised) => !raised)} className="hidden items-center gap-1.5 sm:flex"><span>{handRaised ? "Your hand is raised" : "Your hand is lowered"}</span><Settings size={11} /></button>
-          </footer>
-        </section>
 
-        {(chatOpen || participantsOpen) && (
-          <aside className="flex max-h-[34vh] min-h-0 shrink-0 flex-col rounded-lg border border-[#e0e5dd] bg-white dark:border-[#2a312a] dark:bg-[#161b17] lg:max-h-none lg:w-[270px] xl:w-[300px]">
-            <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#e9ede5] px-3 dark:border-[#293127]">
-              <div>
-                <h2 className="text-[9px] font-semibold">{participantsOpen ? "Participants" : "Class conversation"}</h2>
-                <p className="text-[6px] text-[#81897d] dark:text-[#99a391]">{participantsOpen ? "People in this live class" : "Visible to everyone · Enabled by teacher"}</p>
-              </div>
-              <button type="button" aria-label={participantsOpen ? "Close participants" : "Close chat"} onClick={() => { setChatOpen(false); setParticipantsOpen(false); }} className="rounded p-1 text-[#74806d] hover:bg-[#f1f3ed] dark:text-[#b8c3b0] dark:hover:bg-[#252c22]"><X size={12} /></button>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 text-[8px]">
+              {messages.map((message, index) => (
+                <div key={`${message.name}-${message.time}-${index}`} className="space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className={`font-semibold ${message.self ? "text-emerald-400" : "text-white"}`}>
+                      {message.name}
+                    </span>
+                    <time className="text-[6px] text-gray-400">{message.time}</time>
+                  </div>
+                  <p className={`rounded-lg px-2.5 py-1.5 leading-relaxed ${message.self ? "bg-emerald-950/70 text-emerald-100" : "bg-white/10 text-gray-200"}`}>
+                    {message.text}
+                  </p>
+                </div>
+              ))}
+              {!messages.length && !chatError && (
+                <p className="py-8 text-center text-gray-400 text-[8px]">
+                  No messages yet. Send a message to your teacher.
+                </p>
+              )}
+              {chatError && <p className="text-rose-400 text-[7px]">{chatError}</p>}
             </div>
 
-            {participantsOpen ? (
-              <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2.5">
-                {[{ initials: "AO", name: "Amara Okafor", caption: "Teacher · presenting" }, ...participants].map((person) => (
-                  <div key={person.initials} className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-[#f3f5ef] dark:hover:bg-[#20271e]">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#e2ead9] text-[7px] font-semibold text-[#4b5d3f] dark:bg-[#2b3627] dark:text-[#c2d2b5]">{person.initials}</span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-[7px] font-semibold">{person.name}</span><span className="mt-0.5 block truncate text-[6px] text-[#7a8277]">{person.caption || "In the class"}</span></span>
-                    {person.initials === "GI" && handRaised && <Hand size={11} className="text-[#536b43]" />}
-                    {person.initials === "GI" && microphoneOn && <Mic size={10} className="text-[#536b43]" />}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5">
-                  {messages.map((message, index) => (
-                    <article key={`${message.name}-${message.time}-${index}`} className="space-y-0.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`text-[7px] font-semibold ${message.self ? "text-[#4d633d] dark:text-[#c2d2b5]" : "text-[#343c30] dark:text-[#e1e8dc]"}`}>{message.name}</span>
-                        <time className="text-[6px] text-[#90978b]">{message.time}</time>
-                      </div>
-                      <p className={`rounded-md px-2 py-1.5 text-[7px] leading-relaxed ${message.self ? "bg-[#eaf0e3] text-[#3f4939] dark:bg-[#293522] dark:text-[#d5dfce]" : "bg-[#f3f4ef] text-[#50594b] dark:bg-[#20271e] dark:text-[#c1cbb9]"}`}>{message.text}</p>
-                    </article>
-                  ))}
-                  {!messages.length && !chatError && <p className="py-4 text-center text-[7px] text-[#788172]">No messages yet. Start the conversation.</p>}
-                  {chatError && <p role="status" className="py-1 text-[6px] text-[#a7463a] dark:text-[#f09a8e]">{chatError}</p>}
-                  <div className="pt-1">
-                    <p className="text-[6px] font-semibold uppercase text-[#737c70] dark:text-[#9da897]">Reactions · Stickers</p>
-                    <div className="mt-1 grid grid-cols-5 gap-1">
-                      {reactionEmojis.map((emoji) => (
-                        <button key={emoji} type="button" aria-label={`Send ${emoji} reaction`} onClick={() => sendReaction(emoji)} className="flex h-6 items-center justify-center rounded border border-[#e6e9e2] bg-white text-[10px] hover:bg-[#eaf0e3] dark:border-[#303b2d] dark:bg-[#171d16]">{emoji}</button>
-                      ))}
-                    </div>
-                    <div className="mt-1.5 flex gap-1">
-                      {["Got it!", "Great idea"].map((phrase) => <button key={phrase} type="button" onClick={() => void send(phrase)} className="flex-1 rounded bg-[#edf2e8] py-1 text-[6px] font-medium text-[#526744] dark:bg-[#2b3627] dark:text-[#c2d2b5]">{phrase}</button>)}
-                    </div>
-                  </div>
-                </div>
+            {/* Quick Reactions bar in chat */}
+            <div className="flex items-center justify-center gap-1 border-t border-white/10 p-1.5">
+              {reactionEmojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => sendReaction(emoji)}
+                  className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-white/15 text-xs transition"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
 
-                <form onSubmit={sendMessage} className="flex shrink-0 items-center gap-1.5 border-t border-[#e9ede5] p-2 dark:border-[#293127]">
-                  <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message your class..." className="h-7 min-w-0 flex-1 rounded-md border border-[#e1e6dc] bg-white px-2 text-[7px] outline-none placeholder:text-[#92998d] focus:border-[#9aab8c] dark:border-[#303b2d] dark:bg-[#171d16] dark:text-[#edf1e9]" />
-                  <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message" title="Send message" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#263d21] text-white hover:bg-[#1c3019] disabled:cursor-not-allowed disabled:opacity-50"><Send size={11} /></button>
-                </form>
-                <div className="flex shrink-0 items-center gap-1.5 px-2 pb-2 text-[6px] text-[#92998d]">
-                  <Bell size={9} /> Class chat · Follow the meeting policies
-                  <button type="button" aria-label="View meeting policies" title="Meeting policies" onClick={() => setMeetingPolicyOpen(true)} className="ml-auto rounded p-0.5 hover:bg-[#f1f3ed]"><Settings size={11} /></button>
-                </div>
-              </>
-            )}
+            <form onSubmit={sendMessage} className="flex gap-1.5 border-t border-white/10 p-2">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Ask teacher a question..."
+                className="h-7 min-w-0 flex-1 rounded-lg border border-white/15 bg-white/5 px-2 text-[8px] text-white outline-none placeholder:text-gray-500 focus:border-emerald-500"
+              />
+              <button
+                type="submit"
+                disabled={!draft.trim() || sending}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 transition"
+              >
+                <Send size={11} />
+              </button>
+            </form>
           </aside>
         )}
 
-        {meetingPolicyOpen && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/35 p-4" role="presentation" onClick={() => setMeetingPolicyOpen(false)}>
-            <section role="dialog" aria-modal="true" aria-labelledby="meeting-policy-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-md rounded-xl border border-[#dfe5da] bg-white p-5 shadow-xl dark:border-[#303b2d] dark:bg-[#171d16]">
-              <div className="flex items-start justify-between gap-3">
-                <div><p className="text-[7px] font-semibold uppercase tracking-wide text-[#536447] dark:text-[#b9caa9]">Live class</p><h2 id="meeting-policy-title" className="mt-1 text-[15px] font-semibold">Meeting safety &amp; policies</h2></div>
-                <button type="button" aria-label="Close meeting policies" onClick={() => setMeetingPolicyOpen(false)} className="rounded p-1 text-[#74806d] hover:bg-[#f1f3ed] dark:text-[#b8c3b0] dark:hover:bg-[#252c22]"><X size={14} /></button>
+        {participantsOpen && (
+          <aside className="absolute right-3 top-3 bottom-3 z-30 flex w-72 flex-col rounded-2xl border border-white/15 bg-[#141a14]/95 backdrop-blur shadow-2xl">
+            <div className="flex h-10 items-center justify-between border-b border-white/10 px-3">
+              <div className="flex items-center gap-2">
+                <Users size={13} className="text-emerald-400" />
+                <h2 className="text-[9px] font-bold text-white">Participants (2)</h2>
               </div>
-              <ul className="mt-4 space-y-3 text-[8px] leading-relaxed text-[#586354] dark:text-[#c1cbb9]">
-                <li className="flex gap-2"><Check size={12} className="mt-0.5 shrink-0 text-[#5b7a47]" />Treat classmates respectfully and keep messages related to the lesson.</li>
-                <li className="flex gap-2"><Check size={12} className="mt-0.5 shrink-0 text-[#5b7a47]" />Do not record, screenshot, or redistribute class content without the teacher&apos;s permission.</li>
-                <li className="flex gap-2"><Check size={12} className="mt-0.5 shrink-0 text-[#5b7a47]" />Protect personal information. Share only what is needed for class participation.</li>
-                <li className="flex gap-2"><Check size={12} className="mt-0.5 shrink-0 text-[#5b7a47]" />You control your camera and microphone. Mute when you are not speaking.</li>
-              </ul>
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#edf0e9] pt-3 text-[7px] dark:border-[#303b2d]">
-                <span className="text-[#81897d] dark:text-[#99a391]">Need help with this meeting?</span>
-                <a href="mailto:support@konnect.example?subject=Live%20class%20support" className="font-semibold text-[#40522c] hover:underline dark:text-[#c3d7ad]">Contact support</a>
+              <button
+                type="button"
+                onClick={() => setParticipantsOpen(false)}
+                className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            <div className="space-y-2 p-3 text-[8px]">
+              {/* Teacher item */}
+              <div className="flex items-center gap-2.5 rounded-xl bg-white/5 p-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-800 text-[9px] font-bold text-white">
+                  {teacherInitials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-white">{sessionDetails.teacherName}</p>
+                  <p className="text-[6px] text-emerald-300">Teacher · Host</p>
+                </div>
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[6px] font-semibold text-emerald-300">
+                  Online
+                </span>
               </div>
-            </section>
-          </div>
+
+              {/* Learner item */}
+              <div className="flex items-center gap-2.5 rounded-xl bg-white/5 p-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#2a3c27] text-[9px] font-bold text-emerald-200">
+                  {learnerInitials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-white">{currentUserName} (You)</p>
+                  <p className="text-[6px] text-gray-400">Learner</p>
+                </div>
+                {handRaised && <Hand size={11} className="text-amber-400" />}
+              </div>
+            </div>
+          </aside>
         )}
       </div>
+
+      {/* 4. Sleek Floating Bottom Controls Bar */}
+      <footer className="flex h-14 shrink-0 items-center justify-between border-t border-white/10 bg-[#111611]/95 px-4 backdrop-blur">
+        {/* Left: Device status or notice */}
+        <div className="flex items-center gap-2 text-[7px] text-gray-400">
+          {mediaError ? (
+            <span className="text-rose-400">{mediaError}</span>
+          ) : (
+            <span>Connected securely to {sessionDetails.teacherName}&apos;s live class</span>
+          )}
+        </div>
+
+        {/* Center: Core interactive buttons */}
+        <div className="flex items-center gap-2">
+          {/* Microphone toggle */}
+          <button
+            type="button"
+            onClick={toggleMicrophone}
+            title={microphoneOn ? "Mute microphone" : "Unmute microphone"}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              microphoneOn
+                ? "border-emerald-500/60 bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/40"
+                : "border-white/15 bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            {microphoneOn ? <Mic size={15} /> : <MicOff size={15} />}
+          </button>
+
+          {/* Camera toggle */}
+          <button
+            type="button"
+            onClick={toggleCamera}
+            title={cameraOn ? "Turn camera off" : "Turn camera on"}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              cameraOn
+                ? "border-emerald-500/60 bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/40"
+                : "border-white/15 bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            {cameraOn ? <Camera size={15} /> : <VideoOff size={15} />}
+          </button>
+
+          {/* Raise Hand toggle */}
+          <button
+            type="button"
+            onClick={() => setHandRaised(!handRaised)}
+            title={handRaised ? "Lower hand" : "Raise hand to ask question"}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              handRaised
+                ? "border-amber-500/60 bg-amber-600/30 text-amber-300 hover:bg-amber-600/40"
+                : "border-white/15 bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            <Hand size={15} />
+          </button>
+
+          {/* Chat toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setChatOpen(!chatOpen);
+              if (!chatOpen) setParticipantsOpen(false);
+            }}
+            title="Open class chat"
+            className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              chatOpen
+                ? "border-emerald-500/60 bg-emerald-600/30 text-emerald-300"
+                : "border-white/15 bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            <MessageCircle size={15} />
+            {messages.length > 0 && !chatOpen && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[6px] font-bold text-white">
+                {messages.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Right: Leave room button */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={leaveClass}
+            className="flex items-center gap-1.5 rounded-xl bg-rose-600/90 px-3.5 py-1.5 text-[8px] font-bold text-white shadow-lg transition hover:bg-rose-500"
+          >
+            <X size={12} />
+            <span>Leave Class</span>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 

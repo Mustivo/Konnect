@@ -83,7 +83,6 @@ export default function TeacherClassCreator() {
       }
 
       const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-      const finalMeetingUrl = meetingUrl || `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(newClass.id)}`;
 
       const session = await apiJson<CreatedSession>(await createClassSession(newClass.id, {
         class_room: newClass.id,
@@ -93,10 +92,40 @@ export default function TeacherClassCreator() {
         scheduled_end: endDate.toISOString(),
         status: "LIVE",
         room_id: crypto.randomUUID(),
-        meeting_url: finalMeetingUrl,
+        meeting_url: meetingUrl || `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(newClass.id)}`,
       }));
-      setCreatedSession(session);
-      setNotice("Class and live session created! Share the learner join link below.");
+
+      const finalMeetingUrl = meetingUrl || `${origin}/learner/live_classes/waiting-room?session=${encodeURIComponent(session.id)}`;
+      const activeSessionInfo = {
+        sessionId: String(session.id),
+        classId: newClass.id,
+        courseTitle: newClass.title,
+        sessionTitle: session.title || sessionTitle,
+        teacherName: "Teacher",
+        meetingUrl: finalMeetingUrl,
+        scheduledStart: startDate.toISOString(),
+        scheduledEnd: endDate.toISOString(),
+        status: "LIVE",
+        startedAt: new Date().toISOString(),
+      };
+
+      try {
+        window.localStorage.setItem("konnect-active-live-session", JSON.stringify(activeSessionInfo));
+        if (typeof BroadcastChannel !== "undefined") {
+          const channel = new BroadcastChannel("konnect-live-classes");
+          channel.postMessage({ type: "session-started", session: activeSessionInfo });
+          channel.close();
+        }
+        window.dispatchEvent(new CustomEvent("konnect-active-live-session-updated", { detail: activeSessionInfo }));
+      } catch {
+        // Storage or broadcast fallback
+      }
+
+      setCreatedSession({
+        ...session,
+        meeting_url: finalMeetingUrl,
+      });
+      setNotice("Class and live session created! Published to enrolled learners.");
       formElement.reset();
     } catch (error) {
       const message = apiErrorMessage(error instanceof ApiError ? error.payload : error, "The class could not be created. Please try again.");

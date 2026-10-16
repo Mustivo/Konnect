@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { LucideIcon } from "lucide-react";
 import { currentUser, logout, type ApiUser } from "@/lib/api/auth";
+import { useAppDispatch } from "@/lib/redux/hooks";
+import { logout as logoutAction } from "@/lib/redux/slices/authSlice";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
   BookOpen,
@@ -78,11 +80,11 @@ const teacherMenuItems: MenuItem[] = [
 ];
 
 const adminMenuItems: MenuItem[] = [
-  { name: "Analytics", href: "/admin/analytics", icon: BarChart3, left: 20, marginTop: 0 },
-  { name: "Approval", href: "/admin/approval", icon: UserCheck, left: 20, marginTop: 1 },
-  { name: "Classes", href: "/admin/classes", icon: BookOpen, left: 20, marginTop: 1 },
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid, left: 20, marginTop: 0 },
+  { name: "Classes", href: "/admin/classes", icon: BookOpen, left: 20, marginTop: 1 },
+  { name: "Approval", href: "/admin/approval", icon: UserCheck, left: 20, marginTop: 1 },
   { name: "Management", href: "/admin/management", icon: Users, left: 20, marginTop: 1 },
+  { name: "Analytics", href: "/admin/analytics", icon: BarChart3, left: 20, marginTop: 0 },
   { name: "Reports", href: "/admin/reports", icon: FileText, left: 20, marginTop: 1 },
   { name: "Settings", href: "/admin/settings", icon: Settings, left: 20, marginTop: 1 },
 ];
@@ -90,6 +92,7 @@ const adminMenuItems: MenuItem[] = [
 export default function DashSidebar({ role = "learner", onNavigate }: { role?: DashboardRole; onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const isTeacher = role === "teacher";
   const isAdmin = role === "admin";
   const menuItems = isAdmin ? adminMenuItems : isTeacher ? teacherMenuItems : learnerMenuItems;
@@ -137,9 +140,10 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
     } catch {
       // Clear the local session even if the API is temporarily unavailable.
     } finally {
+      dispatch(logoutAction());
       window.localStorage.removeItem("konnect-access-token");
       window.localStorage.removeItem("konnect-refresh-token");
-      router.replace("/login");
+      router.replace("/login?logged_out=1");
     }
   }
 

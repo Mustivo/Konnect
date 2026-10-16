@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiJson, getLearnerClasses } from "@/lib/api";
+import { currentUser } from "@/lib/api/auth";
 import { getClassSessions } from "@/lib/api/sessions";
 import {
   CalendarDays,
@@ -36,11 +37,76 @@ type ApiSession = { id: string | number; title?: string; scheduled_start?: strin
 type ApiCollection<T> = T[] | { results?: T[]; sessions?: T[] };
 
 const previewLessons: LiveLesson[] = [
-  { id: "uiux", day: "06", weekday: "TUE", time: "14:00–15:30", subject: "UI/UX Design", detail: "Design systems & component libraries", color: "#8957e5", join: true, sessionTitle: "UI/UX Design — From Wireframes to Prototypes", teacher: "Amara Okafor", date: "Tue 6 October 2026", fullTime: "14:00–15:30 BST" },
-  { id: "django-07", day: "07", weekday: "WED", time: "10:00–11:30", subject: "Django", detail: "REST APIs with Django REST Framework", color: "#18a769" },
-  { id: "django-08", day: "08", weekday: "WED", time: "10:00–11:30", subject: "Django", detail: "REST APIs with Django REST Framework", color: "#18a769" },
-  { id: "django-09", day: "09", weekday: "WED", time: "11:00–12:30", subject: "Django", detail: "REST APIs with Django REST Framework", color: "#18a769" },
-  { id: "maths", day: "12", weekday: "FRI", time: "11:00–12:30", subject: "Mathematics", detail: "Probability & real-world statistics", color: "#ee7853" },
+  {
+    id: "algebra",
+    day: "14",
+    weekday: "WED",
+    time: "09:00–09:50",
+    subject: "Algebra I",
+    detail: "Linear equations & inequalities · Solving two-step equations",
+    color: "#4e7543",
+    join: true,
+    sessionTitle: "Algebra I — Linear Equations & Inequalities",
+    teacher: "Mwizerwa Stiven",
+    date: "Wed 14 October 2026",
+    fullTime: "09:00–09:50 AM",
+  },
+  {
+    id: "geometry",
+    day: "15",
+    weekday: "THU",
+    time: "11:00–11:50",
+    subject: "Geometry",
+    detail: "Congruence & similarity · Triangle congruence proofs",
+    color: "#2563a8",
+    join: true,
+    sessionTitle: "Geometry — Triangle Congruence Proofs",
+    teacher: "Mwizerwa Stiven",
+    date: "Thu 15 October 2026",
+    fullTime: "11:00–11:50 AM",
+  },
+  {
+    id: "precalculus",
+    day: "16",
+    weekday: "FRI",
+    time: "14:00–14:50",
+    subject: "Precalculus",
+    detail: "Polynomial & rational functions · Finding polynomial zeros",
+    color: "#8957e5",
+    join: true,
+    sessionTitle: "Precalculus — Polynomial & Rational Functions",
+    teacher: "Mwizerwa Stiven",
+    date: "Fri 16 October 2026",
+    fullTime: "14:00–14:50 PM",
+  },
+  {
+    id: "biology",
+    day: "19",
+    weekday: "MON",
+    time: "10:00–10:50",
+    subject: "Biology",
+    detail: "Cells & ecosystems · Cellular respiration",
+    color: "#18a769",
+    join: false,
+    sessionTitle: "Biology — Cells & Ecosystems",
+    teacher: "Mwizerwa Stiven",
+    date: "Mon 19 October 2026",
+    fullTime: "10:00–10:50 AM",
+  },
+  {
+    id: "statistics",
+    day: "20",
+    weekday: "TUE",
+    time: "13:00–13:50",
+    subject: "Statistics",
+    detail: "Probability & data analysis · Normal distribution",
+    color: "#c2781b",
+    join: false,
+    sessionTitle: "Statistics — Probability & Data Analysis",
+    teacher: "Mwizerwa Stiven",
+    date: "Tue 20 October 2026",
+    fullTime: "13:00–13:50 PM",
+  },
 ];
 
 const checklist = [
@@ -85,10 +151,20 @@ export default function LiveClassesPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [joinedLesson, setJoinedLesson] = useState<string | null>(null);
   const [joinLessonId, setJoinLessonId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState("Learner");
   const [checkedItems, setCheckedItems] = useState(["topic", "notes", "question", "room"]);
   const monthLabel = calendarMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const calendarCells = getCalendarCells(calendarMonth);
   const joinLesson = lessons.find((lesson) => lesson.id === joinLessonId);
+
+  useEffect(() => {
+    currentUser()
+      .then((u) => {
+        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
+        setCurrentUserName(full);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!window.localStorage.getItem("konnect-access-token")) return;
@@ -355,10 +431,10 @@ export default function LiveClassesPage() {
                 </span>
                 <div>
                   <h2 id="join-class-title" className="text-[16px] font-bold text-[#22291f] dark:text-[#edf1e9]">
-                    Join your live class
+                    Ask to join live class
                   </h2>
                   <p className="mt-0.5 text-[10px] text-[#788172] dark:text-[#a0aa99]">
-                    Your enrolled session is ready to join.
+                    Enter the waiting room and request admission from the teacher.
                   </p>
                 </div>
               </div>
@@ -379,7 +455,7 @@ export default function LiveClassesPage() {
                 </p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#e5eddc] px-2 py-1 text-[8px] font-semibold text-[#4d633d] dark:bg-[#303d29] dark:text-[#c7d8b7]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#6f9a4d]" />
-                  Ready to join
+                  Waiting room open
                 </span>
               </div>
               <h3 className="mt-2 text-[13px] font-semibold text-[#252c22] dark:text-[#e8eee3]">
@@ -399,7 +475,7 @@ export default function LiveClassesPage() {
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-[8px] text-[#788172] dark:text-[#a0aa99]">
-                Signed in as Gabriella Igabe
+                Signed in as {currentUserName}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -414,11 +490,11 @@ export default function LiveClassesPage() {
                   onClick={() => {
                     setJoinedLesson(joinLesson.id);
                     setJoinLessonId(null);
-                    router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(joinLesson.id)}`);
+                    router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(joinLesson.id)}&autoRequest=1`);
                   }}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#263d21] px-3 text-[9px] font-semibold text-white hover:bg-[#1c3019]"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#263d21] px-3.5 text-[9px] font-semibold text-white shadow-sm hover:bg-[#1c3019]"
                 >
-                  <Video size={12} /> Join live class
+                  <Video size={12} /> Ask to join &amp; enter waiting room
                 </button>
               </div>
             </div>

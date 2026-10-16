@@ -7,6 +7,7 @@ import { useSessionChat } from "@/lib/useSessionChat";
 import { apiJson } from "@/lib/api";
 import { endSession, getSession, startSession } from "@/lib/api/sessions";
 import {
+  Bell,
   Camera,
   Check,
   Clock,
@@ -43,6 +44,12 @@ type WaitingLearner = {
   requestedAt: string;
 };
 
+type ConnectedLearner = {
+  id: string;
+  name: string;
+  joinedAt: string;
+};
+
 export default function TeacherLiveClassPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
@@ -59,17 +66,43 @@ export default function TeacherLiveClassPage() {
   const [microphoneOn, setMicrophoneOn] = useState(false);
   const [sharingScreen, setSharingScreen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "participants" | "info">("chat");
-  const [autoAdmit, setAutoAdmit] = useState(true);
+  const [autoAdmit, setAutoAdmit] = useState(false);
   const [copyNotice, setCopyNotice] = useState("");
   const [waitingLearners, setWaitingLearners] = useState<WaitingLearner[]>([]);
+  const [joinReminderLearner, setJoinReminderLearner] = useState<WaitingLearner | null>(null);
+  const [connectedLearners, setConnectedLearners] = useState<ConnectedLearner[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [admittedCount, setAdmittedCount] = useState(1); // Teacher is 1
   const [mediaNotice, setMediaNotice] = useState("");
 
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const screenSharePreviewRef = useRef<HTMLVideoElement>(null);
+  const screenMonitorRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+
+  // Synthesized notification chime so no external audio asset is needed
+  function playJoinReminderChime() {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } catch {
+      // Audio context may be restricted by browser until interaction
+    }
+  }
 
   // Chat integration
   const { messages, sending, send } = useSessionChat(sessionId);
@@ -122,7 +155,7 @@ export default function TeacherLiveClassPage() {
 
     function handleIncomingRequest(learnerId: string, learnerName: string) {
       if (autoAdmit) {
-        // Automatically admit
+        // Automatically admit if teacher enabled auto-admit
         channel?.postMessage({
           sessionId,
           status: "admitted",
@@ -131,12 +164,23 @@ export default function TeacherLiveClassPage() {
           `konnect-live-class-admission:${sessionId}`,
           JSON.stringify({ sessionId, status: "admitted" })
         );
+        setConnectedLearners((prev) => {
+          if (prev.some((l) => l.id === learnerId)) return prev;
+          return [...prev, { id: learnerId, name: learnerName, joinedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
+        });
         setAdmittedCount((count) => count + 1);
       } else {
+        const item: WaitingLearner = {
+          id: learnerId,
+          name: learnerName,
+          requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
         setWaitingLearners((prev) => {
           if (prev.some((l) => l.id === learnerId)) return prev;
-          return [...prev, { id: learnerId, name: learnerName, requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
+          return [...prev, item];
         });
+        setJoinReminderLearner(item);
+        playJoinReminderChime();
       }
     }
 
@@ -148,7 +192,30 @@ export default function TeacherLiveClassPage() {
       };
     }
 
-    // Auto-broadcast admission periodically so waiting room picks it up immediately
+    function handleStorage(event: StorageEvent) {
+      if (event.key === `konnect-live-class-request:${sessionId}` && event.newValue) {
+        try {
+          const req = JSON.parse(event.newValue);
+          if (req.type === "join-request" && req.sessionId === sessionId) {
+            handleIncomingRequest(req.learnerId || "learner-1", req.learnerName || "Learner");
+          }
+        } catch {}
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+
+    // Initial check for existing waiting learner requests in local storage
+    try {
+      const raw = window.localStorage.getItem(`konnect-live-class-request:${sessionId}`);
+      if (raw) {
+        const req = JSON.parse(raw);
+        if (req && req.type === "join-request" && req.sessionId === sessionId) {
+          handleIncomingRequest(req.learnerId || "learner-1", req.learnerName || "Learner");
+        }
+      }
+    } catch {}
+
+    // Auto-broadcast admission periodically ONLY if teacher explicitly toggled autoAdmit
     const autoAdmitPulse = setInterval(() => {
       if (autoAdmit) {
         channel?.postMessage({
@@ -164,6 +231,7 @@ export default function TeacherLiveClassPage() {
 
     return () => {
       channel?.close();
+      window.removeEventListener("storage", handleStorage);
       clearInterval(autoAdmitPulse);
     };
   }, [autoAdmit, sessionId]);
@@ -224,6 +292,123 @@ export default function TeacherLiveClassPage() {
     }
   }
 
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const frameIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const streamChannelRef = useRef<BroadcastChannel | null>(null);
+  const framesChannelRef = useRef<BroadcastChannel | null>(null);
+
+  // Set up signaling channel for WebRTC screen sharing and frame streaming
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const streamChannel = new BroadcastChannel("konnect-live-webrtc-stream");
+    const framesChannel = new BroadcastChannel("konnect-live-screen-frames");
+    streamChannelRef.current = streamChannel;
+    framesChannelRef.current = framesChannel;
+
+    streamChannel.onmessage = async (event) => {
+      const data = event.data;
+      if (!data || data.sessionId !== sessionId) return;
+
+      if (data.type === "request-stream" && screenStreamRef.current) {
+        const learnerId = String(data.learnerId || "anonymous-learner");
+        try {
+          // Close old PC if exists
+          const existingPc = peerConnectionsRef.current.get(learnerId);
+          existingPc?.close();
+
+          const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          });
+          peerConnectionsRef.current.set(learnerId, pc);
+
+          screenStreamRef.current.getTracks().forEach((track) => {
+            pc.addTrack(track, screenStreamRef.current!);
+          });
+
+          pc.onicecandidate = (e) => {
+            if (e.candidate) {
+              streamChannel.postMessage({
+                type: "ice-candidate",
+                sessionId,
+                learnerId,
+                candidate: e.candidate,
+                sender: "teacher",
+              });
+            }
+          };
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          streamChannel.postMessage({
+            type: "webrtc-offer",
+            sessionId,
+            learnerId,
+            sdp: pc.localDescription,
+          });
+        } catch (err) {
+          console.error("WebRTC offer creation error:", err);
+        }
+      }
+
+      if (data.type === "webrtc-answer") {
+        const learnerId = String(data.learnerId);
+        const pc = peerConnectionsRef.current.get(learnerId);
+        if (pc && data.sdp) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          } catch (err) {
+            console.error("WebRTC setRemoteDescription error on teacher:", err);
+          }
+        }
+      }
+
+      if (data.type === "ice-candidate" && data.sender === "learner") {
+        const learnerId = String(data.learnerId);
+        const pc = peerConnectionsRef.current.get(learnerId);
+        if (pc && data.candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } catch (err) {
+            console.error("WebRTC addIceCandidate error on teacher:", err);
+          }
+        }
+      }
+    };
+
+    return () => {
+      streamChannel.close();
+      framesChannel.close();
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
+      if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
+    };
+  }, [sessionId]);
+
+  function notifyScreenShare(isSharing: boolean) {
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("konnect-live-screen-share");
+        channel.postMessage({ sessionId, sharing: isSharing, teacherName: session.teacher_name });
+        channel.close();
+      }
+      window.localStorage.setItem(
+        `konnect-live-screen-share:${sessionId}`,
+        JSON.stringify({ sessionId, sharing: isSharing, teacherName: session.teacher_name, timestamp: Date.now() })
+      );
+    } catch {}
+  }
+
+  function stopScreenStreaming() {
+    if (frameIntervalRef.current) {
+      clearInterval(frameIntervalRef.current);
+      frameIntervalRef.current = null;
+    }
+    peerConnectionsRef.current.forEach((pc) => pc.close());
+    peerConnectionsRef.current.clear();
+    streamChannelRef.current?.postMessage({ type: "stream-ended", sessionId });
+    framesChannelRef.current?.postMessage({ type: "stream-ended", sessionId });
+  }
+
   async function toggleScreenShare() {
     setMediaNotice("");
     if (sharingScreen) {
@@ -231,6 +416,9 @@ export default function TeacherLiveClassPage() {
       screenStreamRef.current = null;
       setSharingScreen(false);
       if (screenSharePreviewRef.current) screenSharePreviewRef.current.srcObject = null;
+      if (screenMonitorRef.current) screenMonitorRef.current.srcObject = null;
+      stopScreenStreaming();
+      notifyScreenShare(false);
       return;
     }
 
@@ -242,11 +430,56 @@ export default function TeacherLiveClassPage() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       screenStreamRef.current = stream;
       if (screenSharePreviewRef.current) screenSharePreviewRef.current.srcObject = stream;
+      if (screenMonitorRef.current) screenMonitorRef.current.srcObject = stream;
       setSharingScreen(true);
+      notifyScreenShare(true);
+
+      // Start frame streaming fallback
+      if (typeof document !== "undefined") {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
+
+        frameIntervalRef.current = setInterval(() => {
+          if (!screenStreamRef.current || !screenMonitorRef.current) return;
+          try {
+            const video = screenMonitorRef.current;
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+              const maxDim = 1280;
+              let w = video.videoWidth;
+              let h = video.videoHeight;
+              if (w > maxDim) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              }
+              canvas.width = w;
+              canvas.height = h;
+              ctx?.drawImage(video, 0, 0, w, h);
+              const frameData = canvas.toDataURL("image/jpeg", 0.65);
+              framesChannelRef.current?.postMessage({
+                type: "live-frame",
+                sessionId,
+                frame: frameData,
+                timestamp: Date.now(),
+              });
+            }
+          } catch {}
+        }, 120);
+      }
+
+      // Broadcast stream availability to all learners in the session
+      streamChannelRef.current?.postMessage({
+        type: "stream-available",
+        sessionId,
+        teacherName: session.teacher_name,
+      });
 
       stream.getVideoTracks()[0].onended = () => {
         setSharingScreen(false);
         if (screenSharePreviewRef.current) screenSharePreviewRef.current.srcObject = null;
+        if (screenMonitorRef.current) screenMonitorRef.current.srcObject = null;
+        stopScreenStreaming();
+        notifyScreenShare(false);
       };
     } catch {
       setMediaNotice("Screen sharing was cancelled or unavailable.");
@@ -263,7 +496,7 @@ export default function TeacherLiveClassPage() {
     }
   }
 
-  function admitLearner(learnerId: string) {
+  function admitLearner(learnerId: string, learnerName?: string) {
     const channel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("konnect-live-class-admission")
       : null;
@@ -276,11 +509,28 @@ export default function TeacherLiveClassPage() {
 
     localStorage.setItem(
       `konnect-live-class-admission:${sessionId}`,
-      JSON.stringify({ sessionId, status: "admitted" })
+      JSON.stringify({ sessionId, learnerId, status: "admitted", timestamp: Date.now() })
     );
 
+    try {
+      localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
+    } catch {}
+
+    const target = waitingLearners.find((l) => l.id === learnerId);
+    const name = learnerName || target?.name || "Learner";
+
+    setConnectedLearners((prev) => {
+      if (prev.some((l) => l.id === learnerId)) return prev;
+      return [...prev, { id: learnerId, name, joinedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
+    });
+
     setWaitingLearners((prev) => prev.filter((l) => l.id !== learnerId));
+    if (joinReminderLearner?.id === learnerId) {
+      setJoinReminderLearner(null);
+    }
     setAdmittedCount((count) => count + 1);
+    setCopyNotice(`Admitted ${name} into the live classroom.`);
+    setTimeout(() => setCopyNotice(""), 3500);
     channel?.close();
   }
 
@@ -296,11 +546,26 @@ export default function TeacherLiveClassPage() {
 
     localStorage.setItem(
       `konnect-live-class-admission:${sessionId}`,
-      JSON.stringify({ sessionId, status: "admitted" })
+      JSON.stringify({ sessionId, status: "admitted", timestamp: Date.now() })
     );
+
+    try {
+      localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
+    } catch {}
+
+    setConnectedLearners((prev) => {
+      const existingIds = new Set(prev.map((l) => l.id));
+      const newlyAdded: ConnectedLearner[] = waitingLearners
+        .filter((l) => !existingIds.has(l.id))
+        .map((l) => ({ id: l.id, name: l.name, joinedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }));
+      return [...prev, ...newlyAdded];
+    });
 
     setAdmittedCount((count) => count + waitingLearners.length);
     setWaitingLearners([]);
+    setJoinReminderLearner(null);
+    setCopyNotice("Admitted all waiting learners.");
+    setTimeout(() => setCopyNotice(""), 3500);
     channel?.close();
   }
 
@@ -376,6 +641,43 @@ export default function TeacherLiveClassPage() {
           </div>
         </header>
 
+        {joinReminderLearner && (
+          <aside
+            role="alert"
+            className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-md"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#27481f] text-white">
+                <Bell size={16} className="animate-bounce" />
+              </span>
+              <div>
+                <p className="text-[11px] font-bold text-[#1b2f18]">
+                  🔔 Admission Request: <span className="font-extrabold underline decoration-[#417b35]">{joinReminderLearner.name}</span> wants to join this class
+                </p>
+                <p className="text-[9.5px] text-[#55694f]">
+                  Learner is in the waiting room (Requested at {joinReminderLearner.requestedAt}). Approve to admit them into the live meeting.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => admitLearner(joinReminderLearner.id, joinReminderLearner.name)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#25491d] px-3.5 text-[10.5px] font-bold text-white shadow hover:bg-[#346329]"
+              >
+                <UserCheck size={13} /> Admit Learner
+              </button>
+              <button
+                type="button"
+                onClick={() => setJoinReminderLearner(null)}
+                className="inline-flex h-8 items-center rounded-md border border-[#cdd8c9] bg-white px-2.5 text-[10px] font-semibold text-[#54674d] hover:bg-[#f0f4ee]"
+              >
+                Dismiss
+              </button>
+            </div>
+          </aside>
+        )}
+
         {copyNotice && (
           <div className="shrink-0 rounded-md border border-[#c3dcba] bg-[#eef7ec] px-3 py-1.5 text-[10px] font-medium text-[#2d5c21] dark:border-[#2f492a] dark:bg-[#1a2b18] dark:text-[#b2e2a4]">
             {copyNotice}
@@ -422,15 +724,60 @@ export default function TeacherLiveClassPage() {
               )}
 
               {/* Status Pill on top of Video */}
-              <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-[9px] font-medium text-white backdrop-blur-sm">
-                <span className={`h-2 w-2 rounded-full ${cameraOn ? "bg-green-500" : "bg-red-500"}`} />
-                <span>{cameraOn ? "Teacher Video Active" : "Video Muted"}</span>
+              <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/75 px-3 py-1.5 text-[9px] font-medium text-white backdrop-blur-sm border border-emerald-500/30">
+                {sharingScreen ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-bold text-emerald-300">Screen Sharing Live · Learner View Confirmed</span>
+                  </>
+                ) : (
+                  <>
+                    <span className={`h-2 w-2 rounded-full ${cameraOn ? "bg-green-500" : "bg-red-500"}`} />
+                    <span>{cameraOn ? "Teacher Video Active" : "Video Muted"}</span>
+                  </>
+                )}
                 {microphoneOn && (
                   <span className="flex items-center gap-1 border-l border-white/20 pl-2 text-green-400">
                     <Mic size={10} /> Live Audio
                   </span>
                 )}
               </div>
+
+              {/* Dedicated Learner View Confirmed Verification Tile */}
+              {sharingScreen && (
+                <div
+                  aria-label="Learner view confirmation monitor"
+                  className="absolute bottom-3 right-3 z-20 w-64 overflow-hidden rounded-xl border border-emerald-500/50 bg-[#121911]/95 p-2.5 shadow-2xl backdrop-blur-md"
+                >
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider text-emerald-300">
+                        Learner View Confirmed
+                      </span>
+                    </div>
+                    <span className="rounded bg-[#1a3818] px-1.5 py-0.5 text-[7px] font-bold text-[#9ae28f] border border-[#2b5927]">
+                      Broadcasting
+                    </span>
+                  </div>
+                  <div className="relative mt-2 aspect-video w-full overflow-hidden rounded bg-black">
+                    <video
+                      ref={screenMonitorRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-contain"
+                    />
+                    <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 py-0.5 font-mono text-[6.5px] text-white/90">
+                      Live Mirror · 1080p
+                    </span>
+                  </div>
+                  <p className="mt-1.5 flex items-center gap-1 text-[8px] text-[#9db495]">
+                    <Check size={10} className="text-emerald-400 shrink-0" />
+                    Verified: Learners in classroom are seeing this shared screen
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Bottom Media Controls Bar */}
@@ -648,21 +995,40 @@ export default function TeacherLiveClassPage() {
                     </span>
                   </div>
 
-                  {/* Connected learners indicator */}
-                  <div className="flex items-center justify-between rounded-md border border-[#e4e9df] bg-[#f8faf6] p-2 dark:border-[#273525] dark:bg-[#1c241b]">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#355230] text-[9px] font-bold text-white">
-                        ST
-                      </span>
-                      <div>
-                        <p className="text-[9px] font-bold text-[#1f291c] dark:text-[#edf2ea]">Connected Learner</p>
-                        <p className="text-[7px] text-[#717c6b]">Enrolled student</p>
+                  {/* Connected learners list */}
+                  {connectedLearners.length > 0 ? (
+                    connectedLearners.map((learner) => (
+                      <div key={learner.id} className="flex items-center justify-between rounded-md border border-[#e4e9df] bg-[#f8faf6] p-2 dark:border-[#273525] dark:bg-[#1c241b]">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#355230] text-[9px] font-bold text-white">
+                            {learner.name.slice(0, 2).toUpperCase()}
+                          </span>
+                          <div>
+                            <p className="text-[9px] font-bold text-[#1f291c] dark:text-[#edf2ea]">{learner.name}</p>
+                            <p className="text-[7px] text-[#717c6b]">Enrolled learner · Joined {learner.joinedAt}</p>
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-[#edf6eb] px-1.5 py-0.5 text-[7px] font-semibold text-[#325227] dark:bg-[#202f1d] dark:text-[#aee09f]">
+                          Online
+                        </span>
                       </div>
+                    ))
+                  ) : (
+                    <div className="flex items-center justify-between rounded-md border border-[#e4e9df] bg-[#f8faf6] p-2 dark:border-[#273525] dark:bg-[#1c241b]">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#355230] text-[9px] font-bold text-white">
+                          ST
+                        </span>
+                        <div>
+                          <p className="text-[9px] font-bold text-[#1f291c] dark:text-[#edf2ea]">Connected Learner</p>
+                          <p className="text-[7px] text-[#717c6b]">Waiting for students to join</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-[#f4f7f2] px-1.5 py-0.5 text-[7px] font-semibold text-[#5a6b54] dark:bg-[#202f1d] dark:text-[#aee09f]">
+                        Waiting
+                      </span>
                     </div>
-                    <span className="rounded-full bg-[#edf6eb] px-1.5 py-0.5 text-[7px] font-semibold text-[#325227] dark:bg-[#202f1d] dark:text-[#aee09f]">
-                      Active
-                    </span>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
