@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiJson, browseClasses, enrollInClass, getLearnerClasses } from "@/lib/api";
-import { BookOpen, Check, ChevronDown } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Video } from "lucide-react";
 
 type ApiClass = {
   id: string;
@@ -57,6 +57,47 @@ export default function LearnerCoursesPage() {
   const [loading, setLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [activeLiveClass, setActiveLiveClass] = useState<{ sessionId: string; classId?: string; courseTitle?: string } | null>(null);
+
+  useEffect(() => {
+    function checkLive() {
+      try {
+        const raw = localStorage.getItem("konnect-active-live-session");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.sessionId && parsed.status !== "ENDED") {
+            if (!parsed.lastHeartbeat || Date.now() - parsed.lastHeartbeat < 45000) {
+              setActiveLiveClass(parsed);
+              return;
+            }
+          }
+        }
+      } catch {}
+      setActiveLiveClass(null);
+    }
+    checkLive();
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel("konnect-live-classes");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "session-started" && event.data.session) {
+            setActiveLiveClass(event.data.session);
+          } else if (event.data?.type === "session-ended") {
+            setActiveLiveClass(null);
+          }
+        };
+        channel.postMessage({ type: "is-teacher-live-query" });
+      } catch {}
+    }
+
+    const interval = setInterval(checkLive, 3000);
+    return () => {
+      clearInterval(interval);
+      channel?.close();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -187,12 +228,29 @@ export default function LearnerCoursesPage() {
               <p className="mt-3 line-clamp-3 flex-1 text-[10px] leading-relaxed text-[#58645b] dark:text-[#a6aea0]">{course.description || "No course description has been added yet."}</p>
               <p className="mt-3 text-[9px] text-[#687463] dark:text-[#9aa592]">{course.teacher_name || "Instructor not listed"}</p>
               {isTaking ? (
-                <Link
-                  href="/learner/dashboard"
-                  className="mt-3 flex min-h-9 items-center justify-center rounded-md border border-[#dfe5da] text-[10px] font-semibold text-[#1b2219] hover:bg-[#f3f6ef] dark:border-[#273724] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]"
-                >
-                  Open learner dashboard
-                </Link>
+                <div className="mt-3 flex flex-col gap-1.5">
+                  {Boolean(
+                    activeLiveClass &&
+                    (activeLiveClass.sessionId === course.id ||
+                     activeLiveClass.classId === course.id ||
+                     course.title.toLowerCase().includes((activeLiveClass.courseTitle || "").toLowerCase()) ||
+                     (activeLiveClass.courseTitle || "").toLowerCase().includes(course.title.toLowerCase()))
+                  ) && (
+                    <Link
+                      href={`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveClass?.sessionId || course.id)}&autoRequest=1`}
+                      className="flex min-h-8 items-center justify-center gap-1.5 rounded-md bg-[#25491d] text-[9.5px] font-bold text-white shadow hover:bg-[#326127] transition animate-pulse"
+                    >
+                      <Video size={11} className="text-[#86efac]" />
+                      <span>🔴 Live Now · Ask to Join →</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/learner/live_classes"
+                    className="flex min-h-8 items-center justify-center rounded-md border border-[#dfe5da] text-[9.5px] font-semibold text-[#1b2219] hover:bg-[#f3f6ef] dark:border-[#273724] dark:text-[#dce7d9] dark:hover:bg-[#1e2e1c]"
+                  >
+                    View Class Schedule
+                  </Link>
+                </div>
               ) : isPending ? (
                 <button
                   type="button"

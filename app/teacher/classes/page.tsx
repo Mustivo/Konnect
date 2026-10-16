@@ -225,19 +225,20 @@ export default function TeacherClassesPage() {
                   <div className="flex items-center gap-1.5">
                     <Link
                       href={`/teacher/live-classes/${item.id}`}
-                      className="inline-flex items-center gap-1 rounded-full bg-[#23351f] px-2.5 py-1.5 text-[8px] font-semibold text-white hover:bg-[#30472b] transition-colors"
-                      title="Enter teacher live studio"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#23351f] px-3 py-1.5 text-[8.5px] font-bold text-white shadow-sm hover:bg-[#30472b] transition-colors"
+                      title="Start live session in studio (Enrolled learners will automatically see 'Ask to Join' on their portal)"
                     >
-                      <Video size={10} className="text-[#86efac]" /> Studio
+                      <Video size={11} className="text-[#86efac] animate-pulse" />
+                      <span>Start Live Studio</span>
                     </Link>
                     <button
                       type="button"
                       onClick={() => copyLearnerLink(item.id)}
                       className="inline-flex items-center gap-1 rounded-full border border-[#dce3d7] bg-[#f8faf6] px-2 py-1.5 text-[8px] font-semibold text-[#405439] hover:bg-[#edf2ea] dark:border-[#2b3a28] dark:bg-[#1a2518] dark:text-[#c2d3bd] transition-colors"
-                      title="Copy join link for learners"
+                      title="Copy optional join link"
                     >
                       {copiedId === item.id ? <Check size={10} className="text-[#2c6e21]" /> : <Copy size={10} />}
-                      {copiedId === item.id ? "Copied!" : "Learner Link"}
+                      {copiedId === item.id ? "Copied!" : "Copy Link"}
                     </button>
                   </div>
                   {isActive ? (

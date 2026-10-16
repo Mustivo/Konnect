@@ -50,6 +50,23 @@ function LiveClassWaitingRoomContent() {
   const [userInitials, setUserInitials] = useState("L");
   const [mounted, setMounted] = useState(false);
   const [isTeacherLive, setIsTeacherLive] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [microphoneOn, setMicrophoneOn] = useState(false);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [cameraId, setCameraId] = useState("");
+  const [microphoneId, setMicrophoneId] = useState("");
+  const [mediaError, setMediaError] = useState("");
+  const [admissionState, setAdmissionState] = useState<"ready" | "waiting" | "admitted" | "denied">("ready");
+  const [requestError, setRequestError] = useState("");
+  const [waitingSeconds, setWaitingSeconds] = useState(0);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const requestIdRef = useRef("");
+  const admissionStorageKey = `konnect-live-class-admission:${session.id}`;
+  const requestStorageKey = `konnect-live-class-request:${session.id}`;
 
   useEffect(() => {
     currentUser().then((u) => {
@@ -82,23 +99,6 @@ function LiveClassWaitingRoomContent() {
       }
     }).catch(() => undefined);
   }, [requestStorageKey, session.id]);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [cameraOn, setCameraOn] = useState(false);
-  const [microphoneOn, setMicrophoneOn] = useState(false);
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
-  const [cameraId, setCameraId] = useState("");
-  const [microphoneId, setMicrophoneId] = useState("");
-  const [mediaError, setMediaError] = useState("");
-  const [admissionState, setAdmissionState] = useState<"ready" | "waiting" | "admitted" | "denied">("ready");
-  const [requestError, setRequestError] = useState("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const requestIdRef = useRef("");
-  const admissionStorageKey = `konnect-live-class-admission:${session.id}`;
-  const requestStorageKey = `konnect-live-class-request:${session.id}`;
-
-  const [waitingSeconds, setWaitingSeconds] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -356,11 +356,23 @@ function LiveClassWaitingRoomContent() {
     setRequestError("");
     setAdmissionState("waiting");
 
+    let effectiveName = userName;
+    if (effectiveName === "Learner") {
+      try {
+        const cached = localStorage.getItem("konnect-user");
+        if (cached) {
+          const u = JSON.parse(cached);
+          const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username;
+          if (full) effectiveName = full;
+        }
+      } catch {}
+    }
+
     const joinPayload = {
       type: "join-request",
       sessionId: session.id,
       learnerId: requestId,
-      learnerName: userName,
+      learnerName: effectiveName,
       requestId,
       requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
@@ -485,16 +497,35 @@ function LiveClassWaitingRoomContent() {
                 {session.teacher || "Your instructor"} has received your request and will admit you into the live class when ready.
               </p>
 
-              <div className="mt-5 rounded-lg border border-[#e1e6db] bg-[#f3f5ef] p-3 dark:border-[#303b2d] dark:bg-[#20271e]">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-[#232c20] dark:text-[#edf2ea]">{session.teacher}</p>
-                  <span className="flex items-center gap-1 text-[8px] font-semibold text-[#426135] dark:text-[#aee09f]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#426135] animate-ping" />
-                    Teacher alerted
-                  </span>
+              {isTeacherLive ? (
+                <div className="mt-5 rounded-lg border border-[#c6dfbc] bg-[#eff8ec] p-3 dark:border-[#304d27] dark:bg-[#182816]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-[#1f3b17] dark:text-[#edf2ea]">{session.teacher}</p>
+                    <span className="flex items-center gap-1.5 text-[8px] font-bold text-[#27641d] dark:text-[#aee09f]">
+                      <span className="h-2 w-2 rounded-full bg-[#27641d] animate-pulse" />
+                      Teacher is on live now
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[9px] text-[#4f6b45] dark:text-[#a0aa99]">{session.title}</p>
+                  <p className="mt-1.5 text-[8px] font-medium text-[#2d5722] dark:text-[#b0d9a6]">
+                    ✓ Request sent directly to teacher&apos;s live studio. As soon as the teacher approves, you will enter the classroom automatically.
+                  </p>
                 </div>
-                <p className="mt-1 text-[9px] text-[#788172] dark:text-[#a0aa99]">{session.title}</p>
-              </div>
+              ) : (
+                <div className="mt-5 rounded-lg border border-[#e1e6db] bg-[#f3f5ef] p-3 dark:border-[#303b2d] dark:bg-[#20271e]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-[#232c20] dark:text-[#edf2ea]">{session.teacher}</p>
+                    <span className="flex items-center gap-1 text-[8px] font-semibold text-[#8a681c] dark:text-[#f3c36c]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#c79124] animate-ping" />
+                      Waiting for teacher studio
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[9px] text-[#788172] dark:text-[#a0aa99]">{session.title}</p>
+                  <p className="mt-1.5 text-[8px] text-[#788172] dark:text-[#a0aa99]">
+                    Your request is active. When your teacher goes live, they will receive your request immediately.
+                  </p>
+                </div>
+              )}
 
               {requestError && <p role="status" className="mt-3 text-[9px] text-[#a7463a]">{requestError}</p>}
               <button
