@@ -73,7 +73,6 @@ const teacherMenuItems: MenuItem[] = [
     { name: "Assignments", href: "/teacher/activities/assignments", icon: ClipboardList, left: 20 },
     { name: "Exams", href: "/teacher/activities/exams", icon: ClipboardList, left: 20 },
   ] },
-  { name: "Grades & Reports", href: "/teacher/dashboard#reports", icon: GraduationCap, left: 20, marginTop: 1 },
   { name: "Analytics", href: "/teacher/analytics", icon: BarChart3, left: 20, marginTop: 1 },
   { name: "Messages", href: "/teacher/messages", icon: MessageSquare, left: 20, marginTop: 1, badge: "2" },
   { name: "Settings", href: "/teacher/settings", icon: Settings, left: 20, marginTop: 1 },
