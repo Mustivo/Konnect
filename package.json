@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:status": "node scripts/seed-database.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",

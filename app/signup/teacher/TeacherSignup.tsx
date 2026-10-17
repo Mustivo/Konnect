@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import AccountStep from "./steps/AccountStep";
 import ProfileStep from "./steps/ProfileStep";
 import DocumentsStep from "./steps/DocumentsStep";
-import ReviewStep from "./steps/ReviewStep";
+import ReviewStep, { type TeacherReviewData } from "./steps/ReviewStep";
 import EmailVerification from "./screens/EmailVerification";
 import ApplicationStatus from "./screens/ApplicationStatus";
 import { apiErrorMessage, login, register, updateTeacherProfile } from "@/lib/api";
@@ -48,7 +48,33 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
   const [email, setEmail] = useState("");
   const [verifiedAt, setVerifiedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewData, setReviewData] = useState<TeacherReviewData>({});
   const applicationForm = useRef<HTMLFormElement>(null);
+
+  function captureReviewData() {
+    if (!applicationForm.current) return;
+    const values = new FormData(applicationForm.current);
+    const degree = values.get("degree_certificate") as File | null;
+    const cv = values.get("cv") as File | null;
+    setReviewData({
+      fullName: String(values.get("fullName") || "").trim(),
+      displayName: String(values.get("displayName") || "").trim(),
+      email: String(values.get("email") || "").trim(),
+      country: String(values.get("country") || "").trim(),
+      phone: String(values.get("phone") || "").trim(),
+      headline: String(values.get("headline") || "").trim(),
+      experience: String(values.get("experience") || "").trim(),
+      bio: String(values.get("bio") || "").trim(),
+      subjects: String(values.get("subjects") || "").trim(),
+      institution: String(values.get("institution") || "").trim(),
+      educationLevel: String(values.get("educationLevel") || "").trim(),
+      teachingMode: String(values.get("teachingMode") || "").trim(),
+      portfolio: String(values.get("portfolio") || "").trim(),
+      documentName: String(values.get("documentName") || "").trim(),
+      degreeFileName: degree?.name || "",
+      cvFileName: cv?.name || "",
+    });
+  }
 
   function validateCurrentStep() {
     const fieldset = applicationForm.current?.querySelector<HTMLFieldSetElement>("fieldset:not([hidden])");
@@ -81,12 +107,17 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
     setSubmitting(true);
     setNotice("");
     try {
+      const cleanUsername = (emailAddress.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "teacher") + "_" + Math.random().toString(36).slice(2, 6);
+      const phoneNumber = String(values.get("phone") ?? "").trim();
+
       await register({
         email: emailAddress,
-        username: emailAddress.slice(0, 150),
-        first_name: firstName,
-        last_name: lastNameParts.join(" "),
-        phone_number: String(values.get("phone") ?? "").trim() || undefined,
+        username: cleanUsername,
+        name: fullName || "Instructor",
+        full_name: fullName || "Instructor",
+        first_name: firstName || "Instructor",
+        last_name: lastNameParts.join(" ") || "Teacher",
+        phone_number: phoneNumber || undefined,
         password,
         password_confirm: passwordConfirm,
         role: "TEACHER",
@@ -98,28 +129,36 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
       localStorage.setItem("konnect-refresh-token", tokens.refresh);
 
       const profile = new FormData();
-      profile.set("bio", String(values.get("bio") ?? ""));
-      profile.set("qualifications", [
-        `Display name: ${String(values.get("displayName") ?? "")}`,
-        String(values.get("headline") ?? ""),
-        `Experience: ${String(values.get("experience") ?? "")}`,
-        `Education: ${String(values.get("educationLevel") ?? "")}`,
-        `Institution: ${String(values.get("institution") ?? "")}`,
-        `Languages: ${String(values.get("languages") ?? "")}`,
-        `Teaching mode: ${String(values.get("teachingMode") ?? "")}`,
-        `Availability: ${String(values.get("availability") ?? "")}`,
-        `Country: ${String(values.get("country") ?? "")}`,
-        `Timezone: ${String(values.get("timezone") ?? "")}`,
-        `Portfolio: ${String(values.get("portfolio") ?? "")}`,
-      ].filter((value) => !value.endsWith(": ")).join(" · "));
-      profile.set("expertise_subjects", String(values.get("subjects") ?? ""));
-      profile.set("verification_notes", `Legal name on documents: ${String(values.get("documentName") ?? "")}`);
-      const certificate = values.get("degree-certificate");
-      if (certificate instanceof File && certificate.size > 0) profile.set("verification_document", certificate);
+      profile.set("email", emailAddress);
+      profile.set("full_legal_name", fullName);
+      profile.set("display_name", String(values.get("displayName") ?? fullName).trim());
+      profile.set("phone_number", phoneNumber);
+      profile.set("country", String(values.get("country") ?? "").trim());
+      profile.set("headline", String(values.get("headline") ?? "").trim());
+      profile.set("bio", String(values.get("bio") ?? "").trim());
+      profile.set("years_of_experience", String(values.get("experience") ?? "").trim());
+      profile.set("education_level_taught", String(values.get("educationLevel") ?? "").trim());
+      profile.set("current_institution", String(values.get("institution") ?? "").trim());
+      profile.set("teaching_mode", String(values.get("teachingMode") ?? "").trim());
+      profile.set("subjects_expertise", String(values.get("subjects") ?? "").trim());
+      profile.set("languages", String(values.get("languages") ?? "").trim());
+      profile.set("portfolio_url", String(values.get("portfolio") ?? "").trim());
+      profile.set("legal_name_on_documents", String(values.get("documentName") ?? fullName).trim());
+
+      const degreeCert = values.get("degree_certificate");
+      if (degreeCert instanceof File && degreeCert.size > 0) {
+        profile.set("degree_certificate", degreeCert);
+      }
+      const cvFile = values.get("cv");
+      if (cvFile instanceof File && cvFile.size > 0) {
+        profile.set("cv", cvFile);
+      }
+      const profilePhoto = values.get("profilePhoto");
+      if (profilePhoto instanceof File && profilePhoto.size > 0) {
+        profile.set("profile_picture", profilePhoto);
+      }
 
       await updateTeacherProfile(profile);
-      localStorage.removeItem("konnect-access-token");
-      localStorage.removeItem("konnect-refresh-token");
       router.replace("/login?registered=1");
     } catch (error) {
       const message = apiErrorMessage(error instanceof Error && "payload" in error ? error.payload : error, "Please review your details and try again.");
@@ -212,13 +251,19 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
         <DocumentsStep
           hidden={step !== 3}
           onBack={() => setStep(2)}
-          onContinue={() => { if (validateCurrentStep()) setStep(4); }}
+          onContinue={() => {
+            if (validateCurrentStep()) {
+              captureReviewData();
+              setStep(4);
+            }
+          }}
         />
         <ReviewStep
           hidden={step !== 4}
           onEdit={setStep}
           onBack={() => setStep(3)}
           onSubmit={submitApplication}
+          reviewData={reviewData}
         />
       </form>
       {submitting && (

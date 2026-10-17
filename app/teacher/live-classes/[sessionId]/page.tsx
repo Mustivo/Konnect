@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { useSessionChat } from "@/lib/useSessionChat";
 import { apiJson } from "@/lib/api";
-import { endSession, getSession, startSession } from "@/lib/api/sessions";
+import { endSession, getSession, getSessionAttendance, startSession } from "@/lib/api/sessions";
+import type { MockParticipant } from "@/lib/mock/classesTable";
 import {
   Bell,
   Camera,
@@ -48,6 +49,9 @@ type ConnectedLearner = {
   id: string;
   name: string;
   joinedAt: string;
+  status?: string;
+  durationMinutes?: number;
+  attendanceStatus?: string;
 };
 
 export default function TeacherLiveClassPage() {
@@ -138,6 +142,39 @@ export default function TeacherLiveClassPage() {
       active = false;
     };
   }, [learnerInviteLink, sessionId]);
+
+  // Sync real-time attendance and learner alive duration from database
+  useEffect(() => {
+    let active = true;
+    async function syncAttendance() {
+      try {
+        const res = await getSessionAttendance(sessionId);
+        const data = await apiJson<{ results?: MockParticipant[] }>(res);
+        if (!active || !data?.results) return;
+        const learners = data.results.filter((p) => p.role === "learner");
+        if (learners.length > 0) {
+          setConnectedLearners(
+            learners.map((l) => ({
+              id: l.id,
+              name: l.name,
+              joinedAt: l.joined_at ? new Date(l.joined_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now",
+              status: l.status,
+              durationMinutes: l.duration_minutes || 1,
+              attendanceStatus: l.attendance_status || (l.status === "left" ? "Finished" : "Active"),
+            }))
+          );
+          setAdmittedCount(1 + learners.length);
+        }
+      } catch {}
+    }
+
+    void syncAttendance();
+    const interval = setInterval(syncAttendance, 6000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [sessionId]);
 
   // Live timer ticker
   useEffect(() => {
@@ -1075,11 +1112,17 @@ export default function TeacherLiveClassPage() {
                           </span>
                           <div>
                             <p className="text-[9px] font-bold text-[#1f291c] dark:text-[#edf2ea]">{learner.name}</p>
-                            <p className="text-[7px] text-[#717c6b]">Enrolled learner · Joined {learner.joinedAt}</p>
+                            <p className="text-[7px] text-[#717c6b]">
+                              Joined {learner.joinedAt} · Active: {learner.durationMinutes || 1}m
+                            </p>
                           </div>
                         </div>
-                        <span className="rounded-full bg-[#edf6eb] px-1.5 py-0.5 text-[7px] font-semibold text-[#325227] dark:bg-[#202f1d] dark:text-[#aee09f]">
-                          Online
+                        <span className={`rounded-full px-2 py-0.5 text-[7px] font-semibold ${
+                          learner.status === "left"
+                            ? "bg-[#fce9dc] text-[#bd622c]"
+                            : "bg-[#edf6eb] text-[#325227] dark:bg-[#202f1d] dark:text-[#aee09f]"
+                        }`}>
+                          {learner.attendanceStatus || (learner.status === "left" ? "Left" : "Present")}
                         </span>
                       </div>
                     ))

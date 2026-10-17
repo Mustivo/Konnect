@@ -5,11 +5,8 @@ type DocumentsStepProps = {
 };
 
 const documents = [
-  { name: "CV or résumé", hint: "Optional · PDF, DOC, DOCX · up to 10 MB", accept: ".pdf,.doc,.docx" },
-  { name: "Government ID — front", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
-  { name: "Government ID — back", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
-  { name: "Degree certificate", hint: "PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
-  { name: "Teaching certificates", hint: "Optional · PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png" },
+  { name: "Degree certificate", fieldName: "degree_certificate", hint: "PDF, JPG or PNG · up to 10 MB", accept: ".pdf,image/jpeg,image/png", required: true },
+  { name: "CV or résumé", fieldName: "cv", hint: "Optional · PDF, DOC, DOCX · up to 10 MB", accept: ".pdf,.doc,.docx", required: false },
 ];
 
 export default function DocumentsStep({ hidden, onBack, onContinue }: DocumentsStepProps) {
@@ -17,20 +14,20 @@ export default function DocumentsStep({ hidden, onBack, onContinue }: DocumentsS
     <fieldset hidden={hidden} className="space-y-3 border-0 p-0">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="block text-[0.65rem] font-medium">Legal name on documents
-          <input required name="documentName" placeholder="Enter name as shown on your ID" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
-          <span className="mt-1 block text-[0.5rem] font-normal text-[#84907a]">Must exactly match your government ID</span>
+          <input required name="documentName" placeholder="Enter name as shown on your certificates" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
+          <span className="mt-1 block text-[0.5rem] font-normal text-[#84907a]">Must match your degree or educational credentials</span>
         </label>
-        <p className="rounded bg-[#f0f1e9] p-3 text-[0.55rem] text-[#6c7469]">Before uploading, make sure all names and dates are readable and match your application.</p>
+        <p className="rounded bg-[#f0f1e9] p-3 text-[0.55rem] text-[#6c7469]">Before uploading, ensure your credentials are clear, readable, and in PDF or image format.</p>
       </div>
       <p className="rounded border border-[#dfe5d8] bg-[#edf2e8] px-3 py-2 text-[0.55rem] text-[#52644a]">
-        Your documents are encrypted and visible only to the verification team.
+        Your documents are securely encrypted and reviewed solely for instructor verification.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {documents.map((document) => (
-          <label key={document.name} className="block rounded border border-dashed border-[#cbd5c1] bg-white p-3 text-[0.6rem] dark:border-white/15 dark:bg-white/5">
-            <span className="font-semibold">{document.name}</span>
+          <label key={document.fieldName} className="block rounded border border-dashed border-[#cbd5c1] bg-white p-3 text-[0.6rem] dark:border-white/15 dark:bg-white/5">
+            <span className="font-semibold">{document.name} {document.required ? <span className="text-red-500">*</span> : <span className="font-normal text-[#84907a]">(Optional)</span>}</span>
             <span className="mt-1 block text-[0.5rem] text-[#84907a]">{document.hint}</span>
-            <input required={document.name === "Degree certificate"} type="file" name={document.name.toLowerCase().replaceAll(/[^a-z]+/g, "-")} accept={document.accept} className="mt-2 block w-full text-[0.55rem]" />
+            <input required={document.required} type="file" name={document.fieldName} accept={document.accept} className="mt-2 block w-full text-[0.55rem]" />
           </label>
         ))}
       </div>

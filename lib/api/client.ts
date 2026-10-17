@@ -98,10 +98,22 @@ export function apiErrorMessage(payload: unknown, fallback: string) {
   if (typeof payload === "string" && payload.trim()) return payload;
   if (!payload || typeof payload !== "object") return fallback;
   const body = payload as Record<string, unknown>;
-  const detail = body.detail ?? Object.values(body)[0];
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map(String).join(" ");
-  if (detail && typeof detail === "object") return Object.entries(detail as Record<string, unknown>).map(([field, value]) => `${field}: ${Array.isArray(value) ? value.map(String).join(" ") : String(value)}`).join(" ");
+  if (typeof body.detail === "string") return body.detail;
+  if (Array.isArray(body.detail)) return body.detail.map(String).join(" ");
+
+  const messages: string[] = [];
+  for (const [key, value] of Object.entries(body)) {
+    if (key === "detail") continue;
+    const label = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    if (Array.isArray(value)) {
+      messages.push(`${label}: ${value.map(String).join(" ")}`);
+    } else if (typeof value === "string") {
+      messages.push(`${label}: ${value}`);
+    } else if (value && typeof value === "object") {
+      messages.push(`${label}: ${JSON.stringify(value)}`);
+    }
+  }
+  if (messages.length > 0) return messages.join(" · ");
   return fallback;
 }
 

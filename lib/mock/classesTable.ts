@@ -671,8 +671,13 @@ export interface MockParticipant {
   id: string;
   name: string;
   role: "teacher" | "learner";
-  status: "waiting" | "admitted" | "active";
+  status: "waiting" | "admitted" | "active" | "left";
   joined_at: string;
+  left_at?: string;
+  duration_minutes?: number;
+  last_alive_at?: string;
+  attendance_status?: "Present" | "Late" | "Absent";
+  attendance_pct?: number;
   camera_on?: boolean;
   mic_on?: boolean;
 }

@@ -51,13 +51,14 @@ export default function ProfileStep({ hidden, onBack, onContinue }: ProfileStepP
         </label>
         <label className="block text-[0.65rem] font-medium">Teaching mode
           <select required name="teachingMode" defaultValue="" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-[#10140f]">
-            <option value="" disabled>Select teaching mode</option><option>Live online · Small groups</option><option>Live online · One-to-one</option><option>In person</option><option>Online and in person</option>
+            <option value="" disabled>Select teaching mode</option>
+            <option>Live online · Small groups</option>
+            <option>Live online · One-to-one</option>
+            <option>In person</option>
+            <option>Online and in person</option>
           </select>
         </label>
-        <label className="block text-[0.65rem] font-medium">Availability &amp; timezone
-          <input required name="availability" placeholder="Weekdays 16:00–20:00 · Pacific Time" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
-        </label>
-        <label className="block text-[0.65rem] font-medium">Portfolio or LinkedIn <span className="font-normal text-[#84907a]">Optional</span>
+        <label className="block text-[0.65rem] font-medium sm:col-span-2">Portfolio or LinkedIn <span className="font-normal text-[#84907a]">Optional</span>
           <input name="portfolio" type="url" placeholder="https://..." className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
       </div>

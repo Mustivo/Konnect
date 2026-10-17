@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { apiJson } from "@/lib/api";
-import { getSession, leaveSession } from "@/lib/api/sessions";
+import { getSession, joinSession, leaveSession, heartbeatSession } from "@/lib/api/sessions";
 import { currentUser } from "@/lib/api/auth";
 import { useSessionChat } from "@/lib/useSessionChat";
 import {
@@ -71,6 +71,7 @@ export default function LiveClassRoomPage() {
   const [admissionVerified, setAdmissionVerified] = useState(false);
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenFrame, setRemoteScreenFrame] = useState<string | null>(null);
+  const [aliveSeconds, setAliveSeconds] = useState(0);
 
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
   const teacherLiveScreenRef = useRef<HTMLVideoElement>(null);
@@ -96,6 +97,14 @@ export default function LiveClassRoomPage() {
     setAdmissionVerified(true);
     setDarkMode(window.localStorage.getItem("konnect-theme") === "dark");
 
+    try {
+      const connected = localStorage.getItem(`konnect-live-class-connected:${activeSessionId}`);
+      if (connected) {
+        const parsed = JSON.parse(connected);
+        if (parsed?.learnerId) learnerIdRef.current = String(parsed.learnerId);
+      }
+    } catch {}
+
     currentUser()
       .then((u) => {
         const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
@@ -117,6 +126,52 @@ export default function LiveClassRoomPage() {
       })
       .catch(() => undefined);
   }, [router]);
+
+  // Real-time attendance duration & keep-alive tracking
+  useEffect(() => {
+    if (!sessionId || !admissionVerified) return;
+
+    // Record join in database
+    void joinSession(sessionId, {
+      student_id: learnerIdRef.current,
+      student_name: currentUserName,
+    }).catch(() => undefined);
+
+    const ticker = setInterval(() => {
+      setAliveSeconds((sec) => sec + 1);
+    }, 1000);
+
+    // Heartbeat every 25s so server knows learner is actively alive
+    const heartbeat = setInterval(() => {
+      void heartbeatSession(sessionId, {
+        student_id: learnerIdRef.current,
+      }).catch(() => undefined);
+    }, 25000);
+
+    // On tab close or navigation, cleanly record leave time and attendance duration
+    function handleUnload() {
+      try {
+        const payload = JSON.stringify({ student_id: learnerIdRef.current });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(`/api/sessions/${encodeURIComponent(sessionId)}/leave/`, payload);
+        } else {
+          fetch(`/api/sessions/${encodeURIComponent(sessionId)}/leave/`, {
+            method: "POST",
+            body: payload,
+            keepalive: true,
+          }).catch(() => undefined);
+        }
+      } catch {}
+    }
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      clearInterval(ticker);
+      clearInterval(heartbeat);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [admissionVerified, currentUserName, sessionId]);
 
   // Synchronize teacher screen sharing detection and WebRTC / Frame streaming
   useEffect(() => {
@@ -366,7 +421,9 @@ export default function LiveClassRoomPage() {
   }
 
   function leaveClass() {
-    if (sessionId) void leaveSession(sessionId).catch(() => undefined);
+    if (sessionId) {
+      void leaveSession(sessionId, { student_id: learnerIdRef.current }).catch(() => undefined);
+    }
     sessionStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
     router.push(`/learner/live_classes/class-complete?session=${encodeURIComponent(sessionId)}`);
   }
@@ -420,6 +477,15 @@ export default function LiveClassRoomPage() {
           <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[8px] font-semibold text-emerald-300 border border-emerald-500/30">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             1-on-1 Live Class
+          </span>
+
+          {/* Attendance alive time tracking */}
+          <span
+            className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-medium text-emerald-200 border border-white/15"
+            title="Attendance is automatically recorded based on active presence"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Active: {Math.floor(aliveSeconds / 60)}m {aliveSeconds % 60 < 10 ? "0" : ""}{aliveSeconds % 60}s
           </span>
 
           {/* Participants toggle (2 people) */}

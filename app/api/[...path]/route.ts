@@ -13,15 +13,33 @@ import {
   getSessionsTable,
   isTeacherEmail,
   joinSessionRecord,
+  leaveSessionRecord,
+  heartbeatSessionRecord,
   mockAssessmentSubmissions,
   mockLearnerProfile,
   registerTeacherEmail,
   startSessionRecord,
-} from "@/lib/mock/classesTable";
+} from "@/lib/server/dbStore";
+import {
+  getTeacherProfileByEmail,
+  isRegisteredTeacher,
+  saveTeacherProfile,
+} from "@/lib/server/teacherStore";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_BASE = "https://konnect-classroomvirtual.onrender.com";
+function normalizeBackendBase(url?: string): string {
+  const target = url?.trim() || "https://konnect-classroomvirtual.onrender.com";
+  try {
+    const parsed = new URL(target);
+    const sanitized = parsed.pathname.replace(/\/swagger\/?.*$/i, "").replace(/\/+$/, "");
+    return `${parsed.origin}${sanitized || ""}`;
+  } catch {
+    return "https://konnect-classroomvirtual.onrender.com";
+  }
+}
+
+const BACKEND_BASE = normalizeBackendBase(process.env.NEXT_PUBLIC_API_URL);
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, {
@@ -219,20 +237,35 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
     normalized === "auth/me/teacher-profile" ||
     normalized === "auth/me/teacher-profile/" ||
     normalized === "teacher/profile" ||
-    normalized === "teacher/profile/"
+    normalized === "teacher/profile/" ||
+    normalized === "teachers/me" ||
+    normalized === "teachers/me/"
   ) {
-    return jsonResponse({
+    if (method === "PATCH" || method === "POST" || method === "PUT") {
+      const email = String(requestBody?.email || "current-teacher").toLowerCase();
+      const saved = saveTeacherProfile(email, requestBody || {});
+      return jsonResponse(saved, 200);
+    }
+    const teacherData = getTeacherProfileByEmail("current-teacher") || {
       bio: "Passionate educator specializing in Mathematics and Full-Stack Web Development.",
+      headline: "Experienced Educator & Curriculum Designer",
       subject_specialization: "Mathematics & Computer Science",
+      subjects_expertise: ["Mathematics", "Computer Science"],
+      education_level_taught: "Secondary / High school",
+      teaching_mode: "Live online · Small groups",
+      verification_status: "VERIFIED",
       verified: true,
-    });
+    };
+    return jsonResponse(teacherData, 200);
   }
 
   // 13. Specific session join: /api/sessions/:id/join/
   if (normalized.startsWith("sessions/") && normalized.endsWith("/join")) {
     const parts = normalized.split("/");
     const sessionId = parts[1];
-    const joinResult = joinSessionRecord(sessionId, 1, "Learner");
+    const studentId = requestBody?.student_id || requestBody?.id || 1;
+    const studentName = requestBody?.student_name || requestBody?.name || "Learner";
+    const joinResult = joinSessionRecord(sessionId, studentId, studentName);
     return jsonResponse(joinResult, 200);
   }
 
@@ -267,7 +300,20 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
 
   // 16. Session leave: /api/sessions/:id/leave/
   if (normalized.startsWith("sessions/") && normalized.endsWith("/leave")) {
-    return jsonResponse({ detail: "Left session successfully" }, 200);
+    const parts = normalized.split("/");
+    const sessionId = parts[1];
+    const studentId = requestBody?.student_id || requestBody?.id || 1;
+    const leaveResult = leaveSessionRecord(sessionId, studentId);
+    return jsonResponse(leaveResult, 200);
+  }
+
+  // 16b. Session heartbeat (alive ping): /api/sessions/:id/heartbeat/
+  if (normalized.startsWith("sessions/") && normalized.endsWith("/heartbeat")) {
+    const parts = normalized.split("/");
+    const sessionId = parts[1];
+    const studentId = requestBody?.student_id || requestBody?.id || 1;
+    const heartbeatResult = heartbeatSessionRecord(sessionId, studentId);
+    return jsonResponse(heartbeatResult, 200);
   }
 
   // 17. Session end: /api/sessions/:id/end/
@@ -358,6 +404,20 @@ async function proxy(
     } catch {
       // Body is not JSON (e.g. FormData/multipart or empty)
     }
+
+    if (!parsedBody && (subpath.includes("teacher") || subpath.includes("profile")) && bodyBuffer) {
+      try {
+        const text = new TextDecoder().decode(bodyBuffer);
+        const matches = [...text.matchAll(/name="([^"]+)"[\r\n]+([^\r\n-]+)/g)];
+        const fields: Record<string, string> = {};
+        for (const m of matches) {
+          if (m[1] && m[2]) fields[m[1]] = m[2].trim();
+        }
+        if (Object.keys(fields).length > 0) {
+          parsedBody = fields;
+        }
+      } catch {}
+    }
   }
 
   // Check mock endpoints first for custom routes not present on Render backend
@@ -371,8 +431,27 @@ async function proxy(
   const isClassesRoot = normalized === "classes";
 
   if (normalized === "auth/register") {
+    if (parsedBody) {
+      const email = String(parsedBody.email || "user");
+      const fullName = parsedBody.full_name || parsedBody.name || `${parsedBody.first_name || ""} ${parsedBody.last_name || ""}`.trim() || "Instructor";
+      parsedBody.full_name = fullName;
+      parsedBody.name = fullName;
+
+      if (!parsedBody.username || parsedBody.username.length > 30 || parsedBody.username.includes("@")) {
+        parsedBody.username = (email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "teacher") + "_" + Math.random().toString(36).slice(2, 6);
+      }
+      const encoded = new TextEncoder().encode(JSON.stringify(parsedBody));
+      bodyBuffer = encoded.buffer;
+    }
+
     if (parsedBody?.role && String(parsedBody.role).toUpperCase() === "TEACHER" && parsedBody?.email) {
       registerTeacherEmail(parsedBody.email);
+      saveTeacherProfile(parsedBody.email, {
+        email: parsedBody.email,
+        full_legal_name: parsedBody.full_name,
+        display_name: parsedBody.display_name || parsedBody.first_name || "Instructor",
+        phone_number: parsedBody.phone_number,
+      });
     }
   }
 
@@ -446,15 +525,51 @@ async function proxy(
       }
     }
 
+    // If teacher creates a class and backend returns 403/404, save into persistent database
+    if ((isClassesRoot || normalized === "courses") && request.method === "POST" && (!response.ok || response.status === 403 || response.status === 404)) {
+      const created = addClassToTable(parsedBody || {});
+      return jsonResponse({
+        id: created.numeric_id,
+        name: created.name,
+        grade: created.grade,
+        teacher: created.teacher,
+        description: created.description,
+        created_at: created.created_at,
+      }, 201);
+    }
+
     if (normalized === "users/me" && response.ok) {
       try {
         const cloned = response.clone();
         const meJson = await cloned.json();
-        if (meJson?.email && isTeacherEmail(meJson.email)) {
+        if (meJson?.email && (isTeacherEmail(meJson.email) || isRegisteredTeacher(meJson.email))) {
           meJson.role = "teacher";
+          const teacherProf = getTeacherProfileByEmail(meJson.email);
+          if (teacherProf?.display_name) {
+            meJson.name = teacherProf.display_name;
+          }
           return jsonResponse(meJson, 200);
         }
       } catch {}
+    }
+
+    if (
+      (normalized === "teachers/me" ||
+        normalized === "auth/me/teacher-profile" ||
+        normalized === "teacher/profile") &&
+      (!response.ok || response.status === 403 || response.status === 404)
+    ) {
+      const defaultTeacher = getTeacherProfileByEmail("current-teacher") || {
+        bio: "Passionate educator specializing in Mathematics and Full-Stack Web Development.",
+        headline: "Experienced Educator & Curriculum Designer",
+        subject_specialization: "Mathematics & Computer Science",
+        subjects_expertise: ["Mathematics", "Computer Science"],
+        education_level_taught: "Secondary / High school",
+        teaching_mode: "Live online · Small groups",
+        verification_status: "VERIFIED",
+        verified: true,
+      };
+      return jsonResponse(defaultTeacher, 200);
     }
 
     const responseBody = await response.arrayBuffer();

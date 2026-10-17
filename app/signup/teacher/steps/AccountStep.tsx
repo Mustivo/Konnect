@@ -31,40 +31,41 @@ export default function AccountStep({ hidden, role, onRoleChange, onEmailChange,
           Phone number <span className="font-normal text-[#84907a]">(optional)</span>
           <input autoComplete="tel" name="phone" type="tel" placeholder="+1 415 555 0184" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
-        <label className="block text-[0.65rem] font-medium">
+        <label className="block text-[0.65rem] font-medium sm:col-span-2">
           Country
           <select required name="country" defaultValue="" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-[#10140f]">
             <option value="" disabled>Select your country</option>
-            <option>United States</option><option>Canada</option><option>United Kingdom</option><option>Australia</option><option>Other</option>
-          </select>
-        </label>
-        <label className="block text-[0.65rem] font-medium">
-          Timezone
-          <select required name="timezone" defaultValue="" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-[#10140f]">
-            <option value="" disabled>Select your timezone</option>
-            <option value="America/Los_Angeles">Pacific Time</option><option value="America/Denver">Mountain Time</option><option value="America/Chicago">Central Time</option><option value="America/New_York">Eastern Time</option><option value="Europe/London">London</option><option value="Europe/Paris">Central European Time</option><option value="Asia/Tokyo">Japan Standard Time</option>
+            <option>Rwanda</option>
+            <option>Kenya</option>
+            <option>Uganda</option>
+            <option>Tanzania</option>
+            <option>Nigeria</option>
+            <option>United States</option>
+            <option>Canada</option>
+            <option>United Kingdom</option>
+            <option>Other</option>
           </select>
         </label>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="block text-[0.65rem] font-medium">
           Password
-          <input required minLength={12} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{12,}" type="password" autoComplete="new-password" name="password" placeholder="At least 12 characters" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
+          <input required minLength={8} type="password" autoComplete="new-password" name="password" placeholder="At least 8 characters" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
         <label className="block text-[0.65rem] font-medium">
           Confirm password
-          <input required minLength={12} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{12,}" type="password" autoComplete="new-password" name="confirmPassword" placeholder="Re-enter your password" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
+          <input required minLength={8} type="password" autoComplete="new-password" name="confirmPassword" placeholder="Re-enter your password" className="mt-1 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5" />
         </label>
       </div>
-      <p className="text-[0.5rem] text-[#84907a]">Use 12+ characters, upper and lowercase letters, a number, and a symbol.</p>
+      <p className="text-[0.5rem] text-[#84907a]">Use 8+ characters with a mix of letters and numbers.</p>
       <label className="flex items-center gap-2 text-[0.58rem] text-[#70786d]">
         <input required type="checkbox" name="terms" className="h-3 w-3 accent-[#263d21]" />
-        I agree to the Terms and Privacy Policy.
+        I agree to the Terms of Service and Privacy Policy.
       </label>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <button type="button" onClick={onContinue} className="rounded bg-[#263d21] px-4 py-2.5 text-xs font-semibold text-white">Continue to teaching profile</button>
-        <button type="button" className="rounded border border-[#e0e3d9] px-3 py-2.5 text-[0.65rem]">G&nbsp; Sign up with Google</button>
-        <button type="button" className="rounded border border-[#e0e3d9] px-3 py-2.5 text-[0.65rem]">Sign up with Apple</button>
+      <div className="pt-2">
+        <button type="button" onClick={onContinue} className="w-full rounded bg-[#263d21] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-[#1f321b]">
+          Continue to teaching profile
+        </button>
       </div>
     </fieldset>
   );

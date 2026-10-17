@@ -4,8 +4,9 @@ export const getClassSessions = (classId: string, query = "") => apiRequest(`/ap
 export const createClassSession = (classId: string, payload: Record<string, unknown>) => apiRequest(`/api/sessions/class/${encodeURIComponent(classId)}/`, { method: "POST", body: JSON.stringify(payload) });
 export const getSession = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/`);
 export const startSession = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/start/`, { method: "POST", body: JSON.stringify({}) });
-export const joinSession = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/join/`, { method: "POST", body: JSON.stringify({}) });
-export const leaveSession = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/leave/`, { method: "POST", body: JSON.stringify({}) });
+export const joinSession = (id: string, payload?: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/join/`, { method: "POST", body: JSON.stringify(payload || {}) });
+export const leaveSession = (id: string, payload?: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/leave/`, { method: "POST", body: JSON.stringify(payload || {}) });
+export const heartbeatSession = (id: string, payload?: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/heartbeat/`, { method: "POST", body: JSON.stringify(payload || {}) });
 export const endSession = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/end/`, { method: "POST", body: JSON.stringify({}) });
 export const getSessionAttendance = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/attendance/`);
 export const getSessionChat = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`);
