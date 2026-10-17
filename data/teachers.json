@@ -1,0 +1,39 @@
+{
+  "teacher_auto_test_1792261858955@example.com": {
+    "email": "teacher_auto_test_1792261858955@example.com",
+    "full_legal_name": "Sarah Mugisha",
+    "display_name": "Sarah",
+    "verification_status": "VERIFIED",
+    "created_at": "2026-10-17T18:30:59.107Z",
+    "updated_at": "2026-10-17T18:30:59.107Z"
+  },
+  "mutitistivo@gmail.com": {
+    "email": "mutitistivo@gmail.com",
+    "full_legal_name": "Mutiti Stivo",
+    "display_name": "Stiven",
+    "verification_status": "VERIFIED",
+    "created_at": "2026-10-17T18:41:42.388Z",
+    "phone_number": "+250785917025",
+    "updated_at": "2026-10-17T18:55:21.676Z",
+    "country": "Rwanda",
+    "headline": "Proffessor",
+    "bio": "Good",
+    "years_of_experience": "0–2 years",
+    "education_level_taught": "University",
+    "current_institution": "MKU",
+    "teaching_mode": "Live online · Small groups",
+    "subjects_expertise": "Python",
+    "languages": "English",
+    "legal_name_on_documents": "Mutiti stivo",
+    "Close-Up of a Sleek Black Wireless Earbud.png": "Content",
+    "Jean_Claude_Mugisha_Resume.docx": "Content"
+  },
+  "teacher_valid_1792263107488@example.com": {
+    "email": "teacher_valid_1792263107488@example.com",
+    "full_legal_name": "Alex Kayitare",
+    "display_name": "Alex",
+    "verification_status": "VERIFIED",
+    "created_at": "2026-10-17T18:51:50.243Z",
+    "updated_at": "2026-10-17T18:51:50.243Z"
+  }
+}
