@@ -53,7 +53,7 @@ const learnerMenuItems: MenuItem[] = [
   { name: "My Courses", href: "/learner/courses", icon: BookOpen, left: 20, marginTop: 1 },
   { name: "Live Classes", href: "/learner/live_classes", icon: Video, left: 20, marginTop: 2 },
   { name: "Calendar", href: "/learner/calender", icon: CalendarDays, left: 20, marginTop: 1 },
-  { name: "Tasks", href: "/learner/resource", icon: ClipboardList, left: 20, marginTop: 0, nested: [
+  { name: "Tasks", href: "/learner/tasks/assignment", icon: ClipboardList, left: 20, marginTop: 0, nested: [
     { name: "Assignments", href: "/learner/tasks/assignment", icon: ClipboardList, left: 20 },
     { name: "Exams", href: "/learner/tasks/exams", icon: ClipboardList, left: 20 },
   ] },
@@ -121,11 +121,34 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
     setAccountMenuOpen(false);
   }, [isTeacher, pathname]);
 
-  const displayName = user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Learner" : isAdmin ? "Admin" : isTeacher ? "Teacher" : "Learner";
+  let displayName = "Learner";
+  let displayEmail = "";
+
+  if (isTeacher) {
+    const isMatchingTeacher = user && (user.role === "teacher" || user.email === "mutitistivo@gmail.com");
+    displayName = isMatchingTeacher && (user.name || `${user.first_name || ""} ${user.last_name || ""}`.trim())
+      ? (user.name || `${user.first_name || ""} ${user.last_name || ""}`.trim())
+      : "Mutiti Stivo";
+    displayEmail = isMatchingTeacher && user.email
+      ? user.email
+      : "mutitistivo@gmail.com";
+  } else if (isAdmin) {
+    const isMatchingAdmin = user && (user.role === "admin" || user.email === "admin@gmail.com");
+    displayName = isMatchingAdmin && (user.name || `${user.first_name || ""} ${user.last_name || ""}`.trim())
+      ? (user.name || `${user.first_name || ""} ${user.last_name || ""}`.trim())
+      : "Administrator";
+    displayEmail = isMatchingAdmin && user.email
+      ? user.email
+      : "admin@gmail.com";
+  } else {
+    displayName = user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Steven Mwizerwa" : "Steven Mwizerwa";
+    displayEmail = user?.email || "stevenmwizerwa1@gmail.com";
+  }
+
   const profile = {
-    initials: displayName.split(/\s+/).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? "").join("") || "K",
+    initials: displayName.split(/\s+/).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? "").join("") || (isTeacher ? "MS" : isAdmin ? "AD" : "SM"),
     name: displayName,
-    meta: user?.email ?? (user ? String(user.role).toLowerCase() : "Account"),
+    meta: displayEmail,
   };
   const profileHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=profile";
   const settingsHref = isAdmin ? "/admin/settings" : isTeacher ? "/teacher/settings" : "/learner/settings?section=account";
@@ -141,7 +164,10 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("konnect-access-token");
       window.localStorage.removeItem("konnect-refresh-token");
+      window.localStorage.removeItem("konnect-user-email");
+      window.localStorage.removeItem("konnect-user");
       document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
     }
     router.replace("/login?logged_out=1");
   }

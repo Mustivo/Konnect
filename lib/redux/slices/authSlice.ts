@@ -109,8 +109,13 @@ export const loginWithRedux = createAsyncThunk<
     }
 
     if (typeof window !== "undefined") {
+      const email = String(credentials.email || "").trim().toLowerCase();
       window.localStorage.setItem("konnect-access-token", tokens.access);
       window.localStorage.setItem("konnect-refresh-token", tokens.refresh);
+      if (email) {
+        window.localStorage.setItem("konnect-user-email", email);
+        document.cookie = `konnect-user-email=${email}; path=/; max-age=604800; SameSite=Lax`;
+      }
       document.cookie = `konnect-access-token=${tokens.access}; path=/; max-age=604800; SameSite=Lax`;
     }
 
@@ -127,6 +132,8 @@ export const loginWithRedux = createAsyncThunk<
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("konnect-access-token");
         window.localStorage.removeItem("konnect-refresh-token");
+        window.localStorage.removeItem("konnect-user-email");
+        document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
       }
       return rejectWithValue({
         type: "error",
@@ -144,6 +151,13 @@ export const loginWithRedux = createAsyncThunk<
     user.first_name = user.first_name || "";
     user.last_name = user.last_name || "";
     user.username = user.username || user.email.split("@")[0];
+
+    if (typeof window !== "undefined" && user?.email) {
+      window.localStorage.setItem("konnect-user-email", user.email);
+      window.localStorage.setItem("konnect-user", JSON.stringify(user));
+      document.cookie = `konnect-user-email=${user.email}; path=/; max-age=604800; SameSite=Lax`;
+    }
+
     return { tokens, user };
   } catch (error) {
     return rejectWithValue({
@@ -240,7 +254,10 @@ export const authSlice = createSlice({
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("konnect-access-token");
         window.localStorage.removeItem("konnect-refresh-token");
+        window.localStorage.removeItem("konnect-user-email");
+        window.localStorage.removeItem("konnect-user");
         document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
+        document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
       }
     },
   },

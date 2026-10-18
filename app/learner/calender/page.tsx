@@ -298,16 +298,7 @@ export default function CalendarPage() {
       : dates;
 
   return (
-    <main className="min-h-screen  p-0 text-[#20271e] sm:p-4">
-      <div className="relative mx-auto flex min-h-[calc(100vh-32px)] max-w-[1600px] overflow-hidden rounded-none border border-[#d9ddd2] bg-[#f3f4ed] sm:rounded-[15px]">
-        {/* Mobile sidebar toggle */}
-   
-
-        {/* Sidebar */}
-
-
-        {/* Main content */}
-        <div className="min-w-0 flex-1 px-3 pb-5 pt-14 sm:px-5 sm:pt-5 lg:px-4 lg:pt-5">
+    <div className="space-y-4 py-2 pb-8">
      
 
    
@@ -708,8 +699,6 @@ export default function CalendarPage() {
             </aside>
           </div>
         </div>
-      </div>
-    </main>
   );
 }
 

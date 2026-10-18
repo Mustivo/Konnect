@@ -167,6 +167,7 @@ export default function TeacherAttendancePage() {
                 onChange={(event) => setClassName(event.target.value)}
                 className="h-8 w-full appearance-none rounded-md bg-[#f1f4ed] px-2.5 pr-6 text-[9px] font-normal text-[#273423] outline-none dark:bg-[#20271e] dark:text-[#e1e8dc]"
               >
+                <option>Python &amp; Web Development · Class A</option>
                 <option>Algebra I · Class A</option>
                 <option>Geometry · Class B</option>
                 <option>Precalculus · Class C</option>

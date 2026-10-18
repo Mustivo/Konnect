@@ -63,7 +63,7 @@ export default function TeacherLiveClassPage() {
     id: sessionId,
     title: "Live Course Session",
     course_title: "Classroom Studio",
-    teacher_name: "Instructor",
+    teacher_name: "Mutiti Stivo",
   });
 
   const [cameraOn, setCameraOn] = useState(false);
@@ -193,7 +193,7 @@ export default function TeacherLiveClassPage() {
           classId: sessionId,
           courseTitle: session.course_title || session.title || "Virtual Classroom",
           sessionTitle: session.title || "Live Course Session",
-          teacherName: session.teacher_name || "Mwizerwa Stiven",
+          teacherName: session.teacher_name || "Mutiti Stivo",
           status: "LIVE",
           startedAt: new Date().toISOString(),
           lastHeartbeat: Date.now(),
@@ -246,6 +246,7 @@ export default function TeacherLiveClassPage() {
 
   // Listen for waiting learners & admission via BroadcastChannel & Storage
   useEffect(() => {
+    const cleanSessionId = String(sessionId || "general").toLowerCase().trim();
     const channel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("konnect-live-class-admission")
       : null;
@@ -254,10 +255,14 @@ export default function TeacherLiveClassPage() {
       if (autoAdmit) {
         // Automatically admit if teacher enabled auto-admit
         channel?.postMessage({
-          sessionId,
+          sessionId: cleanSessionId,
           learnerId,
           status: "admitted",
         });
+        localStorage.setItem(
+          `konnect-live-class-admission:${cleanSessionId}`,
+          JSON.stringify({ sessionId: cleanSessionId, learnerId, status: "admitted", timestamp: Date.now() })
+        );
         localStorage.setItem(
           `konnect-live-class-admission:${sessionId}`,
           JSON.stringify({ sessionId, learnerId, status: "admitted", timestamp: Date.now() })
@@ -284,42 +289,77 @@ export default function TeacherLiveClassPage() {
 
     if (channel) {
       channel.onmessage = (event) => {
-        if (event.data?.type === "join-request" && event.data?.sessionId === sessionId) {
-          handleIncomingRequest(event.data.learnerId || "learner-1", event.data.learnerName || "Learner");
+        if (event.data?.type === "join-request") {
+          const msgSession = String(event.data?.sessionId || "").toLowerCase().trim();
+          if (!msgSession || msgSession === cleanSessionId || msgSession === String(sessionId || "").toLowerCase().trim()) {
+            handleIncomingRequest(event.data.learnerId || event.data.requestId || "learner-1", event.data.learnerName || "Steven Mwizerwa");
+          }
         }
       };
     }
 
     function handleStorage(event: StorageEvent) {
-      if (event.key === `konnect-live-class-request:${sessionId}` && event.newValue) {
+      if (!event.key || !event.newValue) return;
+      if (
+        event.key === `konnect-live-class-request:${sessionId}` ||
+        event.key === `konnect-live-class-request:${cleanSessionId}` ||
+        event.key.toLowerCase().startsWith(`konnect-live-class-request:${cleanSessionId}`)
+      ) {
         try {
           const req = JSON.parse(event.newValue);
-          if (req.type === "join-request" && req.sessionId === sessionId) {
-            handleIncomingRequest(req.learnerId || "learner-1", req.learnerName || "Learner");
+          if (req.type === "join-request") {
+            handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
           }
         } catch {}
       }
     }
     window.addEventListener("storage", handleStorage);
 
-    // Initial check for existing waiting learner requests in local storage
-    try {
-      const raw = window.localStorage.getItem(`konnect-live-class-request:${sessionId}`);
-      if (raw) {
-        const req = JSON.parse(raw);
-        if (req && req.type === "join-request" && req.sessionId === sessionId) {
-          handleIncomingRequest(req.learnerId || "learner-1", req.learnerName || "Learner");
+    // Initial check and periodic polling of local storage for waiting learners
+    function scanWaitingRequests() {
+      try {
+        const directKeys = [
+          `konnect-live-class-request:${cleanSessionId}`,
+          `konnect-live-class-request:${sessionId}`,
+        ];
+        for (const k of directKeys) {
+          const raw = window.localStorage.getItem(k);
+          if (raw) {
+            const req = JSON.parse(raw);
+            if (req && req.type === "join-request") {
+              handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
+            }
+          }
         }
-      }
-    } catch {}
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.toLowerCase().startsWith(`konnect-live-class-request:${cleanSessionId}`)) {
+            const val = window.localStorage.getItem(key);
+            if (val) {
+              const req = JSON.parse(val);
+              if (req && req.type === "join-request") {
+                handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    scanWaitingRequests();
+    const scanTimer = setInterval(scanWaitingRequests, 1500);
 
     // Auto-broadcast admission periodically ONLY if teacher explicitly toggled autoAdmit
     const autoAdmitPulse = setInterval(() => {
       if (autoAdmit) {
         channel?.postMessage({
-          sessionId,
+          sessionId: cleanSessionId,
           status: "admitted",
         });
+        localStorage.setItem(
+          `konnect-live-class-admission:${cleanSessionId}`,
+          JSON.stringify({ sessionId: cleanSessionId, status: "admitted" })
+        );
         localStorage.setItem(
           `konnect-live-class-admission:${sessionId}`,
           JSON.stringify({ sessionId, status: "admitted" })
@@ -330,6 +370,7 @@ export default function TeacherLiveClassPage() {
     return () => {
       channel?.close();
       window.removeEventListener("storage", handleStorage);
+      clearInterval(scanTimer);
       clearInterval(autoAdmitPulse);
     };
   }, [autoAdmit, sessionId]);
@@ -595,27 +636,36 @@ export default function TeacherLiveClassPage() {
   }
 
   function admitLearner(learnerId: string, learnerName?: string) {
+    const cleanSessionId = String(sessionId || "general").toLowerCase().trim();
     const channel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("konnect-live-class-admission")
       : null;
 
-    channel?.postMessage({
-      sessionId,
+    const admissionPayload = {
+      sessionId: cleanSessionId,
       learnerId,
       status: "admitted",
-    });
+      timestamp: Date.now(),
+    };
+
+    channel?.postMessage(admissionPayload);
 
     localStorage.setItem(
+      `konnect-live-class-admission:${cleanSessionId}`,
+      JSON.stringify(admissionPayload)
+    );
+    localStorage.setItem(
       `konnect-live-class-admission:${sessionId}`,
-      JSON.stringify({ sessionId, learnerId, status: "admitted", timestamp: Date.now() })
+      JSON.stringify(admissionPayload)
     );
 
     try {
+      localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
       localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
     } catch {}
 
     const target = waitingLearners.find((l) => l.id === learnerId);
-    const name = learnerName || target?.name || "Learner";
+    const name = learnerName || target?.name || "Steven Mwizerwa";
 
     setConnectedLearners((prev) => {
       if (prev.some((l) => l.id === learnerId)) return prev;
@@ -633,21 +683,30 @@ export default function TeacherLiveClassPage() {
   }
 
   function admitAll() {
+    const cleanSessionId = String(sessionId || "general").toLowerCase().trim();
     const channel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("konnect-live-class-admission")
       : null;
 
-    channel?.postMessage({
-      sessionId,
+    const admissionPayload = {
+      sessionId: cleanSessionId,
       status: "admitted",
-    });
+      timestamp: Date.now(),
+    };
+
+    channel?.postMessage(admissionPayload);
 
     localStorage.setItem(
+      `konnect-live-class-admission:${cleanSessionId}`,
+      JSON.stringify(admissionPayload)
+    );
+    localStorage.setItem(
       `konnect-live-class-admission:${sessionId}`,
-      JSON.stringify({ sessionId, status: "admitted", timestamp: Date.now() })
+      JSON.stringify(admissionPayload)
     );
 
     try {
+      localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
       localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
     } catch {}
 
@@ -748,10 +807,10 @@ export default function TeacherLiveClassPage() {
           </div>
         </header>
 
-        {joinReminderLearner && (
+        {waitingLearners.length > 0 && (
           <aside
             role="alert"
-            className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-md"
+            className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-md animate-in fade-in slide-in-from-top-2"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#27481f] text-white">
@@ -759,25 +818,38 @@ export default function TeacherLiveClassPage() {
               </span>
               <div>
                 <p className="text-[11px] font-bold text-[#1b2f18]">
-                  🔔 Admission Request: <span className="font-extrabold underline decoration-[#417b35]">{joinReminderLearner.name}</span> wants to join this class
+                  🔔 Admission Request: <span className="font-extrabold underline decoration-[#417b35]">
+                    {waitingLearners.map((l) => l.name).join(", ")}
+                  </span> wants to join this class
                 </p>
                 <p className="text-[9.5px] text-[#55694f]">
-                  Learner is in the waiting room (Requested at {joinReminderLearner.requestedAt}). Approve to admit them into the live meeting.
+                  {waitingLearners.length === 1
+                    ? `Learner is in the waiting room (Requested at ${waitingLearners[0].requestedAt}). Approve to admit them into the live meeting.`
+                    : `${waitingLearners.length} learners are waiting in the waiting room. Approve to admit them into the live meeting.`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => admitLearner(joinReminderLearner.id, joinReminderLearner.name)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#25491d] px-3.5 text-[10.5px] font-bold text-white shadow hover:bg-[#346329]"
+                onClick={() => {
+                  if (waitingLearners.length === 1) {
+                    admitLearner(waitingLearners[0].id, waitingLearners[0].name);
+                  } else {
+                    admitAll();
+                  }
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#25491d] px-3.5 text-[10.5px] font-bold text-white shadow hover:bg-[#346329] transition-colors"
               >
-                <UserCheck size={13} /> Admit Learner
+                <UserCheck size={13} /> {waitingLearners.length === 1 ? "Admit Learner" : `Admit All (${waitingLearners.length})`}
               </button>
               <button
                 type="button"
-                onClick={() => setJoinReminderLearner(null)}
-                className="inline-flex h-8 items-center rounded-md border border-[#cdd8c9] bg-white px-2.5 text-[10px] font-semibold text-[#54674d] hover:bg-[#f0f4ee]"
+                onClick={() => {
+                  setWaitingLearners([]);
+                  setJoinReminderLearner(null);
+                }}
+                className="inline-flex h-8 items-center rounded-md border border-[#cdd8c9] bg-white px-2.5 text-[10px] font-semibold text-[#54674d] hover:bg-[#f0f4ee] transition-colors"
               >
                 Dismiss
               </button>

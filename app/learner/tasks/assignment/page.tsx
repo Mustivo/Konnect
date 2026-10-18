@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
   ArrowRight,
   CalendarDays,
@@ -236,8 +235,7 @@ export default function AssignmentsPage() {
   }
 
   return (
-    <DashboardShell role="learner">
-      <div className="space-y-4 pb-8 pt-1">
+    <div className="space-y-4 pb-8 pt-1">
       <header>
         <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#35452e] dark:text-[#a4b49e]">
           YOUR LEARNING SPACE
@@ -476,6 +474,5 @@ export default function AssignmentsPage() {
         </section>
       </div>
     </div>
-  </DashboardShell>
-);
+  );
 }

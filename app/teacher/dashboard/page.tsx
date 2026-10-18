@@ -33,9 +33,9 @@ const stats = [
 type TeacherClassSummary = { id: string; code: string; subject: string; title: string; group: string; students: number; tasks: number; schedule: string; time: string };
 
 const classes: TeacherClassSummary[] = [
+  { id: "python-web-dev", code: "PYTH 101", subject: "PYTH 101 · GRADE 11", title: "Python & Web Development", group: "G1 / Class - A", students: 34, tasks: 14, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
   { id: "algebra", code: "MATH 101", subject: "MATH 101 · GRADE 1", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
   { id: "geometry", code: "ALG 201", subject: "ALG 201 · GRADE 1", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, schedule: "Tue, Thu", time: "11:00 AM" },
-  { id: "trigonometry", code: "GEOM 301", subject: "GEOM 301 · GRADE 2", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, schedule: "Mon, Wed", time: "02:00 PM" },
 ];
 
 type ApiClassRoom = { id: string; title: string; subject?: string; enrolled_count?: string | number; max_students?: number; start_date?: string | null };
@@ -48,9 +48,9 @@ const initialApprovals = [
 ];
 
 const rosterStudents = [
-  { name: "Steven Mwizerwa", id: "KA-000", email: "stevenmwizerwa1@gmail.com", joined: "07 Sep 2026", attendance: "98.5%" },
   { name: "Oliver James", id: "KA-001", email: "oliver.james@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
   { name: "David Peter", id: "KA-002", email: "david.peter@student.school.edu", joined: "07 Sep 2026", attendance: "96.4%" },
+  { name: "Steven Mwizerwa", id: "KA-000", email: "stevenmwizerwa1@gmail.com", joined: "07 Sep 2026", attendance: "98.5%" },
   { name: "Lilly Paul", id: "KA-003", email: "lilly.paul@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
   { name: "Emma Wilson", id: "KA-004", email: "emma.wilson@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
   { name: "Noah Williams", id: "KA-005", email: "noah.williams@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
@@ -65,9 +65,9 @@ const initialNotes = [
 ];
 
 const activeClasses = [
+  { id: "python-web-dev", subject: "PYTH 101 · GRADE 11", title: "Python & Web Development", group: "G1 / Class - A", students: 34, tasks: 14, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
   { id: "algebra", subject: "MATH 101 · GRADE 1", title: "Math Algebra Unit Formula", group: "G1 / Class - A", students: 28, tasks: 12, schedule: "Mon, Wed, Fri", time: "09:00 AM" },
   { id: "geometry", subject: "ALG 201 · GRADE 1", title: "Advanced Linear Geometry", group: "G1 / Class - B", students: 30, tasks: 18, schedule: "Tue, Thu", time: "11:00 AM" },
-  { id: "trigonometry", subject: "GEOM 301 · GRADE 2", title: "Trigonometry & Spatial Math", group: "G2 / Class - C", students: 25, tasks: 8, schedule: "Mon, Wed", time: "02:00 PM" },
 ];
 
 const plannerItems = [
@@ -218,6 +218,7 @@ export default function TeacherDashboardPage() {
                 onChange={(event) => setRosterClass(event.target.value)}
                 className="h-7 min-w-0 flex-1 rounded-md border border-[#e2e7dd] bg-[#f8f9f6] px-2 text-[7px] text-[#35402f] outline-none dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc] sm:max-w-[240px]"
               >
+                <option>Python &amp; Web Development · Grade 11 · Class A</option>
                 <option>Algebra I · Grade 9 · Class A</option>
                 <option>Geometry · Grade 10 · Class B</option>
                 <option>Precalculus · Grade 11 · Class C</option>

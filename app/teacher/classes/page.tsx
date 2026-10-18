@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 
 const initialClasses = [
+  { id: "python-web-dev", grade: "Grade 11", group: "Class A", title: "Python & Web Development", topic: "Full-stack Python programming, web frameworks & REST APIs", students: 34, activities: 4, schedule: "Mon, Wed, Fri · 09:00–10:30", joinCode: "PY-2026-A", nextSession: "Today · Live Studio", nextTopic: "Interactive Python OOP & Web APIs", preparation: "Classroom studio ready" },
   { id: "algebra", grade: "Grade 9", group: "Class A", title: "Algebra I", topic: "Linear equations & inequalities", students: 28, activities: 3, schedule: "Mon, Wed, Fri · 09:00–09:50", joinCode: "ALG-IX-28", nextSession: "Wed 14 Oct · 09:00", nextTopic: "Solving two-step equations", preparation: "12 question slides ready" },
   { id: "geometry", grade: "Grade 10", group: "Class B", title: "Geometry", topic: "Congruence & similarity", students: 30, activities: 2, schedule: "Tue, Thu · 11:00–11:50", joinCode: "GEO-IX-26", nextSession: "Thu 15 Oct · 11:00", nextTopic: "Triangle congruence proofs", preparation: "Quiz scheduled" },
-  { id: "precalculus", grade: "Grade 11", group: "Class C", title: "Precalculus", topic: "Polynomial & rational functions", students: 25, activities: 1, schedule: "Mon, Wed · 14:00–14:50", joinCode: "PRE-IX-26", nextSession: "Wed 14 Oct · 14:00", nextTopic: "Finding polynomial zeros", preparation: "Worksheet published" },
 ];
 
 const completedClasses = [

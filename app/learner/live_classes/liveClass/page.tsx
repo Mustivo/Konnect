@@ -50,7 +50,7 @@ export default function LiveClassRoomPage() {
   }>({
     title: "Live Class Session",
     courseTitle: "Classroom Studio",
-    teacherName: "Instructor",
+    teacherName: "Mutiti Stivo",
     agenda: "A structured 1-on-1 session connecting lecture, interactive Q&A, and practical exercises.",
   });
 
@@ -120,7 +120,7 @@ export default function LiveClassRoomPage() {
         setSessionDetails({
           title: String(data.title || "Live Class Session"),
           courseTitle: String(data.course_title || classRoom?.title || classRoom?.subject || "Course"),
-          teacherName: String(data.teacher_name || classRoom?.teacher_name || "Instructor"),
+          teacherName: String(data.teacher_name || classRoom?.teacher_name || "Mutiti Stivo"),
           agenda: String(data.agenda || "Live interactive teaching session."),
         });
       })

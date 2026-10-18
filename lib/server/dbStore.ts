@@ -173,8 +173,8 @@ export function addDbClass(payload: Partial<MockClassItem>): MockClassItem {
     grade: payload.grade || "Grade 10",
     group: payload.group || `Class ${String.fromCharCode(65 + (numericId % 6))}`,
     teacher: payload.teacher || 1,
-    teacher_name: payload.teacher_name || payload.instructor || "Mwizerwa Stiven",
-    instructor: payload.instructor || payload.teacher_name || "Mwizerwa Stiven",
+    teacher_name: payload.teacher_name || payload.instructor || "Mutiti Stivo",
+    instructor: payload.instructor || payload.teacher_name || "Mutiti Stivo",
     lessons: Number(payload.lessons || 10),
     level: payload.level || "Intermediate",
     enrolled_count: Number(payload.enrolled_count || 1),
@@ -246,13 +246,15 @@ export function getDbSessionById(sessionId: string): MockSessionItem {
   );
   if (matched) return matched;
 
+  const matchedClass = getDbClassById(sessionId);
+
   // Fallback
   return {
     id: sessionId,
-    class_room: sessionId,
-    title: "Live Class Session",
-    course_title: "Class Course",
-    teacher_name: "Instructor",
+    class_room: matchedClass?.id || sessionId,
+    title: matchedClass ? `${matchedClass.title} Live Session` : "Live Class Session",
+    course_title: matchedClass?.title || matchedClass?.name || "Class Course",
+    teacher_name: matchedClass?.teacher_name || "Mutiti Stivo",
     scheduled_start: new Date().toISOString(),
     scheduled_end: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     status: "LIVE",
@@ -310,7 +312,7 @@ export function getDbAttendance(sessionId: string): MockParticipant[] {
     db.attendance[cleanId] || [
       {
         id: "teacher-host",
-        name: getDbSessionById(sessionId).teacher_name || "Instructor",
+        name: getDbSessionById(sessionId).teacher_name || "Mutiti Stivo",
         role: "teacher",
         status: "active",
         joined_at: new Date().toISOString(),

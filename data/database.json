@@ -2,6 +2,35 @@
   "version": 1,
   "classes": [
     {
+      "id": "python-web-dev",
+      "numeric_id": 15,
+      "name": "Python & Web Development",
+      "title": "Python & Web Development",
+      "description": "Full-stack Python programming, web frameworks, algorithms, and practical real-world projects.",
+      "subtitle": "Full-stack Python programming, web frameworks, algorithms, and practical real-world projects.",
+      "subject": "Python & Computer Science",
+      "category": "Development",
+      "grade": "Grade 11",
+      "group": "Class A",
+      "teacher": 1,
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
+      "lessons": 16,
+      "level": "Intermediate",
+      "enrolled_count": 34,
+      "max_students": 100,
+      "schedule": "Mon, Wed, Fri · 09:00–10:30",
+      "join_code": "PY-2026-A",
+      "status": "ACTIVE",
+      "banner_image": "/courses/react.jpg",
+      "image": "/courses/react.jpg",
+      "is_enrolled_default": true,
+      "is_teacher_default": true,
+      "is_completed": false,
+      "progress": 25,
+      "created_at": "2026-10-18T10:00:00Z"
+    },
+    {
       "id": "advanced-robotics-ai",
       "numeric_id": 14,
       "name": "Advanced Robotics & AI",
@@ -13,8 +42,8 @@
       "grade": "Grade 12",
       "group": "Class C",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 10,
       "level": "Intermediate",
       "enrolled_count": 1,
@@ -40,8 +69,8 @@
       "grade": "Grade 9",
       "group": "Class A",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 12,
       "level": "Intermediate",
       "enrolled_count": 28,
@@ -69,8 +98,8 @@
       "grade": "Grade 10",
       "group": "Class B",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 10,
       "level": "Intermediate",
       "enrolled_count": 30,
@@ -98,8 +127,8 @@
       "grade": "Grade 11",
       "group": "Class C",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 14,
       "level": "Advanced",
       "enrolled_count": 25,
@@ -127,8 +156,8 @@
       "grade": "Grade 8",
       "group": "Class D",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 15,
       "level": "Beginner",
       "enrolled_count": 24,
@@ -156,8 +185,8 @@
       "grade": "Grade 12",
       "group": "Class E",
       "teacher": 1,
-      "teacher_name": "Mwizerwa Stiven",
-      "instructor": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
+      "instructor": "Mutiti Stivo",
       "lessons": 12,
       "level": "Advanced",
       "enrolled_count": 26,
@@ -384,13 +413,24 @@
   ],
   "enrollments": [
     {
+      "id": "enr-python-web-dev",
+      "student": 1,
+      "school_class": 15,
+      "class_room": "python-web-dev",
+      "class_title": "Python & Web Development",
+      "class_subject": "Python & Computer Science",
+      "teacher_name": "Mutiti Stivo",
+      "status": "ENROLLED",
+      "enrolled_at": "2026-10-01"
+    },
+    {
       "id": "enr-algebra",
       "student": 1,
       "school_class": 1,
       "class_room": "algebra",
       "class_title": "Algebra I",
       "class_subject": "Mathematics",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "status": "ENROLLED",
       "enrolled_at": "2026-09-01"
     },
@@ -401,7 +441,7 @@
       "class_room": "geometry",
       "class_title": "Geometry",
       "class_subject": "Mathematics",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "status": "ENROLLED",
       "enrolled_at": "2026-09-02"
     },
@@ -412,7 +452,7 @@
       "class_room": "precalculus",
       "class_title": "Precalculus",
       "class_subject": "Mathematics",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "status": "ENROLLED",
       "enrolled_at": "2026-09-03"
     },
@@ -423,7 +463,7 @@
       "class_room": "biology",
       "class_title": "Biology",
       "class_subject": "Science",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "status": "ENROLLED",
       "enrolled_at": "2026-09-04"
     },
@@ -434,7 +474,7 @@
       "class_room": "statistics",
       "class_title": "Statistics",
       "class_subject": "Mathematics",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "status": "ENROLLED",
       "enrolled_at": "2026-09-05"
     },
@@ -485,6 +525,20 @@
   ],
   "sessions": [
     {
+      "id": "python-web-dev",
+      "class_room": "python-web-dev",
+      "course_title": "Python & Web Development",
+      "title": "Interactive Python OOP & Web APIs",
+      "agenda": "Object-oriented patterns, REST API endpoints, and live interactive coding.",
+      "teacher_name": "Mutiti Stivo",
+      "scheduled_start": "2026-10-18T18:00:00.000Z",
+      "scheduled_end": "2026-10-18T20:30:00.000Z",
+      "status": "LIVE",
+      "meeting_url": "/learner/live_classes/waiting-room?session=python-web-dev",
+      "room_id": "room-python-live",
+      "host": 1
+    },
+    {
       "id": "uiux",
       "class_room": "uiux",
       "course_title": "UI/UX Design — From Wireframes to Prototypes",
@@ -521,7 +575,7 @@
       "teacher_name": "Dr. Elena Ruiz",
       "scheduled_start": "2026-10-17T20:11:28.235Z",
       "scheduled_end": "2026-10-17T21:41:28.235Z",
-      "status": "SCHEDULED",
+      "status": "LIVE",
       "meeting_url": "/learner/live_classes/waiting-room?session=math",
       "room_id": "room-math-live",
       "host": 104
@@ -532,7 +586,7 @@
       "course_title": "Algebra I",
       "title": "Linear Equations & Inequalities",
       "agenda": "Solving two-step equations and graphing inequalities.",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "scheduled_start": "2026-10-17T19:06:28.235Z",
       "scheduled_end": "2026-10-17T20:06:28.235Z",
       "status": "COMPLETED",
@@ -546,7 +600,7 @@
       "course_title": "Geometry",
       "title": "Triangle Congruence Proofs",
       "agenda": "SSS, SAS, and ASA congruence theorem applications.",
-      "teacher_name": "Mwizerwa Stiven",
+      "teacher_name": "Mutiti Stivo",
       "scheduled_start": "2026-10-17T21:11:28.235Z",
       "scheduled_end": "2026-10-17T22:11:28.235Z",
       "status": "SCHEDULED",
@@ -625,6 +679,37 @@
         "attendance_pct": 2,
         "attendance_status": "Absent"
       }
+    ],
+    "math": [
+      {
+        "id": "1",
+        "name": "Learner",
+        "role": "learner",
+        "status": "active",
+        "joined_at": "2026-10-18T14:14:01.631Z",
+        "camera_on": true,
+        "mic_on": true
+      }
+    ],
+    "python-web-dev": [
+      {
+        "id": "teacher-host",
+        "name": "Mutiti Stivo",
+        "role": "teacher",
+        "status": "active",
+        "joined_at": "2026-10-18T18:00:00.000Z",
+        "camera_on": true,
+        "mic_on": true
+      },
+      {
+        "id": "1",
+        "name": "Learner",
+        "role": "learner",
+        "status": "active",
+        "joined_at": "2026-10-18T17:10:58.506Z",
+        "camera_on": true,
+        "mic_on": true
+      }
     ]
   },
   "chat_messages": {
@@ -648,6 +733,18 @@
         "sender_name": "Amara Okafor",
         "created_at": "2026-10-17T19:03:28.284Z",
         "timestamp": "2026-10-17T19:03:28.284Z"
+      }
+    ],
+    "python-web-dev": [
+      {
+        "id": "msg-py-1",
+        "session_id": "python-web-dev",
+        "message": "Welcome everyone to Python & Web Development live class!",
+        "text": "Welcome everyone to Python & Web Development live class!",
+        "sender_id": 1,
+        "sender_name": "Mutiti Stivo",
+        "created_at": "2026-10-18T18:05:00.000Z",
+        "timestamp": "2026-10-18T18:05:00.000Z"
       }
     ]
   },
@@ -692,5 +789,5 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-17T22:50:17.497Z"
+  "updated_at": "2026-10-18T17:22:42.417Z"
 }

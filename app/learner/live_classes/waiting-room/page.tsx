@@ -44,10 +44,31 @@ type AdmissionMessage = {
 function LiveClassWaitingRoomContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session") || "";
+  const rawSessionId = searchParams.get("session") || "";
+  const sessionId = rawSessionId.trim().toLowerCase();
   const [session, setSession] = useState({ ...fallbackSession, id: sessionId || fallbackSession.id });
-  const [userName, setUserName] = useState("Learner");
-  const [userInitials, setUserInitials] = useState("L");
+  const [userName, setUserName] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("konnect-user");
+        if (cached) {
+          const u = JSON.parse(cached);
+          const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username;
+          if (full) return full;
+        }
+        const email = localStorage.getItem("konnect-user-email");
+        if (email === "stevenmwizerwa1@gmail.com") return "Steven Mwizerwa";
+      } catch {}
+    }
+    return "Steven Mwizerwa";
+  });
+  const [userInitials, setUserInitials] = useState(() => {
+    if (typeof window !== "undefined") {
+      const email = localStorage.getItem("konnect-user-email");
+      if (email === "stevenmwizerwa1@gmail.com") return "SM";
+    }
+    return "SM";
+  });
   const [mounted, setMounted] = useState(false);
   const [isTeacherLive, setIsTeacherLive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -62,11 +83,12 @@ function LiveClassWaitingRoomContent() {
   const [requestError, setRequestError] = useState("");
   const [waitingSeconds, setWaitingSeconds] = useState(0);
 
+  const cleanSessionId = (session.id || sessionId || fallbackSession.id).toLowerCase().trim();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestIdRef = useRef("");
-  const admissionStorageKey = `konnect-live-class-admission:${session.id}`;
-  const requestStorageKey = `konnect-live-class-request:${session.id}`;
+  const admissionStorageKey = `konnect-live-class-admission:${cleanSessionId}`;
+  const requestStorageKey = `konnect-live-class-request:${cleanSessionId}`;
 
   useEffect(() => {
     currentUser().then((u) => {
@@ -211,25 +233,28 @@ function LiveClassWaitingRoomContent() {
 
   // Periodic heartbeat broadcast while waiting so teacher studio always picks up waiting request
   useEffect(() => {
-    if (admissionState !== "waiting" || !session.id) return;
+    if (admissionState !== "waiting" || !cleanSessionId) return;
     const interval = setInterval(() => {
       try {
+        const payload = {
+          type: "join-request",
+          sessionId: cleanSessionId,
+          learnerId: requestIdRef.current,
+          learnerName: userName,
+          requestId: requestIdRef.current,
+          requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          heartbeat: Date.now(),
+        };
+        window.localStorage.setItem(requestStorageKey, JSON.stringify(payload));
         if (typeof BroadcastChannel !== "undefined") {
           const channel = new BroadcastChannel("konnect-live-class-admission");
-          channel.postMessage({
-            type: "join-request",
-            sessionId: session.id,
-            learnerId: requestIdRef.current,
-            learnerName: userName,
-            requestId: requestIdRef.current,
-            requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          });
+          channel.postMessage(payload);
           channel.close();
         }
       } catch {}
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);
-  }, [admissionState, session.id, userName]);
+  }, [admissionState, cleanSessionId, requestStorageKey, userName]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = stream;
@@ -246,7 +271,8 @@ function LiveClassWaitingRoomContent() {
       : new BroadcastChannel("konnect-live-class-admission");
 
     function applyAdmission(message: AdmissionMessage & { learnerId?: string }) {
-      if (message.sessionId !== session.id) return;
+      const msgSessionId = String(message.sessionId || "").toLowerCase().trim();
+      if (msgSessionId !== cleanSessionId && msgSessionId !== String(session.id || "").toLowerCase().trim()) return;
       if (message.requestId && message.requestId !== requestIdRef.current) return;
       if (message.learnerId && message.learnerId !== requestIdRef.current && message.learnerId !== "all") return;
       setAdmissionState(message.status);
@@ -254,8 +280,9 @@ function LiveClassWaitingRoomContent() {
 
       if (message.status === "admitted") {
         try {
+          sessionStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
           sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
-          localStorage.setItem(`konnect-live-class-connected:${session.id}`, JSON.stringify({
+          localStorage.setItem(`konnect-live-class-connected:${cleanSessionId}`, JSON.stringify({
             learnerId: requestIdRef.current || "learner",
             name: userName,
             connectedAt: new Date().toISOString(),
@@ -266,7 +293,7 @@ function LiveClassWaitingRoomContent() {
         // Automatically enter classroom after 1.2 seconds of positive confirmation
         const timer = setTimeout(() => {
           streamRef.current?.getTracks().forEach((track) => track.stop());
-          router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(session.id)}`);
+          router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(cleanSessionId)}`);
         }, 1200);
         return () => clearTimeout(timer);
       }
@@ -286,11 +313,26 @@ function LiveClassWaitingRoomContent() {
     }
 
     window.addEventListener("storage", handleStorage);
+
+    // Initial check and periodic polling while waiting
+    try {
+      const cachedAdmission = localStorage.getItem(admissionStorageKey);
+      if (cachedAdmission) applyAdmission(JSON.parse(cachedAdmission));
+    } catch {}
+
+    const pollAdmission = setInterval(() => {
+      try {
+        const raw = localStorage.getItem(admissionStorageKey) || localStorage.getItem(`konnect-live-class-admission:${session.id}`);
+        if (raw) applyAdmission(JSON.parse(raw));
+      } catch {}
+    }, 1000);
+
     return () => {
       channel?.close();
       window.removeEventListener("storage", handleStorage);
+      clearInterval(pollAdmission);
     };
-  }, [admissionStorageKey, requestStorageKey, router, session.id, userName]);
+  }, [admissionStorageKey, cleanSessionId, requestStorageKey, router, session.id, userName]);
 
   async function refreshDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -370,7 +412,7 @@ function LiveClassWaitingRoomContent() {
 
     const joinPayload = {
       type: "join-request",
-      sessionId: session.id,
+      sessionId: cleanSessionId,
       learnerId: requestId,
       learnerName: effectiveName,
       requestId,
@@ -379,6 +421,7 @@ function LiveClassWaitingRoomContent() {
 
     try {
       window.localStorage.setItem(requestStorageKey, JSON.stringify(joinPayload));
+      window.localStorage.setItem(`konnect-live-class-request:${session.id}`, JSON.stringify(joinPayload));
       if (typeof BroadcastChannel !== "undefined") {
         const channel = new BroadcastChannel("konnect-live-class-admission");
         channel.postMessage(joinPayload);

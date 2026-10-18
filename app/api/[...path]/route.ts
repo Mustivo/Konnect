@@ -132,6 +132,8 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
         enrolled_count: item.enrolled_count,
         start_date: item.created_at,
         join_code: item.join_code,
+        teacher_name: item.teacher_name,
+        instructor: item.instructor,
         status: item.status,
       })),
     });
@@ -696,11 +698,11 @@ async function proxy(
           const teacherProf = getTeacherProfileByEmail(cleanEmail) || getTeacherProfileByEmail("mutitistivo@gmail.com") || getTeacherProfileByEmail("current-teacher");
           return {
             id,
-            email: cleanEmail,
+            email: cleanEmail === "mutitistivo@gmail.com" ? "mutitistivo@gmail.com" : cleanEmail,
             username: cleanEmail.split("@")[0],
-            name: teacherProf?.display_name || teacherProf?.full_legal_name || "Stiven Mutiti",
-            first_name: (teacherProf?.display_name || "Stiven").split(" ")[0],
-            last_name: (teacherProf?.full_legal_name || "Mutiti").split(" ").slice(1).join(" ") || "Teacher",
+            name: "Mutiti Stivo",
+            first_name: "Mutiti",
+            last_name: "Stivo",
             role: "teacher",
             is_active: true,
           };
@@ -747,7 +749,18 @@ async function proxy(
             }
           } catch {}
 
-          const userEmail = tokenEmail || (userId === "9364ccfc-4739-4e68-8e6e-158a2fefef8f" ? "admin@gmail.com" : "stevenmwizerwa1@gmail.com");
+          const referer = headers.get("referer") || "";
+          const cookieEmail = request.cookies.get("konnect-user-email")?.value;
+          let fallbackEmail = "stevenmwizerwa1@gmail.com";
+          if (cookieEmail) {
+            fallbackEmail = cookieEmail;
+          } else if (referer.includes("/teacher")) {
+            fallbackEmail = "mutitistivo@gmail.com";
+          } else if (referer.includes("/admin") || userId === "9364ccfc-4739-4e68-8e6e-158a2fefef8f") {
+            fallbackEmail = "admin@gmail.com";
+          }
+
+          const userEmail = tokenEmail || fallbackEmail;
           return jsonResponse(resolveUserProfile(userEmail, userId), 200);
         }
       }
