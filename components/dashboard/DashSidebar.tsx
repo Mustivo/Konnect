@@ -133,17 +133,17 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
   async function handleLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    const refreshToken = window.localStorage.getItem("konnect-refresh-token");
-    try {
-      if (refreshToken) await logout(refreshToken);
-    } catch {
-      // Clear the local session even if the API is temporarily unavailable.
-    } finally {
-      dispatch(logoutAction());
+    const refreshToken = typeof window !== "undefined" ? window.localStorage.getItem("konnect-refresh-token") : null;
+    if (refreshToken) {
+      logout(refreshToken).catch(() => {});
+    }
+    dispatch(logoutAction());
+    if (typeof window !== "undefined") {
       window.localStorage.removeItem("konnect-access-token");
       window.localStorage.removeItem("konnect-refresh-token");
-      router.replace("/login?logged_out=1");
+      document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
     }
+    router.replace("/login?logged_out=1");
   }
 
   return (

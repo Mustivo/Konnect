@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import DashNav from "@/components/dashboard/DashNav";
 import DashSidebar from "@/components/dashboard/DashSidebar";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
@@ -14,9 +15,24 @@ type DashboardShellProps = {
 };
 
 export default function DashboardShell({ children, role = "learner", teacherDashboard = false }: DashboardShellProps) {
+	const router = useRouter();
 	const isTeacher = role === "teacher";
 	const useTeacherPagePadding = role === "teacher" && !teacherDashboard;
 	const [mobileNavOpen, setMobileNavOpen] = useState(false);
+	const [isAuthorized, setIsAuthorized] = useState(false);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+		const token = window.localStorage.getItem("konnect-access-token");
+		if (!token) {
+			router.replace("/login");
+			return;
+		}
+
+		// Keep cookie in sync for any server-side guards
+		document.cookie = `konnect-access-token=${token}; path=/; max-age=604800; SameSite=Lax`;
+		setIsAuthorized(true);
+	}, [router]);
 
 	useEffect(() => {
 		const wasDark = document.documentElement.classList.contains("dark");
@@ -38,6 +54,17 @@ export default function DashboardShell({ children, role = "learner", teacherDash
 			document.body.style.backgroundColor = prevBg;
 		};
 	}, []);
+
+	if (!isAuthorized) {
+		return (
+			<div className="flex h-screen w-screen items-center justify-center bg-[#f2f3ed]">
+				<div className="flex flex-col items-center gap-2">
+					<div className="size-6 animate-spin rounded-full border-2 border-[#405b35] border-t-transparent" />
+					<p className="text-[11px] font-medium text-[#687564]">Verifying session…</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className={`learner-page ${isTeacher ? "teacher-page" : ""} flex h-screen overflow-hidden bg-[#f2f3ed] text-[#171d15]`}>

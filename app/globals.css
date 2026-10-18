@@ -430,3 +430,12 @@ html[data-theme="dark"] .learner-page [class*="rounded"] {
   animation: banner-in 0.22s ease-out;
 }
 
+@keyframes auth-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+

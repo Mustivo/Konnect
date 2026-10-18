@@ -18,6 +18,7 @@ type Teacher = {
 };
 
 const initialTeachers: Teacher[] = [
+  { id: "mutiti-stivo", initials: "MS", name: "Mutiti Stivo", subject: "Python & Computer Science", best: true, active: 3, limit: 3, rating: 5.0, suspended: false, attendance: 99 },
   { id: "edna-francis", initials: "EF", name: "Edna Francis", subject: "Mathematics", best: true, active: 3, limit: 3, rating: 4.9, suspended: false },
   { id: "michael-reed", initials: "MR", name: "Michael Reed", subject: "Science", best: false, active: 2, limit: 3, rating: 4.8, suspended: false, attendance: 96 },
   { id: "priya-shah", initials: "PS", name: "Priya Shah", subject: "English", best: true, active: 3, limit: 3, rating: 4.9, suspended: false },

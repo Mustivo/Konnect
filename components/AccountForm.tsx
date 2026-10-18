@@ -23,6 +23,7 @@ export default function AccountForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("registered") === "1") {
       dispatch(
@@ -32,19 +33,32 @@ export default function AccountForm() {
           message: "Welcome to Konnect. You can now log in with your credentials to access your courses.",
         })
       );
+      window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("logged_out") === "1" || params.get("logout") === "1") {
       dispatch(
         setNotice({
-          type: "info",
-          title: "Signed out successfully",
-          message: "You have been safely logged out. Please sign in to access your classes and courses.",
+          type: "success",
+          title: "Logout successful",
+          message: "You have been logged out successfully. Please sign in to access your classes and courses.",
+          autoDismiss: 4000,
         })
       );
+      window.history.replaceState({}, "", window.location.pathname);
     } else if (notice?.title === "Welcome back!") {
       // Clear previous login success message when arriving on the login screen
       dispatch(clearNotice());
     }
-  }, [dispatch, notice?.title]);
+  }, [dispatch]);
+
+  // Fallback timer to ensure logout notice cleanly disappears after short duration
+  useEffect(() => {
+    if (notice?.title === "Logout successful") {
+      const timer = window.setTimeout(() => {
+        dispatch(clearNotice());
+      }, 4300);
+      return () => window.clearTimeout(timer);
+    }
+  }, [notice?.title, dispatch]);
 
   const hasAuthError = notice?.type === "error";
 
@@ -70,7 +84,7 @@ export default function AccountForm() {
 
     const actionResult = await dispatch(
       loginWithRedux({
-        email: result.data.email,
+        email: result.data.email.trim().toLowerCase(),
         password: result.data.password,
       })
     );
@@ -124,13 +138,16 @@ export default function AccountForm() {
             <input
               required
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               name="email"
               type="email"
               aria-invalid={Boolean(fieldErrors.email || hasAuthError)}
               aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
               onChange={() => {
                 setFieldErrors((errors) => ({ ...errors, email: undefined }));
-                if (hasAuthError) dispatch(clearNotice());
+                if (hasAuthError || notice?.title === "Logout successful") dispatch(clearNotice());
               }}
               placeholder="you@example.com"
               className={`mt-1.5 w-full rounded border px-3 py-2.5 text-xs outline-none transition dark:bg-white/5 ${
@@ -164,7 +181,7 @@ export default function AccountForm() {
                 aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
                 onChange={() => {
                   setFieldErrors((errors) => ({ ...errors, password: undefined }));
-                  if (hasAuthError) dispatch(clearNotice());
+                  if (hasAuthError || notice?.title === "Logout successful") dispatch(clearNotice());
                 }}
                 placeholder="Enter your password"
                 className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-xs outline-none"

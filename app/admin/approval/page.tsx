@@ -41,6 +41,7 @@ const initialPending: Pending[] = [
 ];
 
 const initialApproved: Approved[] = [
+  { id: "mutiti-stivo", initials: "MS", name: "Mutiti Stivo", qualification: "BSc Computer Science · Certified Python Instructor", approved: "01 Oct 2026" },
   { id: "edna-francis", initials: "EF", name: "Edna Francis", qualification: "MSc Mathematics · QTS", approved: "07 Sep 2026" },
   { id: "michael-reed", initials: "MR", name: "Michael Reed", qualification: "BSc Biology · PGCE", approved: "08 Sep 2026" },
   { id: "priya-shah", initials: "PS", name: "Priya Shah", qualification: "MA English · QTS", approved: "09 Sep 2026" },

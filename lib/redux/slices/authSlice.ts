@@ -39,13 +39,15 @@ function parseApiErrorMessage(data: unknown, fallback: string): string {
 
 function getBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!envUrl) return "https://konnect-classroomvirtual.onrender.com";
+  if (!envUrl) return "https://konnect-k0x2.onrender.com";
   try {
     const parsed = new URL(envUrl);
-    const sanitizedPath = parsed.pathname.replace(/\/swagger\/?.*$/i, "").replace(/\/+$/, "");
+    const sanitizedPath = parsed.pathname
+      .replace(/\/(swagger|api\/docs|docs|api)\/?.*$/i, "")
+      .replace(/\/+$/, "");
     return `${parsed.origin}${sanitizedPath || ""}`;
   } catch {
-    return "https://konnect-classroomvirtual.onrender.com";
+    return "https://konnect-k0x2.onrender.com";
   }
 }
 
@@ -109,6 +111,7 @@ export const loginWithRedux = createAsyncThunk<
     if (typeof window !== "undefined") {
       window.localStorage.setItem("konnect-access-token", tokens.access);
       window.localStorage.setItem("konnect-refresh-token", tokens.refresh);
+      document.cookie = `konnect-access-token=${tokens.access}; path=/; max-age=604800; SameSite=Lax`;
     }
 
     // Fetch user profile
@@ -237,6 +240,7 @@ export const authSlice = createSlice({
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("konnect-access-token");
         window.localStorage.removeItem("konnect-refresh-token");
+        document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
       }
     },
   },

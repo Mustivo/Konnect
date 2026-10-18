@@ -35,5 +35,16 @@
     "verification_status": "VERIFIED",
     "created_at": "2026-10-17T18:51:50.243Z",
     "updated_at": "2026-10-17T18:51:50.243Z"
+  },
+  "current-teacher": {
+    "email": "current-teacher",
+    "full_legal_name": "",
+    "display_name": "",
+    "verification_status": "VERIFIED",
+    "created_at": "2026-10-18T13:20:11.294Z",
+    "bio": "Passionate educator specializing in Mathematics and Full-Stack Web Development.",
+    "qualifications": "",
+    "expertise_subjects": "",
+    "updated_at": "2026-10-18T13:20:13.872Z"
   }
 }

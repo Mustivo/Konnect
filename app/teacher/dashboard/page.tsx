@@ -48,6 +48,7 @@ const initialApprovals = [
 ];
 
 const rosterStudents = [
+  { name: "Steven Mwizerwa", id: "KA-000", email: "stevenmwizerwa1@gmail.com", joined: "07 Sep 2026", attendance: "98.5%" },
   { name: "Oliver James", id: "KA-001", email: "oliver.james@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
   { name: "David Peter", id: "KA-002", email: "david.peter@student.school.edu", joined: "07 Sep 2026", attendance: "96.4%" },
   { name: "Lilly Paul", id: "KA-003", email: "lilly.paul@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },

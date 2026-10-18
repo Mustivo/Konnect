@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import type { AuthMessageState } from "@/lib/redux/types";
@@ -16,6 +17,7 @@ export interface AuthMessageProps {
     onClick?: () => void;
   };
   onDismiss?: () => void;
+  autoDismissTimeout?: number;
   className?: string;
 }
 
@@ -27,8 +29,11 @@ export default function AuthMessage({
   fieldErrors,
   action,
   onDismiss,
+  autoDismissTimeout,
   className = "",
 }: AuthMessageProps) {
+  const [isDismissing, setIsDismissing] = useState(false);
+
   // Normalize notice data from either object or direct props
   let currentType: "error" | "success" | "info" | "warning" = type ?? "error";
   let currentTitle = title;
@@ -55,7 +60,39 @@ export default function AuthMessage({
     currentAction = notice.action || currentAction;
   }
 
-  if (!currentMessage && !currentTitle && (!currentFieldErrors || Object.keys(currentFieldErrors).length === 0)) {
+  const autoDismissMs =
+    autoDismissTimeout ??
+    (typeof notice === "object" && notice && typeof notice.autoDismiss === "number"
+      ? notice.autoDismiss
+      : typeof notice === "object" && notice && notice.autoDismiss === true
+      ? 4000
+      : undefined);
+
+  useEffect(() => {
+    if (!autoDismissMs || !onDismiss) return;
+    setIsDismissing(false);
+
+    const startExitTimer = setTimeout(() => {
+      setIsDismissing(true);
+    }, autoDismissMs);
+
+    const finishDismissTimer = setTimeout(() => {
+      onDismiss();
+    }, autoDismissMs + 280);
+
+    return () => {
+      clearTimeout(startExitTimer);
+      clearTimeout(finishDismissTimer);
+    };
+  }, [autoDismissMs, onDismiss, currentTitle, currentMessage]);
+
+  const hasContent = Boolean(
+    currentMessage ||
+    currentTitle ||
+    (currentFieldErrors && Object.keys(currentFieldErrors).length > 0)
+  );
+
+  if (!hasContent) {
     return null;
   }
 
@@ -113,11 +150,20 @@ export default function AuthMessage({
   // Flatten any structured field errors
   const errorEntries = currentFieldErrors ? Object.entries(currentFieldErrors) : [];
 
+  const handleManualDismiss = () => {
+    setIsDismissing(true);
+    setTimeout(() => {
+      onDismiss?.();
+    }, 200);
+  };
+
   return (
     <aside
       role={currentType === "error" ? "alert" : "status"}
       aria-live={currentType === "error" ? "assertive" : "polite"}
       className={`relative my-3.5 w-full overflow-hidden rounded-xl border px-3.5 py-3 transition-all duration-300 ease-out ${
+        isDismissing ? "opacity-0 -translate-y-2 pointer-events-none scale-[0.99]" : ""
+      } ${
         currentType === "error" ? "animate-auth-shake" : "animate-banner-in"
       } ${style.container} ${className}`}
     >
@@ -187,7 +233,7 @@ export default function AuthMessage({
         {onDismiss && (
           <button
             type="button"
-            onClick={onDismiss}
+            onClick={handleManualDismiss}
             aria-label="Dismiss alert"
             className={`-mr-1 -mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${style.closeBtn}`}
           >
@@ -195,6 +241,26 @@ export default function AuthMessage({
           </button>
         )}
       </div>
+
+      {/* Subtle Auto-dismiss Progress Bar */}
+      {autoDismissMs && !isDismissing && (
+        <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-black/5 dark:bg-white/10 overflow-hidden">
+          <div
+            className={`h-full ${
+              currentType === "success"
+                ? "bg-emerald-500/80 dark:bg-emerald-400"
+                : currentType === "info"
+                ? "bg-[#3b5934]/70 dark:bg-[#a5c29a]"
+                : currentType === "warning"
+                ? "bg-amber-500/80"
+                : "bg-red-500/80"
+            }`}
+            style={{
+              animation: `auth-progress ${autoDismissMs}ms linear forwards`,
+            }}
+          />
+        </div>
+      )}
     </aside>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
   BarChart3,
   CheckCircle2,
@@ -60,8 +59,7 @@ export default function AttendancePage() {
   });
 
   return (
-    <DashboardShell role="learner">
-      <div className="space-y-4 pb-8 pt-1">
+    <div className="space-y-4 pb-8 pt-1">
         {/* Heading */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-wide text-[#556350] dark:text-[#a4af9e]">
@@ -311,6 +309,5 @@ export default function AttendancePage() {
           </div>
         </section>
       </div>
-    </DashboardShell>
   );
 }

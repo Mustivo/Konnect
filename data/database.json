@@ -535,7 +535,7 @@
       "teacher_name": "Mwizerwa Stiven",
       "scheduled_start": "2026-10-17T19:06:28.235Z",
       "scheduled_end": "2026-10-17T20:06:28.235Z",
-      "status": "LIVE",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=algebra",
       "room_id": "room-algebra-live",
       "host": 1
@@ -599,6 +599,31 @@
         "joined_at": "2026-10-17T19:01:28.284Z",
         "camera_on": true,
         "mic_on": true
+      }
+    ],
+    "algebra": [
+      {
+        "id": "1",
+        "name": "Learner",
+        "role": "learner",
+        "status": "active",
+        "joined_at": "2026-10-17T22:49:07.621Z",
+        "camera_on": true,
+        "mic_on": true
+      },
+      {
+        "id": "eecb1c67-2bb6-49a2-ad98-73fc47a4da14",
+        "name": "Learner",
+        "role": "learner",
+        "status": "left",
+        "joined_at": "2026-10-17T22:49:30.264Z",
+        "camera_on": true,
+        "mic_on": true,
+        "last_alive_at": "2026-10-17T22:49:55.134Z",
+        "duration_minutes": 1,
+        "left_at": "2026-10-17T22:50:17.496Z",
+        "attendance_pct": 2,
+        "attendance_status": "Absent"
       }
     ]
   },
@@ -667,5 +692,5 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-17T20:14:37.719Z"
+  "updated_at": "2026-10-17T22:50:17.497Z"
 }

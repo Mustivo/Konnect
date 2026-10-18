@@ -18,16 +18,18 @@ function getBaseUrl(): string {
     return "";
   }
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!envUrl) return "https://konnect-classroomvirtual.onrender.com";
+  if (!envUrl) return "https://konnect-k0x2.onrender.com";
   try {
     const parsed = new URL(envUrl);
-    const sanitizedPath = parsed.pathname.replace(/\/swagger\/?.*$/i, "").replace(/\/+$/, "");
+    const sanitizedPath = parsed.pathname
+      .replace(/\/(swagger|api\/docs|docs|api)\/?.*$/i, "")
+      .replace(/\/+$/, "");
     parsed.pathname = sanitizedPath || "/";
     parsed.search = "";
     parsed.hash = "";
     return `${parsed.origin}${parsed.pathname === "/" ? "" : parsed.pathname}`;
   } catch {
-    return "https://konnect-classroomvirtual.onrender.com";
+    return "https://konnect-k0x2.onrender.com";
   }
 }
 

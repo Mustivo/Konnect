@@ -6,7 +6,9 @@ if (!configuredApiBaseUrl) {
 
 function normalizeApiBaseUrl(rawUrl: string) {
   const parsed = new URL(rawUrl);
-  const sanitizedPath = parsed.pathname.replace(/\/swagger\/?.*$/i, "").replace(/\/+$/, "");
+  const sanitizedPath = parsed.pathname
+    .replace(/\/(swagger|api\/docs|docs|api)\/?.*$/i, "")
+    .replace(/\/+$/, "");
   parsed.pathname = sanitizedPath || "/";
   parsed.search = "";
   parsed.hash = "";

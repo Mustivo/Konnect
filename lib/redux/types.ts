@@ -43,6 +43,7 @@ export interface AuthMessageState {
     label: string;
     href?: string;
   };
+  autoDismiss?: boolean | number;
 }
 
 export interface SchoolClass {

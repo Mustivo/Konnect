@@ -45,6 +45,23 @@ type StudentRecord = {
 
 const initialStudents: StudentRecord[] = [
   {
+    id: "stu-steven",
+    name: "Steven Mwizerwa",
+    email: "stevenmwizerwa1@gmail.com",
+    studentNumber: "STU-100000",
+    className: "Introduction to Python & Web Systems",
+    gradeLevel: "Grade 12",
+    attendancePct: 98.8,
+    gradePct: 97.4,
+    status: "Honor Roll",
+    hasFlag: false,
+    initials: "SM",
+    avatarBg: "bg-[#e5efdf]",
+    avatarText: "text-[#2e4726]",
+    recentSubmission: "Full Stack Web & Python Final Project",
+    recentScore: "98 / 100 (98%)",
+  },
+  {
     id: "stu-1",
     name: "Alice Umutoni",
     email: "learner.alice@konnect.com",

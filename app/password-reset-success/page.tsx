@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import AccountPage from "@/components/AccountPage";
 
 export const metadata: Metadata = {
-  title: "Password recovery | Konnect",
-  description: "Password recovery is not currently available for Konnect accounts.",
+  title: "Password reset successful | Konnect",
+  description: "Your password has been successfully updated. Log into your Konnect account.",
 };
 
 export default function PasswordResetSuccessPage() {

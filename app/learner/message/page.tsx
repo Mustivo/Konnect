@@ -2,7 +2,6 @@
 
 import { FormEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import DashboardShell from "@/components/dashboard/DashboardShell";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -163,8 +162,7 @@ export default function LearnerMessagesPage() {
   }
 
   return (
-    <DashboardShell role="learner">
-      <div className="space-y-4 pb-8 pt-1">
+    <div className="space-y-4 pb-8 pt-1">
         <header>
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#63774f] dark:text-[#a4af9e]">Your learning space</p>
           <h1 className="mt-1 text-[26px] font-bold leading-none text-[#172115] dark:text-[#ecf1ea]">Messages</h1>
@@ -270,6 +268,5 @@ export default function LearnerMessagesPage() {
           </section>
         </section>
       </div>
-    </DashboardShell>
   );
 }

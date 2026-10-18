@@ -167,7 +167,7 @@ export default function Navbar() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setUserMenuOpen(false);
     setOpen(false);
     const refreshToken =
@@ -175,16 +175,13 @@ export default function Navbar() {
         ? window.localStorage.getItem("konnect-refresh-token")
         : null;
     if (refreshToken) {
-      try {
-        await logoutApi(refreshToken);
-      } catch {
-        // Clear session even if network fails
-      }
+      logoutApi(refreshToken).catch(() => {});
     }
     dispatch(logoutAction());
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("konnect-access-token");
       window.localStorage.removeItem("konnect-refresh-token");
+      document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
     }
     router.push("/login?logged_out=1");
   };

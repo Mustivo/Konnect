@@ -2,134 +2,262 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, Info } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound } from "lucide-react";
 import { z } from "zod";
 import AuthMessage from "@/components/ui/AuthMessage";
 
-const recoveryEmailSchema = z.string().trim().email("Enter a valid email address.");
+const resetSchema = z
+  .object({
+    email: z.string().trim().email("Enter a valid email address."),
+    newPassword: z.string().min(8, "Password must be at least 8 characters long."),
+    confirmPassword: z.string().min(1, "Please confirm your new password."),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
 
 type PasswordRecoveryProps = {
   mode: "forgot" | "reset-success";
 };
 
 export default function PasswordRecovery({ mode }: PasswordRecoveryProps) {
-  const isSuccess = mode === "reset-success";
-  const [notice, setNotice] = useState("");
+  const router = useRouter();
+  const [isSuccess, setIsSuccess] = useState(mode === "reset-success");
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [notice, setNotice] = useState<{
+    type: "error" | "success" | "info";
+    title?: string;
+    message: string;
+  } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setNotice(null);
+    setFieldErrors({});
+
     const formData = new FormData(event.currentTarget);
-    const result = recoveryEmailSchema.safeParse(formData.get("email"));
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const newPassword = String(formData.get("newPassword") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    const result = resetSchema.safeParse({ email, newPassword, confirmPassword });
     if (!result.success) {
-      setNotice(result.error.issues[0]?.message ?? "Enter a valid email address.");
+      const errors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        const path = String(issue.path[0]);
+        if (!errors[path]) errors[path] = issue.message;
+      });
+      setFieldErrors(errors);
       return;
     }
-    setNotice("No email was sent. The connected API does not currently provide a password reset or OTP endpoint. Please contact support for help.");
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email, new_password: newPassword }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setNotice({
+          type: "error",
+          title: "Password reset failed",
+          message: data?.error || data?.detail || "Could not reset your password. Please try again.",
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      setIsSuccess(true);
+    } catch {
+      setNotice({
+        type: "error",
+        title: "Connection error",
+        message: "Failed to connect to the authentication server. Please check your internet connection.",
+      });
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="flex min-h-[500px] flex-1 items-center justify-center bg-[#f8f7f1] px-6 py-12 text-[#20271d] dark:bg-[#10140f] dark:text-[#f4f4f0] sm:px-10 md:min-h-screen md:px-12 md:py-8">
       {isSuccess ? (
-        <section className="w-full max-w-[620px] rounded-[2.5rem] bg-white px-7 py-12 text-center shadow-[0_20px_60px_rgba(29,45,25,0.04)] dark:bg-[#171c18] sm:px-12 md:py-16">
-          <Link
-            href="/"
-            className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-[#dfe5d8] bg-white/70 px-3.5 py-2 text-xs font-semibold text-[#52644a] transition hover:border-[#b9c9ac] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43] dark:border-white/10 dark:bg-white/5 dark:text-[#c5d6bc] dark:hover:bg-white/10"
-          >
-            <ArrowLeft size={14} />
-            Back to main site
-          </Link>
-          <div className="mb-10 flex justify-center opacity-40">
-            <Link href="/" aria-label="Konnect home">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/konnect-wordmark.png" alt="Konnect" className="h-10 w-auto dark:brightness-0 dark:invert" />
-            </Link>
+        <section className="w-full max-w-[520px] rounded-[2rem] border border-[#e1e6db] bg-white p-8 text-center shadow-[0_20px_50px_rgba(29,45,25,0.06)] dark:border-white/10 dark:bg-[#161b17] sm:p-12">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 ring-8 ring-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-950/20">
+            <CheckCircle2 size={28} strokeWidth={2.4} />
           </div>
-          <p className="text-[0.58rem] font-bold uppercase tracking-[0.17em] text-[#687c50] dark:text-[#a8bd8c]">
-            Password help
+
+          <p className="mt-5 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#607954] dark:text-[#a8bd8c]">
+            Account security
           </p>
-          <h1 className="mx-auto mt-2 max-w-[430px] text-[1.8rem] font-semibold leading-tight tracking-[-0.055em] sm:text-[2rem]">
-            Password recovery is not available yet.
+          <h1 className="mt-1 text-[1.75rem] font-bold leading-tight tracking-[-0.04em] sm:text-[2rem]">
+            Password updated!
           </h1>
-          <div className="mx-auto mt-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#eaf0e5] text-[#42653a] dark:bg-[#263d21] dark:text-[#c5d6bc]">
-            <Info size={19} />
-          </div>
-          <p className="mt-4 text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-            No password was changed. The connected API does not yet support reset emails or OTP verification.
+          <p className="mx-auto mt-2.5 max-w-[360px] text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
+            Your password has been successfully reset. You can now use your new password to sign in to your Konnect account.
           </p>
+
           <Link
             href="/login"
-            className="mt-5 inline-flex min-h-11 w-full max-w-[360px] items-center justify-center rounded bg-[#263d21] px-4 text-xs font-semibold text-white transition hover:bg-[#344f2c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43]"
+            className="mt-6 inline-flex min-h-11 w-full max-w-[320px] items-center justify-center rounded-lg bg-[#273a23] px-5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1e2e1a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43]"
           >
-            Return to login
+            Log in with new password &rarr;
           </Link>
-          <p className="mt-4 text-[0.58rem] text-[#70786d] dark:text-[#b0b8aa]">
-            Still having trouble?{" "}
-            <Link href="/contact" className="font-semibold text-[#526d43] hover:underline dark:text-[#b7cc9d]">
-              Contact support
-            </Link>
-          </p>
         </section>
       ) : (
-        <section className="w-full max-w-[420px]">
+        <section className="w-full max-w-[440px]">
           <Link
             href="/"
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#dfe5d8] bg-white/70 px-3.5 py-2 text-xs font-semibold text-[#52644a] transition hover:border-[#b9c9ac] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43] dark:border-white/10 dark:bg-white/5 dark:text-[#c5d6bc] dark:hover:bg-white/10"
+            className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-[#dfe5d8] bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-[#52644a] transition hover:border-[#b9c9ac] hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-[#c5d6bc] dark:hover:bg-white/10"
           >
-            <ArrowLeft size={14} />
-            Back to main site
+            <ArrowLeft size={13} />
+            Back to Home
           </Link>
-          <div className="mb-12 flex justify-center">
+
+          <div className="mb-6 flex justify-center sm:justify-start">
             <Link href="/" aria-label="Konnect home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/konnect-wordmark.png" alt="Konnect" className="h-10 w-auto dark:brightness-0 dark:invert" />
+              <img src="/konnect-wordmark.png" alt="Konnect" className="h-9 w-auto dark:brightness-0 dark:invert" />
             </Link>
           </div>
-          <p className="text-[0.58rem] font-bold uppercase tracking-[0.17em] text-[#687c50] dark:text-[#a8bd8c]">
-            Password help
-          </p>
-          <h1 className="mt-2 max-w-[360px] text-[1.9rem] font-semibold leading-[1.05] tracking-[-0.055em] sm:text-[2.15rem]">
-            We’ll help you get back in.
+
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#e4ede0] text-[#344d2d] dark:bg-[#253621] dark:text-[#b4ceaa]">
+              <KeyRound size={13} />
+            </span>
+            <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-[#607954] dark:text-[#a8bd8c]">
+              Password Reset
+            </p>
+          </div>
+
+          <h1 className="mt-1 text-[1.75rem] font-bold leading-tight tracking-[-0.04em] sm:text-[2rem]">
+            Reset your password.
           </h1>
-          <p className="mt-3 max-w-[390px] text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-            Enter the email linked to your Konnect account. This field is required. Password recovery is not available through the connected service yet.
+          <p className="mt-1.5 text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
+            Enter your account email and choose a new password of at least 8 characters.
           </p>
-          <form onSubmit={handleSubmit} className="mt-5">
-            <label className="block text-[0.65rem] font-medium" htmlFor="recovery-email">
-              Email address
-            </label>
-            <input
-              required
-              autoComplete="email"
-              id="recovery-email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              className="mt-1.5 w-full rounded border border-[#e0e3d9] bg-white px-3 py-2.5 text-xs outline-none transition placeholder:text-[#8b9188] focus:border-[#526d43] focus:ring-2 focus:ring-[#526d43]/10 dark:border-white/10 dark:bg-white/5"
-            />
+
+          <AuthMessage notice={notice} onDismiss={() => setNotice(null)} className="my-4" />
+
+          <form onSubmit={handleSubmit} method="POST" className="mt-4 space-y-3.5">
+            <div>
+              <label className="block text-[0.68rem] font-medium" htmlFor="reset-email">
+                Account email address
+              </label>
+              <input
+                required
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                id="reset-email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                className={`mt-1.5 w-full rounded border px-3 py-2.5 text-xs outline-none transition dark:bg-white/5 ${
+                  fieldErrors.email
+                    ? "border-red-300 focus:border-red-500"
+                    : "border-[#e0e3d9] focus:border-[#526d43] focus:ring-2 focus:ring-[#526d43]/10 dark:border-white/10"
+                }`}
+              />
+              {fieldErrors.email && (
+                <span className="mt-1 block text-[0.62rem] text-red-600 dark:text-red-400">
+                  {fieldErrors.email}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[0.68rem] font-medium" htmlFor="new-password">
+                New password (min 8 characters)
+              </label>
+              <div
+                className={`mt-1.5 flex rounded border transition dark:bg-white/5 ${
+                  fieldErrors.newPassword
+                    ? "border-red-300 focus-within:border-red-500"
+                    : "border-[#e0e3d9] focus-within:border-[#526d43] focus-within:ring-2 focus-within:ring-[#526d43]/10 dark:border-white/10"
+                }`}
+              >
+                <input
+                  required
+                  id="new-password"
+                  name="newPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter new password"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-xs outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="px-3 text-[#70786d] hover:text-[#20271d] dark:text-[#a0a89d] dark:hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              {fieldErrors.newPassword && (
+                <span className="mt-1 block text-[0.62rem] text-red-600 dark:text-red-400">
+                  {fieldErrors.newPassword}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[0.68rem] font-medium" htmlFor="confirm-password">
+                Confirm new password
+              </label>
+              <div
+                className={`mt-1.5 flex rounded border transition dark:bg-white/5 ${
+                  fieldErrors.confirmPassword
+                    ? "border-red-300 focus-within:border-red-500"
+                    : "border-[#e0e3d9] focus-within:border-[#526d43] focus-within:ring-2 focus-within:ring-[#526d43]/10 dark:border-white/10"
+                }`}
+              >
+                <input
+                  required
+                  id="confirm-password"
+                  name="confirmPassword"
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Re-type new password"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-xs outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                  className="px-3 text-[#70786d] hover:text-[#20271d] dark:text-[#a0a89d] dark:hover:text-white"
+                >
+                  {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              {fieldErrors.confirmPassword && (
+                <span className="mt-1 block text-[0.62rem] text-red-600 dark:text-red-400">
+                  {fieldErrors.confirmPassword}
+                </span>
+              )}
+            </div>
+
             <button
               type="submit"
-              className="mt-3 min-h-11 w-full rounded bg-[#263d21] px-4 text-xs font-semibold text-white transition hover:bg-[#344f2c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43]"
+              disabled={submitting}
+              className="mt-4 flex min-h-11 w-full items-center justify-center rounded-lg bg-[#263d21] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#344f2c] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#526d43]"
             >
-              Check recovery options
+              {submitting ? "Updating password…" : "Reset password"}
             </button>
           </form>
-          <AuthMessage
-            notice={
-              notice
-                ? {
-                    type: notice.includes("valid") ? "error" : "info",
-                    title: notice.includes("valid") ? "Invalid email address" : "Password reset info",
-                    message: notice,
-                  }
-                : null
-            }
-            onDismiss={() => setNotice("")}
-            className="mt-4"
-          />
 
-          <p className="mt-3 text-center text-[0.65rem]">
-            <Link href="/login" className="font-semibold text-[#526d43] hover:underline dark:text-[#b7cc9d]">
-              + Return to login
+          <p className="mt-5 text-center text-xs">
+            Remember your password?{" "}
+            <Link href="/login" className="font-semibold text-[#526d43] hover:underline dark:text-[#a8bd8c]">
+              Log in
             </Link>
           </p>
         </section>
