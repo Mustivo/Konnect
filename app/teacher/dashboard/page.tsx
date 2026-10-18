@@ -7,7 +7,13 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
 import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
 import {
+  admitLiveJoinRequest,
+  getLiveJoinRequests,
+  rejectLiveJoinRequest,
+} from "@/lib/api/sessions";
+import {
   ArrowRight,
+  Bell,
   BookOpen,
   CalendarDays,
   Check,
@@ -18,6 +24,7 @@ import {
   MoreVertical,
   Search,
   ThumbsUp,
+  UserCheck,
   Users,
   Video,
   X,
@@ -75,11 +82,24 @@ const plannerItems = [
   { title: "Linear Functions Review", className: "G1 / Class - B", status: "Today", color: "text-[#4e7543] bg-[#e7f1e2]" },
 ];
 
+type LiveClassJoinRequest = {
+  id: string;
+  sessionId: string;
+  classTitle?: string;
+  teacherName?: string;
+  learnerId: string;
+  learnerName: string;
+  requestedAt: string;
+  status: "waiting" | "admitted" | "denied";
+};
+
 export default function TeacherDashboardPage() {
   const pathname = usePathname();
   const isRosterView = pathname === "/teacher/student";
   const [activeClasses, setActiveClasses] = useState(classes);
   const [approvals, setApprovals] = useState(initialApprovals);
+  const [liveRequests, setLiveRequests] = useState<LiveClassJoinRequest[]>([]);
+  const [liveActionNotice, setLiveActionNotice] = useState("");
   const [notes] = useState(initialNotes);
   const [, setAddingNote] = useState(false);
   const [rosterClass, setRosterClass] = useState("Algebra I · Grade 9 · Class A");
@@ -90,6 +110,232 @@ export default function TeacherDashboardPage() {
   const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
   const [loadNotice, setLoadNotice] = useState("");
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
+  function playJoinChime() {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } catch {}
+  }
+
+  function acceptLiveRequest(req: LiveClassJoinRequest) {
+    const cleanSessionId = String(req.sessionId || "general").toLowerCase().trim();
+    const channel = typeof BroadcastChannel !== "undefined"
+      ? new BroadcastChannel("konnect-live-class-admission")
+      : null;
+
+    const admissionPayload = {
+      sessionId: cleanSessionId,
+      requestId: req.id,
+      learnerId: req.learnerId,
+      status: "admitted" as const,
+      timestamp: Date.now(),
+    };
+
+    channel?.postMessage(admissionPayload);
+    channel?.close();
+
+    localStorage.setItem(`konnect-live-class-admission:${cleanSessionId}`, JSON.stringify(admissionPayload));
+    localStorage.setItem(`konnect-live-class-admission:${req.sessionId}`, JSON.stringify(admissionPayload));
+    localStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
+    localStorage.setItem(`konnect-live-class-admitted:${req.sessionId}`, "true");
+
+    try {
+      const rawAll = localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsed = JSON.parse(rawAll);
+        const filtered = Array.isArray(parsed)
+          ? parsed.filter((item: LiveClassJoinRequest) => item.id !== req.id && item.learnerId !== req.learnerId)
+          : [];
+        localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+      }
+      localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
+      localStorage.removeItem(`konnect-live-class-request:${req.sessionId}`);
+    } catch {}
+
+    setLiveRequests((prev) => prev.filter((r) => r.id !== req.id && r.learnerId !== req.learnerId));
+    setLiveActionNotice(`✓ Admitted ${req.learnerName} into ${req.classTitle || "live class"}.`);
+    setTimeout(() => setLiveActionNotice(""), 4500);
+
+    void admitLiveJoinRequest(cleanSessionId, req.id, {
+      learner_id: req.learnerId,
+      learner_name: req.learnerName,
+    }).catch(() => undefined);
+  }
+
+  function rejectLiveRequest(req: LiveClassJoinRequest) {
+    const cleanSessionId = String(req.sessionId || "general").toLowerCase().trim();
+    const channel = typeof BroadcastChannel !== "undefined"
+      ? new BroadcastChannel("konnect-live-class-admission")
+      : null;
+
+    const rejectionPayload = {
+      sessionId: cleanSessionId,
+      requestId: req.id,
+      learnerId: req.learnerId,
+      status: "denied" as const,
+      timestamp: Date.now(),
+    };
+
+    channel?.postMessage(rejectionPayload);
+    channel?.close();
+
+    localStorage.setItem(`konnect-live-class-admission:${cleanSessionId}`, JSON.stringify(rejectionPayload));
+    localStorage.setItem(`konnect-live-class-admission:${req.sessionId}`, JSON.stringify(rejectionPayload));
+
+    try {
+      const rawAll = localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsed = JSON.parse(rawAll);
+        const filtered = Array.isArray(parsed)
+          ? parsed.filter((item: LiveClassJoinRequest) => item.id !== req.id && item.learnerId !== req.learnerId)
+          : [];
+        localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+      }
+      localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
+      localStorage.removeItem(`konnect-live-class-request:${req.sessionId}`);
+    } catch {}
+
+    setLiveRequests((prev) => prev.filter((r) => r.id !== req.id && r.learnerId !== req.learnerId));
+    setLiveActionNotice(`✕ Declined live class join request from ${req.learnerName}.`);
+    setTimeout(() => setLiveActionNotice(""), 4500);
+
+    void rejectLiveJoinRequest(cleanSessionId, req.id, {
+      learner_id: req.learnerId,
+    }).catch(() => undefined);
+  }
+
+  // Real-time tracking of learner join requests across BroadcastChannel, localStorage, and API
+  useEffect(() => {
+    function parseJoinRequestItem(raw: unknown): LiveClassJoinRequest | null {
+      if (!raw || typeof raw !== "object") return null;
+      const r = raw as Record<string, unknown>;
+      const learnerId = String(r.learner_id || r.learnerId || r.requestId || r.id || "").trim();
+      const learnerName = String(r.learner_name || r.learnerName || "Learner").trim();
+      const sessionId = String(r.session_id || r.sessionId || "general").trim();
+      const reqId = String(r.id || r.requestId || learnerId).trim();
+      const status = (r.status as "waiting" | "admitted" | "denied") || "waiting";
+      if (!learnerId || status !== "waiting") return null;
+      return {
+        id: reqId,
+        sessionId,
+        classTitle: String(r.class_title || r.classTitle || "Live Classroom"),
+        teacherName: String(r.teacher_name || r.teacherName || "Instructor"),
+        learnerId,
+        learnerName,
+        requestedAt: String(r.requested_at || r.requestedAt || "Just now"),
+        status,
+      };
+    }
+
+    function syncRequests() {
+      const discoveredMap = new Map<string, LiveClassJoinRequest>();
+
+      try {
+        const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+        if (rawAll) {
+          const parsed = JSON.parse(rawAll);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              const parsedItem = parseJoinRequestItem(item);
+              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+            }
+          }
+        }
+      } catch {}
+
+      try {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith("konnect-live-class-request:")) {
+            const val = window.localStorage.getItem(key);
+            if (val) {
+              const parsedItem = parseJoinRequestItem(JSON.parse(val));
+              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+            }
+          }
+        }
+      } catch {}
+
+      void getLiveJoinRequests("all")
+        .then((res) => apiJson<{ results?: Array<Record<string, unknown>> }>(res))
+        .then((data) => {
+          if (data?.results && Array.isArray(data.results)) {
+            for (const item of data.results) {
+              const parsedItem = parseJoinRequestItem(item);
+              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+            }
+          }
+          const list = Array.from(discoveredMap.values());
+          setLiveRequests((current) => {
+            if (list.length > current.length) {
+              playJoinChime();
+            }
+            return list;
+          });
+        })
+        .catch(() => {
+          const list = Array.from(discoveredMap.values());
+          setLiveRequests(list);
+        });
+    }
+
+    syncRequests();
+
+    let admissionChannel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        admissionChannel = new BroadcastChannel("konnect-live-class-admission");
+        admissionChannel.onmessage = (event) => {
+          if (event.data?.type === "join-request") {
+            const parsed = parseJoinRequestItem(event.data);
+            if (parsed) {
+              setLiveRequests((prev) => {
+                if (prev.some((r) => r.id === parsed.id || r.learnerId === parsed.learnerId)) return prev;
+                playJoinChime();
+                return [parsed, ...prev];
+              });
+            }
+          } else if (event.data?.status === "admitted" || event.data?.status === "denied") {
+            const targetId = event.data.requestId || event.data.learnerId;
+            setLiveRequests((prev) => prev.filter((r) => r.id !== targetId && r.learnerId !== targetId));
+          }
+        };
+      } catch {}
+    }
+
+    function handleStorage(e: StorageEvent) {
+      if (
+        e.key === "konnect-all-live-requests" ||
+        (e.key && e.key.startsWith("konnect-live-class-request:")) ||
+        (e.key && e.key.startsWith("konnect-live-class-admission:"))
+      ) {
+        syncRequests();
+      }
+    }
+
+    window.addEventListener("storage", handleStorage);
+    const interval = setInterval(syncRequests, 2000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+      admissionChannel?.close();
+    };
+  }, []);
 
   function copyClassLink(classId: string) {
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
@@ -156,7 +402,7 @@ export default function TeacherDashboardPage() {
     { label: "Active Classes", value: String(activeClassTotal), icon: BookOpen, tone: "bg-[#e5efdf] text-[#34522a]" },
     { label: "Students", value: String(studentTotal), icon: Users, tone: "bg-[#eaf2ff] text-[#2563a8]" },
     { label: "Pending Review", value: String(pendingReviewCount), icon: FileText, tone: "bg-[#fce7f3] text-[#be3b75]" },
-    { label: "Approvals", value: String(approvals.length), icon: Check, tone: "bg-[#fef4e8] text-[#c2781b]" },
+    { label: "Approvals", value: String(approvals.length + liveRequests.length), icon: Check, tone: "bg-[#fef4e8] text-[#c2781b]" },
     { label: "Classes Created", value: `${activeClassTotal}/3`, icon: CalendarDays, tone: "bg-[#e5f0ff] text-[#3475b9]" },
   ];
   const filteredStudents = rosterStudents.filter((student) => {
@@ -178,6 +424,101 @@ export default function TeacherDashboardPage() {
       <TeacherClassCreator />
       <div className="space-y-5 pt-1 pb-8">
         {loadNotice && <p role="status" className="text-[9px] text-[#7d8979]">{loadNotice}</p>}
+
+        {liveActionNotice && (
+          <aside role="status" className="flex items-center gap-2 rounded-xl border border-[#c2e2bc] bg-[#eff8ec] px-4 py-2.5 text-[10px] font-semibold text-[#25571a] shadow-sm dark:border-[#2f5424] dark:bg-[#1a2918] dark:text-[#aee09f]">
+            <Check size={14} className="text-[#3b7b28]" />
+            <span>{liveActionNotice}</span>
+          </aside>
+        )}
+
+        {liveRequests.length > 0 && (
+          <section
+            aria-label="Pending live class join requests"
+            className="relative overflow-hidden rounded-2xl border-2 border-[#3d7a31] bg-gradient-to-r from-[#edf7eb] via-[#f7fcf5] to-[#eaf5e7] p-4 shadow-[0_6px_24px_rgba(40,110,25,0.14)] dark:border-[#3a5e30] dark:from-[#182618] dark:via-[#1c2e1b] dark:to-[#172416]"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d8e6d2] pb-3 dark:border-[#2b4425]">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3.5 w-3.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39882a] opacity-75" />
+                  <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#2c6e20]" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#244f1c] px-2.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-white shadow-xs">
+                      <Bell size={10} className="animate-bounce" />
+                      Live Lobby Request
+                    </span>
+                    <h2 className="text-[14px] font-extrabold text-[#192f15] dark:text-[#ecf3e9]">
+                      Learner Waiting to Join Class ({liveRequests.length})
+                    </h2>
+                  </div>
+                  <p className="mt-0.5 text-[9px] text-[#55694f] dark:text-[#9bb094]">
+                    Learners joined the waiting room directly from their portal without a link. Accept to admit them, or reject the request.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-md border border-[#c7dbc0] bg-[#f0f8ed] px-2.5 py-1 text-[8.5px] font-medium text-[#3b5930] dark:border-[#354c30] dark:bg-[#1a2819] dark:text-[#bedbb5]">
+                Teacher Dashboard Review Mode
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-2.5">
+              {liveRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#cfe2c9] bg-white p-3.5 shadow-xs dark:border-[#2d422a] dark:bg-[#141d13]"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#24401c] text-[12px] font-bold text-white shadow">
+                      {req.learnerName.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "L"}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-extrabold text-[13px] text-[#1c2a1a] dark:text-[#eef4ec]">
+                          {req.learnerName}
+                        </p>
+                        <span className="rounded-full bg-[#fdf5e7] px-2 py-0.5 text-[8px] font-bold text-[#9b6818] border border-[#e8d2a6] dark:bg-[#2b2010] dark:text-[#f2c66d]">
+                          Waiting in lobby · {req.requestedAt || "Just now"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[#465a41] dark:text-[#b4c7ae]">
+                        Target Class: <strong className="font-bold text-[#20371a] dark:text-[#cde4c5]">{req.classTitle || "Live Classroom Session"}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => acceptLiveRequest(req)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow hover:bg-[#346627] transition-all active:scale-[0.98]"
+                    >
+                      <Check size={14} className="text-[#86efac]" />
+                      <span>Accept / Admit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => rejectLiveRequest(req)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e5c3bd] bg-[#fff5f3] px-3.5 text-[10.5px] font-bold text-[#b83535] hover:bg-[#fde9e6] transition-all active:scale-[0.98] dark:border-[#4d2520] dark:bg-[#241514] dark:text-[#f89c9c]"
+                    >
+                      <X size={14} />
+                      <span>Reject</span>
+                    </button>
+                    <Link
+                      href={`/teacher/live-classes/${encodeURIComponent(req.sessionId)}`}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#c5d5bf] bg-[#f8faf6] px-3 text-[10.5px] font-bold text-[#344d2c] hover:bg-[#edf3e9] transition-all dark:border-[#2a3c27] dark:bg-[#192218] dark:text-[#cde0c7]"
+                      title="Launch studio to start audio/video session"
+                    >
+                      <Video size={13} className="text-[#3b732d]" />
+                      <span>Go to Live Room →</span>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {!isRosterView && <section id="analytics" aria-label="Assignments and classes overview" className="rounded-xl border border-[#e2e7dd] bg-white px-3 py-3 shadow-[0_1px_3px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]">
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -361,15 +702,34 @@ export default function TeacherDashboardPage() {
             aria-label="Students pending approval"
             className="rounded-2xl border border-[#e8ebe4] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13]"
           >
-            <div className="mb-2 flex items-center justify-between gap-2"><h2 className="text-[10px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students Pending Approval</h2><span className="rounded-full bg-[#fce9dc] px-2 py-1 text-[7px] font-semibold text-[#bc612a]">{approvals.length} waiting</span></div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-[10px] font-bold text-[#243020] dark:text-[#ecf1ea]">Students Pending Approval</h2>
+              <span className="rounded-full bg-[#fce9dc] px-2 py-1 text-[7px] font-semibold text-[#bc612a]">{approvals.length + liveRequests.length} waiting</span>
+            </div>
             <div className="space-y-2">
+              {liveRequests.map((req) => (
+                <div key={req.id} className="flex items-center gap-2 rounded-lg border border-[#cce3c6] bg-[#f2f8ef] p-2 dark:border-[#2f4928] dark:bg-[#182618]">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#244b1c] text-[6px] font-bold text-white shadow-xs">
+                    {req.learnerName.split(" ").map((part) => part[0]).join("")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-[7.5px] font-bold text-[#253322] dark:text-[#e1e8dc]">{req.learnerName}</p>
+                      <span className="rounded bg-[#28571e] px-1 py-0.2 text-[5.5px] font-bold uppercase text-white">Live Class</span>
+                    </div>
+                    <p className="truncate text-[6px] text-[#4f6746] dark:text-[#a0b59b]">{req.classTitle || "Live Room"} · {req.requestedAt}</p>
+                  </div>
+                  <button type="button" onClick={() => acceptLiveRequest(req)} aria-label={`Accept ${req.learnerName}`} className="rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white hover:bg-[#324f2b]">Accept</button>
+                  <button type="button" onClick={() => rejectLiveRequest(req)} aria-label={`Reject ${req.learnerName}`} className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[#b83535] hover:bg-[#fce9e6] dark:bg-[#161b17]"><X size={9} /></button>
+                </div>
+              ))}
               {approvals.slice(0, 3).map((student, index) => <div key={student.name} className="flex items-center gap-2 rounded-lg bg-[#f6f7f3] p-2 dark:bg-[#20271e]">
                 <span className={`grid size-6 shrink-0 place-items-center rounded-full text-[6px] font-bold text-white ${["bg-[#617b62]", "bg-[#9c7054]", "bg-[#586f89]"][index % 3]}`}>{student.name.split(" ").map((part) => part[0]).join("")}</span>
                 <div className="min-w-0 flex-1"><p className="truncate text-[7px] font-semibold text-[#253322] dark:text-[#e1e8dc]">{student.name}</p><p className="truncate text-[6px] text-[#7c8776] dark:text-[#9ca797]">{student.meta}</p></div>
                 <button type="button" onClick={() => dismissApproval(student.name)} aria-label={`Approve ${student.name}`} className="rounded-full bg-[#23351f] px-2 py-1 text-[6px] font-semibold text-white">Approve</button>
                 <button type="button" onClick={() => dismissApproval(student.name)} aria-label={`Dismiss ${student.name}`} className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[#71806b] dark:bg-[#161b17]"><X size={9} /></button>
               </div>)}
-              {!approvals.length && <p className="py-5 text-center text-[8px] text-[#7c8776]">No pending approvals.</p>}
+              {!approvals.length && !liveRequests.length && <p className="py-5 text-center text-[8px] text-[#7c8776]">No pending approvals.</p>}
             </div>
             <Link href="/teacher/student#approvals" className="mt-3 block text-right text-[7px] font-semibold text-[#405c35] hover:underline dark:text-[#c5d6b8]">View All Requests <span aria-hidden="true">›</span></Link>
           </section>}

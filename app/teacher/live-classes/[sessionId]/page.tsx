@@ -5,7 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { useSessionChat } from "@/lib/useSessionChat";
 import { apiJson } from "@/lib/api";
-import { endSession, getSession, getSessionAttendance, startSession } from "@/lib/api/sessions";
+import {
+  admitLiveJoinRequest,
+  endSession,
+  getLiveJoinRequests,
+  getSession,
+  getSessionAttendance,
+  rejectLiveJoinRequest,
+  startSession,
+} from "@/lib/api/sessions";
 import type { MockParticipant } from "@/lib/mock/classesTable";
 import {
   Bell,
@@ -24,9 +32,11 @@ import {
   Share2,
   Shield,
   UserCheck,
+  UserX,
   Users,
   Video,
   VideoOff,
+  X,
 } from "lucide-react";
 
 type SessionDetails = {
@@ -252,34 +262,50 @@ export default function TeacherLiveClassPage() {
       : null;
 
     function handleIncomingRequest(learnerId: string, learnerName: string) {
+      const cleanId = String(learnerId || "").trim();
+      const cleanName = String(learnerName || "").trim() || "Learner";
+      if (!cleanId) return;
+
+      // Check if this learner is already admitted or denied
+      try {
+        const admission = localStorage.getItem(`konnect-live-class-admission:${cleanSessionId}`);
+        if (admission) {
+          const adm = JSON.parse(admission);
+          if (adm.status === "admitted" || adm.status === "denied") {
+            if (String(adm.learnerId || adm.requestId || "") === cleanId) return;
+          }
+        }
+      } catch {}
+
       if (autoAdmit) {
-        // Automatically admit if teacher enabled auto-admit
         channel?.postMessage({
           sessionId: cleanSessionId,
-          learnerId,
+          learnerId: cleanId,
           status: "admitted",
         });
         localStorage.setItem(
           `konnect-live-class-admission:${cleanSessionId}`,
-          JSON.stringify({ sessionId: cleanSessionId, learnerId, status: "admitted", timestamp: Date.now() })
+          JSON.stringify({ sessionId: cleanSessionId, learnerId: cleanId, status: "admitted", timestamp: Date.now() })
         );
         localStorage.setItem(
           `konnect-live-class-admission:${sessionId}`,
-          JSON.stringify({ sessionId, learnerId, status: "admitted", timestamp: Date.now() })
+          JSON.stringify({ sessionId, learnerId: cleanId, status: "admitted", timestamp: Date.now() })
         );
+        localStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
+        localStorage.setItem(`konnect-live-class-admitted:${sessionId}`, "true");
         setConnectedLearners((prev) => {
-          if (prev.some((l) => l.id === learnerId)) return prev;
-          return [...prev, { id: learnerId, name: learnerName, joinedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
+          if (prev.some((l) => l.id === cleanId)) return prev;
+          return [...prev, { id: cleanId, name: cleanName, joinedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
         });
         setAdmittedCount((count) => count + 1);
       } else {
         const item: WaitingLearner = {
-          id: learnerId,
-          name: learnerName,
+          id: cleanId,
+          name: cleanName,
           requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
         setWaitingLearners((prev) => {
-          if (prev.some((l) => l.id === learnerId)) return prev;
+          if (prev.some((l) => l.id === cleanId)) return prev;
           return [...prev, item];
         });
         setJoinReminderLearner(item);
@@ -291,8 +317,8 @@ export default function TeacherLiveClassPage() {
       channel.onmessage = (event) => {
         if (event.data?.type === "join-request") {
           const msgSession = String(event.data?.sessionId || "").toLowerCase().trim();
-          if (!msgSession || msgSession === cleanSessionId || msgSession === String(sessionId || "").toLowerCase().trim()) {
-            handleIncomingRequest(event.data.learnerId || event.data.requestId || "learner-1", event.data.learnerName || "Steven Mwizerwa");
+          if (msgSession === cleanSessionId) {
+            handleIncomingRequest(event.data.learnerId || event.data.requestId || "learner", event.data.learnerName || "Learner");
           }
         }
       };
@@ -301,53 +327,70 @@ export default function TeacherLiveClassPage() {
     function handleStorage(event: StorageEvent) {
       if (!event.key || !event.newValue) return;
       if (
-        event.key === `konnect-live-class-request:${sessionId}` ||
         event.key === `konnect-live-class-request:${cleanSessionId}` ||
-        event.key.toLowerCase().startsWith(`konnect-live-class-request:${cleanSessionId}`)
+        event.key === `konnect-live-class-request:${sessionId}`
       ) {
         try {
           const req = JSON.parse(event.newValue);
-          if (req.type === "join-request") {
-            handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
+          if (req.type === "join-request" && String(req.sessionId || "").toLowerCase().trim() === cleanSessionId) {
+            handleIncomingRequest(req.learnerId || req.requestId || "learner", req.learnerName || "Learner");
           }
         } catch {}
       }
     }
     window.addEventListener("storage", handleStorage);
 
-    // Initial check and periodic polling of local storage for waiting learners
+    // Initial check and periodic polling of server API and local storage for waiting learners
     function scanWaitingRequests() {
-      try {
-        const directKeys = [
-          `konnect-live-class-request:${cleanSessionId}`,
-          `konnect-live-class-request:${sessionId}`,
-        ];
-        for (const k of directKeys) {
-          const raw = window.localStorage.getItem(k);
-          if (raw) {
-            const req = JSON.parse(raw);
-            if (req && req.type === "join-request") {
-              handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
+      // 1. Query server API for active waiting join requests for THIS exact session
+      void getLiveJoinRequests(cleanSessionId)
+        .then((res) => apiJson<{ results?: Array<{ id: string; session_id: string; learner_id: string | number; learner_name: string; status: string; requested_at?: string }> }>(res))
+        .then((data) => {
+          if (data?.results && Array.isArray(data.results)) {
+            const activeWaiting = data.results.filter(
+              (r) => r.status === "waiting" && String(r.session_id || "").toLowerCase().trim() === cleanSessionId
+            );
+            if (activeWaiting.length > 0) {
+              setWaitingLearners(
+                activeWaiting.map((r) => ({
+                  id: String(r.learner_id || r.id),
+                  name: r.learner_name || "Learner",
+                  requestedAt: r.requested_at ? new Date(r.requested_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now",
+                }))
+              );
+              return;
             }
           }
-        }
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const key = window.localStorage.key(i);
-          if (key && key.toLowerCase().startsWith(`konnect-live-class-request:${cleanSessionId}`)) {
-            const val = window.localStorage.getItem(key);
-            if (val) {
-              const req = JSON.parse(val);
-              if (req && req.type === "join-request") {
-                handleIncomingRequest(req.learnerId || req.requestId || "learner-1", req.learnerName || "Steven Mwizerwa");
+
+          // 2. Fallback to localStorage ONLY for this session if not yet handled
+          try {
+            const raw = window.localStorage.getItem(`konnect-live-class-request:${cleanSessionId}`);
+            if (raw) {
+              const req = JSON.parse(raw);
+              const admission = window.localStorage.getItem(`konnect-live-class-admission:${cleanSessionId}`);
+              let isHandled = false;
+              if (admission) {
+                try {
+                  const adm = JSON.parse(admission);
+                  if (adm.status === "admitted" || adm.status === "denied") isHandled = true;
+                } catch {}
+              }
+              if (!isHandled && req && req.type === "join-request" && String(req.sessionId || "").toLowerCase().trim() === cleanSessionId) {
+                handleIncomingRequest(req.learnerId || req.requestId || "learner", req.learnerName || "Learner");
+                return;
               }
             }
-          }
-        }
-      } catch {}
+          } catch {}
+
+          // If no waiting request exists for this session, clear waiting learners
+          setWaitingLearners([]);
+          setJoinReminderLearner(null);
+        })
+        .catch(() => undefined);
     }
 
     scanWaitingRequests();
-    const scanTimer = setInterval(scanWaitingRequests, 1500);
+    const scanTimer = setInterval(scanWaitingRequests, 2000);
 
     // Auto-broadcast admission periodically ONLY if teacher explicitly toggled autoAdmit
     const autoAdmitPulse = setInterval(() => {
@@ -658,6 +701,8 @@ export default function TeacherLiveClassPage() {
       `konnect-live-class-admission:${sessionId}`,
       JSON.stringify(admissionPayload)
     );
+    localStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
+    localStorage.setItem(`konnect-live-class-admitted:${sessionId}`, "true");
 
     try {
       localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
@@ -665,7 +710,7 @@ export default function TeacherLiveClassPage() {
     } catch {}
 
     const target = waitingLearners.find((l) => l.id === learnerId);
-    const name = learnerName || target?.name || "Steven Mwizerwa";
+    const name = learnerName || target?.name || "Learner";
 
     setConnectedLearners((prev) => {
       if (prev.some((l) => l.id === learnerId)) return prev;
@@ -704,6 +749,8 @@ export default function TeacherLiveClassPage() {
       `konnect-live-class-admission:${sessionId}`,
       JSON.stringify(admissionPayload)
     );
+    localStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
+    localStorage.setItem(`konnect-live-class-admitted:${sessionId}`, "true");
 
     try {
       localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
@@ -724,6 +771,59 @@ export default function TeacherLiveClassPage() {
     setCopyNotice("Admitted all waiting learners.");
     setTimeout(() => setCopyNotice(""), 3500);
     channel?.close();
+  }
+
+  function denyLearner(learnerId: string, learnerName?: string) {
+    const cleanSessionId = String(sessionId || "general").toLowerCase().trim();
+    const channel = typeof BroadcastChannel !== "undefined"
+      ? new BroadcastChannel("konnect-live-class-admission")
+      : null;
+
+    const rejectionPayload = {
+      sessionId: cleanSessionId,
+      learnerId,
+      status: "denied" as const,
+      timestamp: Date.now(),
+    };
+
+    channel?.postMessage(rejectionPayload);
+
+    localStorage.setItem(
+      `konnect-live-class-admission:${cleanSessionId}`,
+      JSON.stringify(rejectionPayload)
+    );
+    localStorage.setItem(
+      `konnect-live-class-admission:${sessionId}`,
+      JSON.stringify(rejectionPayload)
+    );
+
+    try {
+      localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
+      localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
+      const rawAll = localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsed = JSON.parse(rawAll);
+        const filtered = Array.isArray(parsed)
+          ? parsed.filter((r: { id?: string; learnerId?: string }) => r.id !== learnerId && r.learnerId !== learnerId)
+          : [];
+        localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+      }
+    } catch {}
+
+    const target = waitingLearners.find((l) => l.id === learnerId);
+    const name = learnerName || target?.name || "Learner";
+
+    setWaitingLearners((prev) => prev.filter((l) => l.id !== learnerId));
+    if (joinReminderLearner?.id === learnerId) {
+      setJoinReminderLearner(null);
+    }
+    setCopyNotice(`Declined join request from ${name}.`);
+    setTimeout(() => setCopyNotice(""), 3500);
+    channel?.close();
+
+    void rejectLiveJoinRequest(cleanSessionId, learnerId, {
+      learner_id: learnerId,
+    }).catch(() => undefined);
   }
 
   async function handleEndClass() {
@@ -810,22 +910,22 @@ export default function TeacherLiveClassPage() {
         {waitingLearners.length > 0 && (
           <aside
             role="alert"
-            className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-md animate-in fade-in slide-in-from-top-2"
+            className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-lg animate-in fade-in slide-in-from-top-2"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#27481f] text-white">
                 <Bell size={16} className="animate-bounce" />
               </span>
               <div>
-                <p className="text-[11px] font-bold text-[#1b2f18]">
-                  🔔 Admission Request: <span className="font-extrabold underline decoration-[#417b35]">
-                    {waitingLearners.map((l) => l.name).join(", ")}
-                  </span> wants to join this class
+                <p className="text-[11.5px] font-bold text-[#1b2f18]">
+                  🔔 Live Lobby Request: <span className="font-extrabold underline decoration-[#417b35]">
+                    Learner Waiting to Join Class ({waitingLearners.map((l) => l.name).join(", ")})
+                  </span>
                 </p>
                 <p className="text-[9.5px] text-[#55694f]">
                   {waitingLearners.length === 1
-                    ? `Learner is in the waiting room (Requested at ${waitingLearners[0].requestedAt}). Approve to admit them into the live meeting.`
-                    : `${waitingLearners.length} learners are waiting in the waiting room. Approve to admit them into the live meeting.`}
+                    ? `Learner is in the live lobby waiting to join (Requested at ${waitingLearners[0].requestedAt}). Approve to admit them into this live meeting.`
+                    : `${waitingLearners.length} learners are in the live lobby waiting to join. Approve to admit them into this live meeting.`}
                 </p>
               </div>
             </div>
@@ -839,19 +939,22 @@ export default function TeacherLiveClassPage() {
                     admitAll();
                   }
                 }}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#25491d] px-3.5 text-[10.5px] font-bold text-white shadow hover:bg-[#346329] transition-colors"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#25491d] px-3.5 text-[10.5px] font-bold text-white shadow hover:bg-[#346329] transition-all hover:scale-105 active:scale-95"
               >
-                <UserCheck size={13} /> {waitingLearners.length === 1 ? "Admit Learner" : `Admit All (${waitingLearners.length})`}
+                <UserCheck size={13} /> {waitingLearners.length === 1 ? "Accept & Admit" : `Admit All (${waitingLearners.length})`}
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setWaitingLearners([]);
-                  setJoinReminderLearner(null);
+                  if (waitingLearners.length === 1) {
+                    denyLearner(waitingLearners[0].id, waitingLearners[0].name);
+                  } else {
+                    waitingLearners.forEach((l) => denyLearner(l.id, l.name));
+                  }
                 }}
-                className="inline-flex h-8 items-center rounded-md border border-[#cdd8c9] bg-white px-2.5 text-[10px] font-semibold text-[#54674d] hover:bg-[#f0f4ee] transition-colors"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#e5c3bd] bg-[#fff5f3] px-3 text-[10.5px] font-bold text-[#b83535] hover:bg-[#fde9e6] transition-all dark:border-[#4d2520] dark:bg-[#241514] dark:text-[#f89c9c]"
               >
-                Dismiss
+                <X size={13} /> {waitingLearners.length === 1 ? "Reject" : "Reject All"}
               </button>
             </div>
           </aside>
@@ -875,6 +978,63 @@ export default function TeacherLiveClassPage() {
           <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#dfe5da] bg-[#111811] shadow-sm dark:border-[#263124]">
             {/* Viewport */}
             <div className="relative flex flex-1 items-center justify-center overflow-hidden p-2">
+              {/* LIVE LOBBY REQUEST - LEARNER WAITING TO JOIN CLASS (ON ROOM VIDEO STAGE) */}
+              {waitingLearners.length > 0 && (
+                <div className="absolute top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[#48a934] bg-[#0c140b]/95 p-3.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1e4817] text-white">
+                      <Bell size={18} className="animate-bounce" />
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#eab308] text-[9px] font-black text-black">
+                        {waitingLearners.length}
+                      </span>
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-[#25521e] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[#a5f396] border border-[#3b782f]">
+                          Live Lobby Request
+                        </span>
+                        <span className="text-[11px] font-bold text-white">
+                          Learner Waiting to Join Class
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-200">
+                        <span className="font-extrabold text-[#bcf2b0] underline">
+                          {waitingLearners.map((l) => l.name).join(", ")}
+                        </span>{" "}
+                        {waitingLearners.length === 1 ? "is waiting in the live lobby. Accept to admit them into this meeting." : "are waiting in the live lobby. Accept to admit them into this meeting."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (waitingLearners.length === 1) {
+                          admitLearner(waitingLearners[0].id, waitingLearners[0].name);
+                        } else {
+                          admitAll();
+                        }
+                      }}
+                      className="inline-flex h-8.5 items-center gap-1.5 rounded-lg bg-[#2e6b22] px-3.5 text-[10.5px] font-bold text-white shadow-md hover:bg-[#3d8c2d] transition-all hover:scale-105 active:scale-95"
+                    >
+                      <UserCheck size={14} /> {waitingLearners.length === 1 ? "Accept & Admit to Class" : `Admit All (${waitingLearners.length})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (waitingLearners.length === 1) {
+                          denyLearner(waitingLearners[0].id, waitingLearners[0].name);
+                        } else {
+                          waitingLearners.forEach((l) => denyLearner(l.id, l.name));
+                        }
+                      }}
+                      className="inline-flex h-8.5 items-center gap-1.5 rounded-lg border border-[#f87171]/40 bg-[#450a0a]/80 px-3 text-[10.5px] font-bold text-[#fca5a5] hover:bg-[#7f1d1d]/80 transition-all active:scale-95"
+                    >
+                      <X size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              )}
               {sharingScreen ? (
                 <video
                   ref={screenSharePreviewRef}
@@ -1118,19 +1278,34 @@ export default function TeacherLiveClassPage() {
             {activeTab === "participants" && (
               <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
                 {/* Waiting room queue */}
+                {/* Live Lobby Request: Learner Waiting to Join Class */}
                 {waitingLearners.length > 0 && (
-                  <div className="mb-4 rounded-md border border-[#ebd8b7] bg-[#fdf9f0] p-2.5 dark:border-[#423118] dark:bg-[#231a0e]">
+                  <div className="mb-4 rounded-xl border-2 border-[#3d7a31] bg-[#f0f8ed] p-3 shadow-sm dark:border-[#385e2f] dark:bg-[#182816]">
                     <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-[#825c1e] dark:text-[#e5b364]">
-                        Waiting Room ({waitingLearners.length})
-                      </p>
-                      <button
-                        type="button"
-                        onClick={admitAll}
-                        className="rounded bg-[#825c1e] px-2 py-0.5 text-[8px] font-semibold text-white hover:bg-[#684713]"
-                      >
-                        Admit all
-                      </button>
+                      <div>
+                        <span className="rounded bg-[#25521e] px-1.5 py-0.5 text-[7.5px] font-black uppercase tracking-wider text-[#a5f396]">
+                          Live Lobby Request
+                        </span>
+                        <p className="mt-1 text-[9.5px] font-bold text-[#1b2f18] dark:text-[#edf2ea]">
+                          Learner Waiting to Join Class ({waitingLearners.length})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={admitAll}
+                          className="rounded bg-[#25491d] px-2.5 py-1 text-[8px] font-bold text-white hover:bg-[#346329]"
+                        >
+                          Admit all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => waitingLearners.forEach((l) => denyLearner(l.id, l.name))}
+                          className="rounded border border-[#e0cbab] bg-white px-2 py-0.5 text-[8px] font-semibold text-[#8b3b3b] hover:bg-[#fde9e6] dark:border-[#423118] dark:bg-[#1a1711] dark:text-[#f89c9c]"
+                        >
+                          Reject all
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-2 space-y-1.5">
@@ -1140,13 +1315,22 @@ export default function TeacherLiveClassPage() {
                             <p className="font-semibold text-[#273123] dark:text-[#e0e9dc]">{learner.name}</p>
                             <p className="text-[7px] text-[#7d8678]">Requested at {learner.requestedAt}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => admitLearner(learner.id)}
-                            className="rounded bg-[#2c4724] px-2.5 py-1 text-[8px] font-semibold text-white hover:bg-[#3b5d30]"
-                          >
-                            Admit
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => admitLearner(learner.id, learner.name)}
+                              className="rounded bg-[#2c4724] px-2.5 py-1 text-[8px] font-semibold text-white hover:bg-[#3b5d30]"
+                            >
+                              Admit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => denyLearner(learner.id, learner.name)}
+                              className="rounded border border-[#e5c3bd] bg-[#fff5f3] px-2 py-1 text-[8px] font-semibold text-[#b83535] hover:bg-[#fde9e6] dark:border-[#4d2520] dark:bg-[#241514] dark:text-[#f89c9c]"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -88,10 +88,20 @@ export default function LiveClassRoomPage() {
     const activeSessionId = new URLSearchParams(window.location.search).get("session") || "algebra";
     setSessionId(activeSessionId);
 
-    if (sessionStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) !== "true") {
+    const cleanSession = activeSessionId.toLowerCase().trim();
+    const isAdmitted =
+      sessionStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) === "true" ||
+      sessionStorage.getItem(`konnect-live-class-admitted:${cleanSession}`) === "true" ||
+      localStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) === "true" ||
+      localStorage.getItem(`konnect-live-class-admitted:${cleanSession}`) === "true";
+
+    if (!isAdmitted) {
       router.replace(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeSessionId)}`);
       return;
     }
+
+    sessionStorage.setItem(`konnect-live-class-admitted:${activeSessionId}`, "true");
+    sessionStorage.setItem(`konnect-live-class-admitted:${cleanSession}`, "true");
 
     setMounted(true);
     setAdmissionVerified(true);

@@ -11,3 +11,24 @@ export const endSession = (id: string) => apiRequest(`/api/sessions/${encodeURIC
 export const getSessionAttendance = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/attendance/`);
 export const getSessionChat = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`);
 export const sendSessionChatMessage = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`, { method: "POST", body: JSON.stringify(payload) });
+
+export const getLiveJoinRequests = (sessionId = "all") =>
+  apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests`);
+
+export const requestJoinSession = (sessionId: string, payload: Record<string, unknown>) =>
+  apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const admitLiveJoinRequest = (sessionId: string, requestId: string, payload?: Record<string, unknown>) =>
+  apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests/${encodeURIComponent(requestId)}/admit`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+
+export const rejectLiveJoinRequest = (sessionId: string, requestId: string, payload?: Record<string, unknown>) =>
+  apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests/${encodeURIComponent(requestId)}/reject`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });

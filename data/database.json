@@ -533,7 +533,7 @@
       "teacher_name": "Mutiti Stivo",
       "scheduled_start": "2026-10-18T18:00:00.000Z",
       "scheduled_end": "2026-10-18T20:30:00.000Z",
-      "status": "LIVE",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=python-web-dev",
       "room_id": "room-python-live",
       "host": 1
@@ -619,29 +619,6 @@
         "joined_at": "2026-10-17T18:56:28.284Z",
         "camera_on": true,
         "mic_on": true
-      },
-      {
-        "id": "1",
-        "name": "Student (You)",
-        "role": "learner",
-        "status": "active",
-        "joined_at": "2026-10-17T19:01:28.284Z",
-        "camera_on": true,
-        "mic_on": true
-      },
-      {
-        "id": "080d3a70-4144-4830-b49b-46dd01cad7aa",
-        "name": "Learner",
-        "role": "learner",
-        "status": "left",
-        "joined_at": "2026-10-17T20:13:08.625Z",
-        "camera_on": true,
-        "mic_on": true,
-        "last_alive_at": "2026-10-17T20:14:24.261Z",
-        "duration_minutes": 1,
-        "left_at": "2026-10-17T20:14:37.719Z",
-        "attendance_pct": 1,
-        "attendance_status": "Absent"
       }
     ],
     "react": [
@@ -655,42 +632,8 @@
         "mic_on": true
       }
     ],
-    "algebra": [
-      {
-        "id": "1",
-        "name": "Learner",
-        "role": "learner",
-        "status": "active",
-        "joined_at": "2026-10-17T22:49:07.621Z",
-        "camera_on": true,
-        "mic_on": true
-      },
-      {
-        "id": "eecb1c67-2bb6-49a2-ad98-73fc47a4da14",
-        "name": "Learner",
-        "role": "learner",
-        "status": "left",
-        "joined_at": "2026-10-17T22:49:30.264Z",
-        "camera_on": true,
-        "mic_on": true,
-        "last_alive_at": "2026-10-17T22:49:55.134Z",
-        "duration_minutes": 1,
-        "left_at": "2026-10-17T22:50:17.496Z",
-        "attendance_pct": 2,
-        "attendance_status": "Absent"
-      }
-    ],
-    "math": [
-      {
-        "id": "1",
-        "name": "Learner",
-        "role": "learner",
-        "status": "active",
-        "joined_at": "2026-10-18T14:14:01.631Z",
-        "camera_on": true,
-        "mic_on": true
-      }
-    ],
+    "algebra": [],
+    "math": [],
     "python-web-dev": [
       {
         "id": "teacher-host",
@@ -698,15 +641,6 @@
         "role": "teacher",
         "status": "active",
         "joined_at": "2026-10-18T18:00:00.000Z",
-        "camera_on": true,
-        "mic_on": true
-      },
-      {
-        "id": "1",
-        "name": "Learner",
-        "role": "learner",
-        "status": "active",
-        "joined_at": "2026-10-18T17:10:58.506Z",
         "camera_on": true,
         "mic_on": true
       }
@@ -745,6 +679,16 @@
         "sender_name": "Mutiti Stivo",
         "created_at": "2026-10-18T18:05:00.000Z",
         "timestamp": "2026-10-18T18:05:00.000Z"
+      },
+      {
+        "id": "msg-1792353557024-5dfi",
+        "session_id": "python-web-dev",
+        "message": "hey",
+        "text": "hey",
+        "sender_id": "92f7d9cb-06cf-4961-a655-43d827a2a736",
+        "sender_name": "Mutiti Stivo",
+        "created_at": "2026-10-18T19:59:17.024Z",
+        "timestamp": "2026-10-18T19:59:17.024Z"
       }
     ]
   },
@@ -789,5 +733,72 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-18T17:22:42.417Z"
+  "updated_at": "2026-10-18T21:03:30.710Z",
+  "live_join_requests": {
+    "algebra": [
+      {
+        "id": "req-1792356754414-lghc",
+        "session_id": "algebra",
+        "class_title": "Algebra I — Linear Equations & Inequalities",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-18T20:52:34.414Z",
+        "updated_at": "2026-10-18T21:03:20.957Z"
+      }
+    ],
+    "geometry": [
+      {
+        "id": "req-1792356755630-x7sx",
+        "session_id": "geometry",
+        "class_title": "Triangle Congruence Proofs",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-18T20:52:35.630Z",
+        "updated_at": "2026-10-18T21:03:23.384Z"
+      }
+    ],
+    "react": [
+      {
+        "id": "req-1792356756786-22j4",
+        "session_id": "react",
+        "class_title": "React Component Patterns & Hooks",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-18T20:52:36.786Z",
+        "updated_at": "2026-10-18T21:03:24.382Z"
+      }
+    ],
+    "uiux": [
+      {
+        "id": "req-1792356757691-sr1v",
+        "session_id": "uiux",
+        "class_title": "Design systems & component libraries",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-18T20:52:37.691Z",
+        "updated_at": "2026-10-18T21:03:28.697Z"
+      }
+    ],
+    "math": [
+      {
+        "id": "req-1792356758609-4szg",
+        "session_id": "math",
+        "class_title": "Linear Functions & Problem Solving",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-18T20:52:38.609Z",
+        "updated_at": "2026-10-18T21:03:30.710Z"
+      }
+    ]
+  }
 }

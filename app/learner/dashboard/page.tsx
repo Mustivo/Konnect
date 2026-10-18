@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, ClipboardList, GraduationCap, Video } from "lucide-react";
+import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, Check, ClipboardList, GraduationCap, Loader2, Video } from "lucide-react";
 import { apiJson, getLearnerClasses, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
 import { currentUser, getLearnerProfile } from "@/lib/api/auth";
+import { requestJoinSession } from "@/lib/api/sessions";
 
 type ActiveLiveSession = {
   sessionId: string;
@@ -120,6 +121,160 @@ export default function LearnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadNotice, setLoadNotice] = useState("");
   const [activeLiveClass, setActiveLiveClass] = useState<ActiveLiveSession | null>(null);
+
+  type JoinRequestStatus = "idle" | "waiting" | "admitted" | "denied";
+  const [requestStatuses, setRequestStatuses] = useState<Record<string, JoinRequestStatus>>({});
+  const requestStatusesRef = useRef<Record<string, JoinRequestStatus>>({});
+  const learnerIdRef = useRef<string>("learner-" + Math.random().toString(36).slice(2, 8));
+
+  useEffect(() => {
+    requestStatusesRef.current = requestStatuses;
+  }, [requestStatuses]);
+
+  // 1. One-time mount restore from localStorage
+  useEffect(() => {
+    try {
+      const restored: Record<string, JoinRequestStatus> = {};
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith("konnect-live-class-requested:")) {
+          const sid = key.replace("konnect-live-class-requested:", "").toLowerCase().trim();
+          const val = window.localStorage.getItem(key);
+          if (val === "waiting" || val === "admitted" || val === "denied") {
+            restored[sid] = val as JoinRequestStatus;
+          }
+        }
+      }
+      if (Object.keys(restored).length > 0) {
+        setRequestStatuses(restored);
+      }
+    } catch {}
+  }, []);
+
+  // 2. Admission channel listener & interval check
+  useEffect(() => {
+    function applyAdmission(admission: { sessionId: string; status: "admitted" | "denied" }) {
+      const sid = String(admission.sessionId || "").toLowerCase().trim();
+      if (!sid) return;
+
+      if (admission.status === "admitted") {
+        setRequestStatuses((prev) => ({ ...prev, [sid]: "admitted" }));
+        window.sessionStorage.setItem(`konnect-live-class-admitted:${sid}`, "true");
+        window.localStorage.setItem(`konnect-live-class-admitted:${sid}`, "true");
+        window.localStorage.removeItem(`konnect-live-class-requested:${sid}`);
+
+        setTimeout(() => {
+          router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(sid)}`);
+        }, 500);
+      } else if (admission.status === "denied") {
+        setRequestStatuses((prev) => ({ ...prev, [sid]: "denied" }));
+        window.localStorage.removeItem(`konnect-live-class-requested:${sid}`);
+      }
+    }
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel("konnect-live-class-admission");
+        channel.onmessage = (event) => {
+          if (event.data?.status === "admitted" || event.data?.status === "denied") {
+            applyAdmission(event.data);
+          }
+        };
+      } catch {}
+    }
+
+    function handleStorage(event: StorageEvent) {
+      if (!event.key || !event.newValue) return;
+      if (event.key.startsWith("konnect-live-class-admission:")) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed && (parsed.status === "admitted" || parsed.status === "denied")) {
+            applyAdmission(parsed);
+          }
+        } catch {}
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+
+    const pollTimer = setInterval(() => {
+      const currentMap = requestStatusesRef.current;
+      Object.keys(currentMap).forEach((sid) => {
+        if (currentMap[sid] === "waiting") {
+          try {
+            const raw = window.localStorage.getItem(`konnect-live-class-admission:${sid}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.status === "admitted" || parsed?.status === "denied") {
+                applyAdmission(parsed);
+              }
+            }
+          } catch {}
+        }
+      });
+    }, 1200);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(pollTimer);
+    };
+  }, [router]);
+
+  async function handleAskToJoin(rawSessionId: string, sessionTitle?: string) {
+    const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
+
+    // Allow only ONE request!
+    if (requestStatuses[cleanSessionId] === "waiting" || requestStatuses[cleanSessionId] === "admitted") {
+      return;
+    }
+
+    setRequestStatuses((prev) => ({ ...prev, [cleanSessionId]: "waiting" }));
+    window.localStorage.setItem(`konnect-live-class-requested:${cleanSessionId}`, "waiting");
+
+    const reqPayload = {
+      type: "join-request",
+      sessionId: cleanSessionId,
+      learnerId: learnerIdRef.current,
+      learnerName: data.name || "Learner",
+      classTitle: sessionTitle || "Live Class Session",
+      timestamp: Date.now(),
+    };
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const ch = new BroadcastChannel("konnect-live-class-admission");
+        ch.postMessage(reqPayload);
+        ch.close();
+      }
+
+      window.localStorage.setItem(`konnect-live-class-request:${cleanSessionId}`, JSON.stringify(reqPayload));
+      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+      let allReqs = [];
+      try {
+        allReqs = rawAll ? JSON.parse(rawAll) : [];
+      } catch {}
+      if (!Array.isArray(allReqs)) allReqs = [];
+      allReqs = allReqs.filter((r: { id?: string; learnerId?: string }) => r.id !== reqPayload.learnerId && r.learnerId !== reqPayload.learnerId);
+      allReqs.push({
+        id: reqPayload.learnerId,
+        sessionId: cleanSessionId,
+        learnerId: reqPayload.learnerId,
+        learnerName: data.name || "Learner",
+        classTitle: sessionTitle || "Live Class Session",
+        status: "waiting",
+        requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: Date.now(),
+      });
+      window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(allReqs));
+
+      await requestJoinSession(cleanSessionId, {
+        student_id: learnerIdRef.current,
+        student_name: data.name || "Learner",
+        class_title: sessionTitle || "Live Class Session",
+      }).catch(() => undefined);
+    } catch {}
+  }
 
   useEffect(() => {
     function checkActiveSession() {
@@ -286,13 +441,29 @@ export default function LearnerDashboardPage() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <Link
-                href={`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeLiveClass.sessionId)}&autoRequest=1`}
-                className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow hover:bg-[#346627] transition"
-              >
-                <Video size={13} className="text-[#86efac] animate-pulse" />
-                <span>Ask to Join Live Class →</span>
-              </Link>
+              {requestStatuses[activeLiveClass.sessionId.toLowerCase().trim()] === "waiting" ? (
+                <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2 text-[10px] font-bold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                  </span>
+                  <span>Waiting for teacher approval...</span>
+                </div>
+              ) : requestStatuses[activeLiveClass.sessionId.toLowerCase().trim()] === "admitted" ? (
+                <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow">
+                  <Check size={13} className="stroke-[3]" />
+                  <span>Approved! Entering class...</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleAskToJoin(activeLiveClass.sessionId, activeLiveClass.sessionTitle)}
+                  className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#274e1d] px-4 text-[10.5px] font-bold text-white shadow hover:bg-[#346627] transition"
+                >
+                  <Video size={13} className="text-[#86efac] animate-pulse" />
+                  <span>Ask to Join Live Class →</span>
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -314,12 +485,51 @@ export default function LearnerDashboardPage() {
             <Link href="/learner/courses" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">All classes</Link>
           </div>
           <div className="mt-3 divide-y divide-[#edf0e9] dark:divide-white/10">
-            {loading ? <p className="py-4 text-[10px] text-[#7a8575]">Loading your classes…</p> : data.classes.length ? data.classes.slice(0, 5).map((item) => (
-              <article key={item.id} className="flex items-center justify-between gap-3 py-3 first:pt-1">
-                <div className="min-w-0"><h3 className="truncate text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{item.class_title}</h3><p className="mt-1 truncate text-[8px] text-[#798374] dark:text-[#9aa592]">{item.class_subject || "Class"}{item.teacher_name ? ` · ${item.teacher_name}` : ""}</p></div>
-                <span className="shrink-0 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">Enrolled</span>
-              </article>
-            )) : <p className="py-4 text-[10px] text-[#7a8575]">No enrolled classes are linked to this account yet.</p>}
+            {loading ? <p className="py-4 text-[10px] text-[#7a8575]">Loading your classes…</p> : data.classes.length ? data.classes.slice(0, 5).map((item) => {
+              const cleanId = item.class_room.toLowerCase().trim();
+              const currentStatus = requestStatuses[cleanId];
+
+              return (
+                <article key={item.id} className="flex items-center justify-between gap-3 py-3 first:pt-1">
+                  <div className="min-w-0"><h3 className="truncate text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{item.class_title}</h3><p className="mt-1 truncate text-[8px] text-[#798374] dark:text-[#9aa592]">{item.class_subject || "Class"}{item.teacher_name ? ` · ${item.teacher_name}` : ""}</p></div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="hidden sm:inline-block rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6b8]">Enrolled</span>
+                    {currentStatus === "waiting" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[8px] font-semibold text-amber-800 dark:text-amber-200 animate-pulse">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                        Waiting for teacher approval...
+                      </span>
+                    ) : currentStatus === "admitted" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[8px] font-bold text-white shadow">
+                        <Check size={10} className="stroke-[3]" />
+                        Approved!
+                      </span>
+                    ) : currentStatus === "denied" ? (
+                      <div className="flex items-center gap-1">
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[7px] text-red-700">Declined</span>
+                        <button
+                          type="button"
+                          onClick={() => handleAskToJoin(item.class_room, item.class_title)}
+                          className="text-[7.5px] font-bold text-[#2e5924] underline"
+                        >
+                          Ask again
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleAskToJoin(item.class_room, item.class_title)}
+                        className="inline-flex items-center gap-1 rounded bg-[#274e1d] px-2.5 py-1 text-[8px] font-bold text-white shadow hover:bg-[#346627] transition-all"
+                        title="Ask to join live class directly from your portal"
+                      >
+                        <Video size={10} className="text-[#86efac]" />
+                        <span>Ask to Join</span>
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            }) : <p className="py-4 text-[10px] text-[#7a8575]">No enrolled classes are linked to this account yet.</p>}
           </div>
         </div>
 

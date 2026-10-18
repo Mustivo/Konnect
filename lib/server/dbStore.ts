@@ -13,6 +13,18 @@ import {
   type MockParticipant,
 } from "../mock/classesTable";
 
+export interface LiveJoinRequestItem {
+  id: string;
+  session_id: string;
+  class_title?: string;
+  teacher_name?: string;
+  learner_id: string | number;
+  learner_name: string;
+  status: "waiting" | "admitted" | "denied";
+  requested_at: string;
+  updated_at?: string;
+}
+
 export interface DatabaseSchema {
   version: number;
   classes: MockClassItem[];
@@ -20,6 +32,7 @@ export interface DatabaseSchema {
   sessions: MockSessionItem[];
   attendance: Record<string, MockParticipant[]>;
   chat_messages: Record<string, MockChatMessage[]>;
+  live_join_requests?: Record<string, LiveJoinRequestItem[]>;
   assessments: typeof mockAssessmentSubmissions;
   learner_profile: typeof mockLearnerProfile;
   seeded_at: string;
@@ -55,15 +68,6 @@ function getInitialDatabase(): DatabaseSchema {
           role: "teacher",
           status: "active",
           joined_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          camera_on: true,
-          mic_on: true,
-        },
-        {
-          id: "1",
-          name: "Student (You)",
-          role: "learner",
-          status: "active",
-          joined_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
           camera_on: true,
           mic_on: true,
         },
@@ -470,6 +474,105 @@ export function addDbChat(
   db.chat_messages[cleanId] = chats;
   saveDatabase(db);
   return newMsg;
+}
+
+// ----------------- Live Join Requests -----------------
+export function addDbLiveJoinRequest(
+  sessionId: string,
+  request: Partial<LiveJoinRequestItem>
+): LiveJoinRequestItem {
+  const db = loadDatabase();
+  const cleanId = String(sessionId || "general").toLowerCase();
+  if (!db.live_join_requests) db.live_join_requests = {};
+  const list = db.live_join_requests[cleanId] || [];
+
+  const reqId = request.id || `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const filtered = list.filter((r) => String(r.learner_id) !== String(request.learner_id) && r.id !== reqId);
+
+  const newReq: LiveJoinRequestItem = {
+    id: reqId,
+    session_id: cleanId,
+    class_title: request.class_title || "Live Class",
+    teacher_name: request.teacher_name || "Instructor",
+    learner_id: request.learner_id || "learner-1",
+    learner_name: request.learner_name || "Learner",
+    status: (request.status as "waiting" | "admitted" | "denied") || "waiting",
+    requested_at: request.requested_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  filtered.push(newReq);
+  db.live_join_requests[cleanId] = filtered;
+  saveDatabase(db);
+  return newReq;
+}
+
+export function getDbLiveJoinRequests(sessionId?: string): LiveJoinRequestItem[] {
+  const db = loadDatabase();
+  if (!db.live_join_requests) db.live_join_requests = {};
+  if (!sessionId || sessionId === "all") {
+    return Object.values(db.live_join_requests).flat();
+  }
+  const cleanId = String(sessionId).toLowerCase();
+  return db.live_join_requests[cleanId] || [];
+}
+
+export function updateDbLiveJoinRequestStatus(
+  sessionId: string,
+  requestIdOrLearnerId: string,
+  status: "admitted" | "denied"
+): LiveJoinRequestItem | null {
+  const db = loadDatabase();
+  if (!db.live_join_requests) db.live_join_requests = {};
+  const cleanId = String(sessionId || "general").toLowerCase();
+
+  let targetSession = cleanId;
+  let targetIndex = -1;
+
+  if (db.live_join_requests[cleanId]) {
+    targetIndex = db.live_join_requests[cleanId].findIndex(
+      (r) => r.id === requestIdOrLearnerId || String(r.learner_id) === String(requestIdOrLearnerId)
+    );
+  }
+
+  if (targetIndex === -1) {
+    for (const [sId, list] of Object.entries(db.live_join_requests)) {
+      const idx = list.findIndex(
+        (r) => r.id === requestIdOrLearnerId || String(r.learner_id) === String(requestIdOrLearnerId)
+      );
+      if (idx !== -1) {
+        targetSession = sId;
+        targetIndex = idx;
+        break;
+      }
+    }
+  }
+
+  if (targetIndex === -1 || !db.live_join_requests[targetSession]) {
+    return null;
+  }
+
+  const req = db.live_join_requests[targetSession][targetIndex];
+  req.status = status;
+  req.updated_at = new Date().toISOString();
+
+  if (status === "admitted") {
+    recordDbAttendance(targetSession, req.learner_id, req.learner_name);
+  }
+
+  saveDatabase(db);
+  return req;
+}
+
+export function clearDbLiveJoinRequests(sessionId?: string): void {
+  const db = loadDatabase();
+  if (!db.live_join_requests) return;
+  if (!sessionId || sessionId === "all") {
+    db.live_join_requests = {};
+  } else {
+    delete db.live_join_requests[String(sessionId).toLowerCase()];
+  }
+  saveDatabase(db);
 }
 
 // ----------------- Assessments & Profile -----------------

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson, currentUser } from "@/lib/api";
-import { getSession, joinSession } from "@/lib/api/sessions";
+import { getLiveJoinRequests, getSession, joinSession, requestJoinSession } from "@/lib/api/sessions";
 import {
   ArrowLeft,
   Check,
@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Video,
   VideoOff,
+  X,
 } from "lucide-react";
 
 const fallbackSession = {
@@ -58,16 +59,18 @@ function LiveClassWaitingRoomContent() {
         }
         const email = localStorage.getItem("konnect-user-email");
         if (email === "stevenmwizerwa1@gmail.com") return "Steven Mwizerwa";
+        if (email) return email.split("@")[0];
       } catch {}
     }
-    return "Steven Mwizerwa";
+    return "Learner";
   });
   const [userInitials, setUserInitials] = useState(() => {
     if (typeof window !== "undefined") {
       const email = localStorage.getItem("konnect-user-email");
       if (email === "stevenmwizerwa1@gmail.com") return "SM";
+      if (email) return email.slice(0, 2).toUpperCase();
     }
-    return "SM";
+    return "LR";
   });
   const [mounted, setMounted] = useState(false);
   const [isTeacherLive, setIsTeacherLive] = useState(false);
@@ -320,11 +323,29 @@ function LiveClassWaitingRoomContent() {
       if (cachedAdmission) applyAdmission(JSON.parse(cachedAdmission));
     } catch {}
 
-    const pollAdmission = setInterval(() => {
+    const pollAdmission = setInterval(async () => {
       try {
         const raw = localStorage.getItem(admissionStorageKey) || localStorage.getItem(`konnect-live-class-admission:${session.id}`);
         if (raw) applyAdmission(JSON.parse(raw));
       } catch {}
+
+      // Also check API status if requestId is present
+      if (requestIdRef.current && cleanSessionId) {
+        try {
+          const res = await getLiveJoinRequests(cleanSessionId);
+          const data = await apiJson<{ results?: Array<{ id: string; learner_id: string | number; status: "waiting" | "admitted" | "denied" }> }>(res);
+          const reqs = data?.results || [];
+          const myReq = reqs.find((r) => r.id === requestIdRef.current || String(r.learner_id) === String(requestIdRef.current));
+          if (myReq && (myReq.status === "admitted" || myReq.status === "denied")) {
+            applyAdmission({
+              sessionId: cleanSessionId,
+              requestId: requestIdRef.current,
+              learnerId: requestIdRef.current,
+              status: myReq.status,
+            });
+          }
+        } catch {}
+      }
     }, 1000);
 
     return () => {
@@ -391,6 +412,8 @@ function LiveClassWaitingRoomContent() {
   }
 
   async function sendJoinRequest() {
+    if (admissionState === "waiting" || admissionState === "admitted") return;
+
     const requestId = typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `${Date.now()}`;
@@ -413,15 +436,28 @@ function LiveClassWaitingRoomContent() {
     const joinPayload = {
       type: "join-request",
       sessionId: cleanSessionId,
+      classTitle: session.title || session.course || "Live Class",
+      teacherName: session.teacher || "Mutiti Stivo",
       learnerId: requestId,
       learnerName: effectiveName,
       requestId,
       requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: Date.now(),
     };
 
     try {
       window.localStorage.setItem(requestStorageKey, JSON.stringify(joinPayload));
       window.localStorage.setItem(`konnect-live-class-request:${session.id}`, JSON.stringify(joinPayload));
+
+      // Maintain shared pending live requests list for teacher dashboard across all classes
+      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+      const parsedAll = rawAll ? JSON.parse(rawAll) : [];
+      const filtered = Array.isArray(parsedAll)
+        ? parsedAll.filter((r: { requestId?: string; learnerId?: string }) => r.requestId !== requestId && r.learnerId !== requestId)
+        : [];
+      filtered.unshift(joinPayload);
+      window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+
       if (typeof BroadcastChannel !== "undefined") {
         const channel = new BroadcastChannel("konnect-live-class-admission");
         channel.postMessage(joinPayload);
@@ -429,14 +465,30 @@ function LiveClassWaitingRoomContent() {
       }
     } catch {}
 
-    // Also notify backend if supported, but do not block UI
-    void joinSession(sessionId).catch(() => undefined);
+    // Notify backend API
+    void requestJoinSession(cleanSessionId, {
+      requestId,
+      id: requestId,
+      learner_id: requestId,
+      learner_name: effectiveName,
+      class_title: session.title || session.course || "Live Class",
+      teacher_name: session.teacher || "Mutiti Stivo",
+      requested_at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    }).catch(() => undefined);
   }
 
   function cancelJoinRequest() {
     try {
       localStorage.removeItem(requestStorageKey);
       localStorage.removeItem(admissionStorageKey);
+      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsedAll = JSON.parse(rawAll);
+        if (Array.isArray(parsedAll)) {
+          const filtered = parsedAll.filter((r: { requestId?: string; learnerId?: string }) => r.requestId !== requestIdRef.current && r.learnerId !== requestIdRef.current);
+          window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+        }
+      }
     } catch {}
     requestIdRef.current = "";
     setAdmissionState("ready");
@@ -533,8 +585,17 @@ function LiveClassWaitingRoomContent() {
                 </div>
               </div>
 
-              <h1 className="mt-4 text-[22px] font-semibold leading-tight text-[#1b2318] dark:text-[#edf2ea]">
-                Waiting to be admitted
+              <div className="mt-4 flex items-center gap-2">
+                <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                  Live Lobby Request
+                </span>
+                <span className="text-[10px] font-bold text-[#55694f] dark:text-[#a5b89f]">
+                  Learner Waiting to Join Class
+                </span>
+              </div>
+
+              <h1 className="mt-3 text-[22px] font-semibold leading-tight text-[#1b2318] dark:text-[#edf2ea]">
+                Waiting for Teacher Approval
               </h1>
               <p className="mt-2 text-[12px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">
                 {session.teacher || "Your instructor"} has received your request and will admit you into the live class when ready.
@@ -555,17 +616,17 @@ function LiveClassWaitingRoomContent() {
                   </p>
                 </div>
               ) : (
-                <div className="mt-5 rounded-lg border border-[#e1e6db] bg-[#f3f5ef] p-3 dark:border-[#303b2d] dark:bg-[#20271e]">
+                <div className="mt-5 rounded-lg border border-[#e8d7b7] bg-[#fbf7ee] p-3.5 dark:border-[#423118] dark:bg-[#20180d]">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-bold text-[#232c20] dark:text-[#edf2ea]">{session.teacher}</p>
-                    <span className="flex items-center gap-1 text-[8px] font-semibold text-[#8a681c] dark:text-[#f3c36c]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#c79124] animate-ping" />
-                      Waiting for teacher studio
+                    <p className="text-[10px] font-bold text-[#232c20] dark:text-[#edf2ea]">{session.teacher || "Mutiti Stivo"}</p>
+                    <span className="flex items-center gap-1.5 text-[8.5px] font-bold text-[#9e6d1a] dark:text-[#f3c36c]">
+                      <span className="h-2 w-2 rounded-full bg-[#c79124] animate-ping" />
+                      Waiting for Teacher to Admit You
                     </span>
                   </div>
-                  <p className="mt-1 text-[9px] text-[#788172] dark:text-[#a0aa99]">{session.title}</p>
-                  <p className="mt-1.5 text-[8px] text-[#788172] dark:text-[#a0aa99]">
-                    Your request is active. When your teacher goes live, they will receive your request immediately.
+                  <p className="mt-1 text-[9.5px] font-semibold text-[#665126] dark:text-[#ebd8b7]">{session.title}</p>
+                  <p className="mt-2 text-[8.5px] leading-relaxed text-[#735824] dark:text-[#d3bc91]">
+                    Your join request has been sent to your teacher&apos;s dashboard. Your teacher is not currently in the live room yet. Please stay on this screen — when your teacher receives and accepts your request, you will automatically enter the live class!
                   </p>
                 </div>
               )}
@@ -598,6 +659,37 @@ function LiveClassWaitingRoomContent() {
                 <Video size={14} /> Enter classroom now
               </button>
             </>
+          ) : admissionState === "denied" ? (
+            <>
+              <div className="mt-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#fce9e6] text-[#b83535] dark:bg-[#341818] dark:text-[#f89c9c]">
+                <X size={22} className="stroke-[3]" />
+              </div>
+              <span className="mt-2 inline-block rounded-full bg-[#fce9e6] px-2.5 py-0.5 text-[8.5px] font-bold text-[#b83535] dark:bg-[#341818] dark:text-[#f89c9c]">
+                Request Declined
+              </span>
+              <h1 className="mt-3 text-[20px] font-bold leading-tight text-[#222d1f] dark:text-[#edf2ea]">
+                Join Request Declined
+              </h1>
+              <p className="mt-2 text-[11px] leading-relaxed text-[#737c70] dark:text-[#a0aa99]">
+                Your teacher ({session.teacher || "Instructor"}) declined your request to join this session at this time.
+              </p>
+              <div className="mt-6 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={sendJoinRequest}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#263d21] text-[10px] font-semibold text-white shadow hover:bg-[#1c3019]"
+                >
+                  <Video size={13} /> Ask to join again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/learner/live_classes")}
+                  className="h-10 w-full rounded-full border border-[#dfe5da] text-[10px] font-semibold text-[#536447] hover:bg-[#f5f7f2] dark:border-[#303b2d] dark:text-[#c2ccb9] dark:hover:bg-[#20271e]"
+                >
+                  Return to Live Classes
+                </button>
+              </div>
+            </>
           ) : (
             <>
               <h1 className="mt-5 text-[24px] font-medium leading-tight">Ready to join?</h1>
@@ -615,7 +707,6 @@ function LiveClassWaitingRoomContent() {
               <p className="mt-4 flex items-start gap-2 text-[9px] leading-relaxed text-[#788172] dark:text-[#a0aa99]"><Check size={12} className="mt-0.5 shrink-0 text-[#62834d]" />Your camera and microphone are under your control. The class host must admit you before you can enter.</p>
               {requestError && <p role="status" className="mt-3 text-[9px] text-[#a7463a]">{requestError}</p>}
               <button type="button" onClick={sendJoinRequest} className="mt-5 h-11 w-full rounded-full bg-[#263d21] text-[11px] font-semibold text-white hover:bg-[#1c3019]">Ask to join</button>
-              {admissionState === "denied" && <button type="button" onClick={sendJoinRequest} className="mt-2 h-9 w-full rounded-full border border-[#dfe5da] text-[9px] font-semibold text-[#536447] dark:border-[#303b2d] dark:text-[#c2ccb9]">Request again</button>}
             </>
           )}
         </aside>

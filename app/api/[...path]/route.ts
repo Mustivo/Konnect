@@ -19,6 +19,9 @@ import {
   mockLearnerProfile,
   registerTeacherEmail,
   startSessionRecord,
+  addDbLiveJoinRequest,
+  getDbLiveJoinRequests,
+  updateDbLiveJoinRequestStatus,
 } from "@/lib/server/dbStore";
 import {
   getTeacherProfileByEmail,
@@ -266,6 +269,38 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
     return jsonResponse(teacherData, 200);
   }
 
+  // 12b. Live class join requests: GET & POST /api/sessions/live-requests/ or /api/sessions/:id/live-requests/
+  if (
+    normalized === "sessions/live-requests" ||
+    normalized.startsWith("sessions/live-requests/") ||
+    (normalized.startsWith("sessions/") && normalized.includes("/live-requests"))
+  ) {
+    const parts = normalized.split("/");
+    let sessionId = "all";
+    if (parts[1] !== "live-requests") {
+      sessionId = parts[1];
+    }
+
+    // Check for admit / reject actions: /api/sessions/:id/live-requests/:reqId/admit or reject
+    if (normalized.endsWith("/admit") || normalized.endsWith("/reject") || normalized.endsWith("/deny")) {
+      const isAdmit = normalized.endsWith("/admit");
+      const reqId = parts[3] || requestBody?.requestId || requestBody?.id || "";
+      const updated = updateDbLiveJoinRequestStatus(sessionId, reqId, isAdmit ? "admitted" : "denied");
+      return jsonResponse(updated || { status: isAdmit ? "admitted" : "denied", session_id: sessionId, id: reqId }, 200);
+    }
+
+    if (method === "POST" && requestBody) {
+      const created = addDbLiveJoinRequest(sessionId, requestBody);
+      return jsonResponse(created, 201);
+    }
+
+    const requests = getDbLiveJoinRequests(sessionId);
+    return jsonResponse({
+      count: requests.length,
+      results: requests,
+    }, 200);
+  }
+
   // 13. Specific session join: /api/sessions/:id/join/
   if (normalized.startsWith("sessions/") && normalized.endsWith("/join")) {
     const parts = normalized.split("/");
@@ -273,6 +308,7 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
     const studentId = requestBody?.student_id || requestBody?.id || 1;
     const studentName = requestBody?.student_name || requestBody?.name || "Learner";
     const joinResult = joinSessionRecord(sessionId, studentId, studentName);
+    updateDbLiveJoinRequestStatus(sessionId, String(studentId), "admitted");
     return jsonResponse(joinResult, 200);
   }
 
