@@ -132,21 +132,62 @@ export default function LearnerDashboardPage() {
   }, [requestStatuses]);
 
   // 1. One-time mount restore from localStorage
+  // 1. One-time mount restore from localStorage
   useEffect(() => {
     try {
-      const restored: Record<string, JoinRequestStatus> = {};
+      const activeFound: Array<{ sid: string; status: JoinRequestStatus; timestamp: number }> = [];
+      const keysToRemove: string[] = [];
+
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
         if (key && key.startsWith("konnect-live-class-requested:")) {
           const sid = key.replace("konnect-live-class-requested:", "").toLowerCase().trim();
           const val = window.localStorage.getItem(key);
-          if (val === "waiting" || val === "admitted" || val === "denied") {
-            restored[sid] = val as JoinRequestStatus;
+
+          // Hardcode purge for past Saturday 17th test sessions
+          const isStale = sid === "react" || sid === "uiux" || sid === "math" || val === "denied";
+
+          if (isStale) {
+            keysToRemove.push(key);
+            keysToRemove.push(`konnect-live-class-request:${sid}`);
+            keysToRemove.push(`konnect-live-class-admission:${sid}`);
+          } else if (val === "waiting" || val === "admitted") {
+            let ts = 0;
+            try {
+              const reqRaw = window.localStorage.getItem(`konnect-live-class-request:${sid}`);
+              if (reqRaw) {
+                const parsed = JSON.parse(reqRaw);
+                ts = Number(parsed?.timestamp) || 0;
+              }
+            } catch {}
+            activeFound.push({ sid, status: val as JoinRequestStatus, timestamp: ts });
           }
         }
       }
-      if (Object.keys(restored).length > 0) {
-        setRequestStatuses(restored);
+
+      // STRICT 1-CLASS LIMIT: If multiple classes were stored waiting/admitted, keep ONLY THE SINGLE LATEST ONE!
+      if (activeFound.length > 1) {
+        activeFound.sort((a, b) => b.timestamp - a.timestamp);
+        for (let i = 1; i < activeFound.length; i++) {
+          const dropSid = activeFound[i].sid;
+          keysToRemove.push(`konnect-live-class-requested:${dropSid}`);
+          keysToRemove.push(`konnect-live-class-request:${dropSid}`);
+          keysToRemove.push(`konnect-live-class-admission:${dropSid}`);
+        }
+        activeFound.splice(1);
+      }
+
+      // Clean up all stale or excess keys from localStorage
+      keysToRemove.forEach((k) => {
+        try {
+          window.localStorage.removeItem(k);
+        } catch {}
+      });
+
+      if (activeFound.length === 1) {
+        setRequestStatuses({ [activeFound[0].sid]: activeFound[0].status });
+      } else {
+        setRequestStatuses({});
       }
     } catch {}
   }, []);

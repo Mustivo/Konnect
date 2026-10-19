@@ -31,6 +31,9 @@ type LiveLesson = {
   teacher?: string;
   date?: string;
   fullTime?: string;
+  isExpired?: boolean;
+  scheduledStart?: string;
+  scheduledEnd?: string;
 };
 
 type ApiEnrollment = { class_room: string; class_title: string; class_subject: string; teacher_name: string; status?: string };
@@ -49,11 +52,44 @@ type ActiveLiveSession = {
   lastHeartbeat?: number;
 };
 
+function checkLessonExpiration(lesson: LiveLesson): boolean {
+  if (lesson.isExpired) return true;
+
+  if (lesson.scheduledEnd) {
+    const end = new Date(lesson.scheduledEnd);
+    if (!isNaN(end.getTime()) && end.getTime() < Date.now()) {
+      return true;
+    }
+  }
+
+  if (lesson.scheduledStart) {
+    const start = new Date(lesson.scheduledStart);
+    if (!isNaN(start.getTime()) && start.getTime() + 2 * 60 * 60 * 1000 < Date.now()) {
+      return true;
+    }
+  }
+
+  if (lesson.date) {
+    const parsed = new Date(lesson.date);
+    if (!isNaN(parsed.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lessonDay = new Date(parsed);
+      lessonDay.setHours(23, 59, 59, 999);
+      if (lessonDay.getTime() < today.getTime()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 const previewLessons: LiveLesson[] = [
   {
     id: "python-web-dev",
-    day: "18",
-    weekday: "SUN",
+    day: "19",
+    weekday: "MON",
     time: "18:00–20:30",
     subject: "Python & Web Development",
     detail: "Object-oriented patterns, REST API endpoints, and live interactive coding",
@@ -61,50 +97,8 @@ const previewLessons: LiveLesson[] = [
     join: true,
     sessionTitle: "Python & Web Development — Interactive OOP & Web APIs",
     teacher: "Mutiti Stivo",
-    date: "Sun 18 October 2026",
+    date: "Mon 19 October 2026",
     fullTime: "18:00–20:30 PM",
-  },
-  {
-    id: "algebra",
-    day: "14",
-    weekday: "WED",
-    time: "09:00–09:50",
-    subject: "Algebra I",
-    detail: "Linear equations & inequalities · Solving two-step equations",
-    color: "#4e7543",
-    join: true,
-    sessionTitle: "Algebra I — Linear Equations & Inequalities",
-    teacher: "Mutiti Stivo",
-    date: "Wed 14 October 2026",
-    fullTime: "09:00–09:50 AM",
-  },
-  {
-    id: "geometry",
-    day: "15",
-    weekday: "THU",
-    time: "11:00–11:50",
-    subject: "Geometry",
-    detail: "Congruence & similarity · Triangle congruence proofs",
-    color: "#2563a8",
-    join: true,
-    sessionTitle: "Geometry — Triangle Congruence Proofs",
-    teacher: "Mutiti Stivo",
-    date: "Thu 15 October 2026",
-    fullTime: "11:00–11:50 AM",
-  },
-  {
-    id: "precalculus",
-    day: "16",
-    weekday: "FRI",
-    time: "14:00–14:50",
-    subject: "Precalculus",
-    detail: "Polynomial & rational functions · Finding polynomial zeros",
-    color: "#8957e5",
-    join: true,
-    sessionTitle: "Precalculus — Polynomial & Rational Functions",
-    teacher: "Mutiti Stivo",
-    date: "Fri 16 October 2026",
-    fullTime: "14:00–14:50 PM",
   },
   {
     id: "biology",
@@ -114,7 +108,7 @@ const previewLessons: LiveLesson[] = [
     subject: "Biology",
     detail: "Cells & ecosystems · Cellular respiration",
     color: "#18a769",
-    join: false,
+    join: true,
     sessionTitle: "Biology — Cells & Ecosystems",
     teacher: "Mutiti Stivo",
     date: "Mon 19 October 2026",
@@ -128,11 +122,53 @@ const previewLessons: LiveLesson[] = [
     subject: "Statistics",
     detail: "Probability & data analysis · Normal distribution",
     color: "#c2781b",
-    join: false,
+    join: true,
     sessionTitle: "Statistics — Probability & Data Analysis",
     teacher: "Mutiti Stivo",
     date: "Tue 20 October 2026",
     fullTime: "13:00–13:50 PM",
+  },
+  {
+    id: "algebra",
+    day: "21",
+    weekday: "WED",
+    time: "09:00–09:50",
+    subject: "Algebra I",
+    detail: "Linear equations & inequalities · Solving two-step equations",
+    color: "#4e7543",
+    join: true,
+    sessionTitle: "Algebra I — Linear Equations & Inequalities",
+    teacher: "Mutiti Stivo",
+    date: "Wed 21 October 2026",
+    fullTime: "09:00–09:50 AM",
+  },
+  {
+    id: "geometry",
+    day: "22",
+    weekday: "THU",
+    time: "11:00–11:50",
+    subject: "Geometry",
+    detail: "Congruence & similarity · Triangle congruence proofs",
+    color: "#2563a8",
+    join: true,
+    sessionTitle: "Geometry — Triangle Congruence Proofs",
+    teacher: "Mutiti Stivo",
+    date: "Thu 22 October 2026",
+    fullTime: "11:00–11:50 AM",
+  },
+  {
+    id: "precalculus",
+    day: "23",
+    weekday: "FRI",
+    time: "14:00–14:50",
+    subject: "Precalculus",
+    detail: "Polynomial & rational functions · Finding polynomial zeros",
+    color: "#8957e5",
+    join: true,
+    sessionTitle: "Precalculus — Polynomial & Rational Functions",
+    teacher: "Mutiti Stivo",
+    date: "Fri 23 October 2026",
+    fullTime: "14:00–14:50 PM",
   },
 ];
 
@@ -197,22 +233,65 @@ export default function LiveClassesPage() {
   // 1. One-time mount restore from localStorage
   useEffect(() => {
     try {
-      const restored: Record<string, JoinRequestStatus> = {};
+      const activeFound: Array<{ sid: string; status: JoinRequestStatus; timestamp: number }> = [];
+      const keysToRemove: string[] = [];
+
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
         if (key && key.startsWith("konnect-live-class-requested:")) {
           const sid = key.replace("konnect-live-class-requested:", "").toLowerCase().trim();
           const val = window.localStorage.getItem(key);
-          if (val === "waiting" || val === "admitted" || val === "denied") {
-            restored[sid] = val as JoinRequestStatus;
+
+          // Check if session is expired
+          const lessonMatch = lessons.find((l) => l.id.toLowerCase().trim() === sid);
+          const isExpired = lessonMatch
+            ? checkLessonExpiration(lessonMatch)
+            : sid === "react" || sid === "uiux" || sid === "math";
+
+          if (isExpired || val === "denied") {
+            keysToRemove.push(key);
+            keysToRemove.push(`konnect-live-class-request:${sid}`);
+            keysToRemove.push(`konnect-live-class-admission:${sid}`);
+          } else if (val === "waiting" || val === "admitted") {
+            let ts = 0;
+            try {
+              const reqRaw = window.localStorage.getItem(`konnect-live-class-request:${sid}`);
+              if (reqRaw) {
+                const parsed = JSON.parse(reqRaw);
+                ts = Number(parsed?.timestamp) || 0;
+              }
+            } catch {}
+            activeFound.push({ sid, status: val as JoinRequestStatus, timestamp: ts });
           }
         }
       }
-      if (Object.keys(restored).length > 0) {
-        setRequestStatuses(restored);
+
+      // STRICT 1-CLASS LIMIT: If multiple classes were stored waiting/admitted, keep ONLY THE SINGLE LATEST ONE!
+      if (activeFound.length > 1) {
+        activeFound.sort((a, b) => b.timestamp - a.timestamp);
+        for (let i = 1; i < activeFound.length; i++) {
+          const dropSid = activeFound[i].sid;
+          keysToRemove.push(`konnect-live-class-requested:${dropSid}`);
+          keysToRemove.push(`konnect-live-class-request:${dropSid}`);
+          keysToRemove.push(`konnect-live-class-admission:${dropSid}`);
+        }
+        activeFound.splice(1);
+      }
+
+      // Clean up all expired, denied, or excess requests from localStorage
+      keysToRemove.forEach((k) => {
+        try {
+          window.localStorage.removeItem(k);
+        } catch {}
+      });
+
+      if (activeFound.length === 1) {
+        setRequestStatuses({ [activeFound[0].sid]: activeFound[0].status });
+      } else {
+        setRequestStatuses({});
       }
     } catch {}
-  }, []);
+  }, [lessons]);
 
   // 2. Admission channel listener & interval check
   useEffect(() => {
@@ -495,7 +574,16 @@ export default function LiveClassesPage() {
           const start = session.scheduled_start ? new Date(session.scheduled_start) : null;
           const end = session.scheduled_end ? new Date(session.scheduled_end) : null;
           const validStart = start && Number.isFinite(start.getTime());
-          const joinable = !["COMPLETED", "CANCELLED", "CANCELED"].includes(session.status?.toUpperCase() ?? "");
+          const validEnd = end && Number.isFinite(end.getTime());
+
+          const isExpired = validEnd
+            ? end.getTime() < Date.now()
+            : validStart
+            ? start.getTime() + 60 * 60 * 1000 < Date.now()
+            : false;
+          const isCancelled = ["COMPLETED", "CANCELLED", "CANCELED", "EXPIRED", "ENDED"].includes(session.status?.toUpperCase() ?? "");
+          const isEnded = isExpired || isCancelled;
+
           return {
             id: String(session.id),
             day: validStart ? String(start.getDate()).padStart(2, "0") : "--",
@@ -504,7 +592,10 @@ export default function LiveClassesPage() {
             subject: enrollment.class_subject || "Live class",
             detail: session.title || enrollment.class_title,
             color: "#18a769",
-            join: joinable,
+            join: !isEnded,
+            isExpired: isEnded,
+            scheduledStart: session.scheduled_start,
+            scheduledEnd: session.scheduled_end,
             sessionTitle: session.title || enrollment.class_title,
             teacher: enrollment.teacher_name,
             date: validStart ? start.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "Schedule to be announced",
@@ -650,23 +741,23 @@ export default function LiveClassesPage() {
                 const isThisLive = Boolean(
                   activeLiveSession &&
                   (activeLiveSession.sessionId === lesson.id ||
-                   activeLiveSession.classId === lesson.id ||
-                   lesson.id === "algebra")
+                   activeLiveSession.classId === lesson.id)
                 );
 
-                const currentStatus = requestStatuses[cleanTargetId] || requestStatuses[cleanLessonId];
+                const isExpired = checkLessonExpiration(lesson);
+                const currentStatus = isExpired ? undefined : (requestStatuses[cleanTargetId] || requestStatuses[cleanLessonId]);
 
                 return (
                   <div
                     key={lesson.id}
                     className={`flex min-h-[48px] items-center gap-2 border-b border-[#dce6d4] py-1.5 last:border-0 dark:border-[#303b2d] ${
-                      isThisLive ? "rounded-lg bg-[#f0f8ed] p-2 border border-[#428031] dark:bg-[#182618] dark:border-[#3a5e30] my-1" : ""
+                      isThisLive && !isExpired ? "rounded-lg bg-[#f0f8ed] p-2 border border-[#428031] dark:bg-[#182618] dark:border-[#3a5e30] my-1" : ""
                     }`}
                   >
                     <div className="flex w-6 shrink-0 flex-col items-center leading-none">
                       <span className="text-[6px] font-semibold text-[#66705f] dark:text-[#9aa693]">{lesson.weekday}</span>
                       <span className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
-                        isThisLive ? "bg-[#25491d] text-white" : lesson.join ? "bg-[#263d21] text-white" : "text-[#263226] dark:text-[#e3e9df]"
+                        isThisLive && !isExpired ? "bg-[#25491d] text-white" : (!isExpired && lesson.join) ? "bg-[#263d21] text-white" : "text-[#778074] dark:text-[#889484] bg-[#eaefe6] dark:bg-[#20271e]"
                       }`}>
                         {lesson.day}
                       </span>
@@ -674,19 +765,28 @@ export default function LiveClassesPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[8px] font-semibold" style={{ color: lesson.color }}>{lesson.time}</p>
-                        {isThisLive && (
+                        <p className={`text-[8px] font-semibold ${isExpired ? "text-gray-400 dark:text-gray-500 line-through" : ""}`} style={{ color: isExpired ? undefined : lesson.color }}>{lesson.time}</p>
+                        {isThisLive && !isExpired && (
                           <span className="inline-flex items-center gap-1 rounded bg-[#254b1d] px-1.5 py-0.2 text-[7px] font-bold uppercase text-white shadow-xs">
                             <span className="h-1 w-1 rounded-full bg-[#86efac] animate-pulse" />
                             Live Now
                           </span>
                         )}
+                        {isExpired && (
+                          <span className="rounded bg-gray-200 px-1 py-0.2 text-[6.5px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            Ended
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[9px] font-semibold text-[#22291f] dark:text-[#ecf1e9]">{lesson.subject}</p>
+                      <p className={`text-[9px] font-semibold ${isExpired ? "text-gray-500 dark:text-gray-400" : "text-[#22291f] dark:text-[#ecf1e9]"}`}>{lesson.subject}</p>
                       <p className="truncate text-[8px] text-[#768071] dark:text-[#98a393]">{lesson.detail}</p>
                     </div>
 
-                    {isThisLive ? (
+                    {isExpired ? (
+                      <span className="shrink-0 rounded-full border border-[#dce5d8] bg-[#f4f7f2] px-2.5 py-0.5 text-[7.5px] font-semibold text-[#8a9686] dark:border-[#2d372a] dark:bg-[#1a2219] dark:text-[#7f8f7a]">
+                        Class Ended
+                      </span>
+                    ) : isThisLive ? (
                       currentStatus === "waiting" ? (
                         <div className="shrink-0 flex items-center gap-1.5">
                           <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[8px] font-semibold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
@@ -767,7 +867,11 @@ export default function LiveClassesPage() {
                           {joinedLesson === lesson.id ? "Joined ✓" : "Ask to Join →"}
                         </button>
                       )
-                    ) : null}
+                    ) : (
+                      <span className="shrink-0 rounded-full border border-[#dce5d8] bg-[#f4f7f2] px-2.5 py-0.5 text-[7.5px] font-semibold text-[#8a9686] dark:border-[#2d372a] dark:bg-[#1a2219] dark:text-[#7f8f7a]">
+                        Class Ended
+                      </span>
+                    )}
                   </div>
                 );
               })}

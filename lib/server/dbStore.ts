@@ -539,6 +539,14 @@ export function getDbLiveJoinRequests(sessionId?: string, teacherClassesOnly = f
 
   let allRequests = Object.values(db.live_join_requests).flat();
 
+  // Filter out any requests for sessions that are already completed or past their scheduled end
+  const endedSessionIds = new Set(
+    (db.sessions || [])
+      .filter((s) => s.status === "COMPLETED" || (s.scheduled_end && new Date(s.scheduled_end).getTime() < Date.now()))
+      .map((s) => String(s.id).toLowerCase())
+  );
+  allRequests = allRequests.filter((r) => !endedSessionIds.has(String(r.session_id || r.sessionId).toLowerCase()));
+
   if (sessionId && sessionId !== "all") {
     const cleanId = String(sessionId).toLowerCase();
     allRequests = db.live_join_requests[cleanId] || [];
