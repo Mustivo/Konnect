@@ -23,6 +23,9 @@ import {
   getDbLiveJoinRequests,
   updateDbLiveJoinRequestStatus,
   removeDbLiveJoinRequest,
+  heartbeatDbLiveSession,
+  endDbLiveSession,
+  getDbActiveLiveSessions,
 } from "@/lib/server/dbStore";
 import {
   getTeacherProfileByEmail,
@@ -427,6 +430,22 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
   }
 
   // 21. Live sessions list /api/live-sessions/
+  if (normalized === "live-sessions/active" && method === "GET") {
+    return jsonResponse({ results: getDbActiveLiveSessions() });
+  }
+
+  if (normalized.startsWith("live-sessions/") && normalized.endsWith("/heartbeat") && method === "POST") {
+    const sessionId = normalized.split("/")[1];
+    const presence = heartbeatDbLiveSession(sessionId, requestBody || {});
+    return presence ? jsonResponse(presence, 200) : jsonResponse({ detail: "Session ID is required." }, 400);
+  }
+
+  if (normalized.startsWith("live-sessions/") && normalized.endsWith("/end") && method === "POST") {
+    const sessionId = normalized.split("/")[1];
+    endDbLiveSession(sessionId);
+    return jsonResponse({ session_id: sessionId, status: "ENDED" }, 200);
+  }
+
   if (normalized === "live-sessions" || normalized.startsWith("live-sessions/")) {
     if (method === "POST" && requestBody) {
       const created = createClassSessionRecord(requestBody);

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import {
   initialClassesTable,
   initialEnrollmentsTable,
@@ -40,6 +41,14 @@ export interface DatabaseSchema {
   attendance: Record<string, MockParticipant[]>;
   chat_messages: Record<string, MockChatMessage[]>;
   live_join_requests?: Record<string, LiveJoinRequestItem[]>;
+  live_session_presence?: Record<string, {
+    session_id: string;
+    title: string;
+    course_title: string;
+    teacher_name: string;
+    meeting_url?: string;
+    last_heartbeat: string;
+  }>;
   assessments: typeof mockAssessmentSubmissions;
   learner_profile: typeof mockLearnerProfile;
   seeded_at: string;
@@ -652,6 +661,45 @@ export function clearDbLiveJoinRequests(sessionId?: string): void {
     delete db.live_join_requests[String(sessionId).toLowerCase()];
   }
   saveDatabase(db);
+}
+
+export function heartbeatDbLiveSession(
+  sessionId: string,
+  presence: { title?: string; course_title?: string; teacher_name?: string; meeting_url?: string }
+) {
+  const db = loadDatabase();
+  const cleanId = String(sessionId || "").trim().toLowerCase();
+  if (!cleanId) return null;
+  if (!db.live_session_presence) db.live_session_presence = {};
+
+  const current = db.live_session_presence[cleanId];
+  const next = {
+    session_id: cleanId,
+    title: presence.title || current?.title || "Live Class Session",
+    course_title: presence.course_title || current?.course_title || "Classroom Studio",
+    teacher_name: presence.teacher_name || current?.teacher_name || "Instructor",
+    meeting_url: presence.meeting_url || current?.meeting_url || `https://meet.jit.si/konnect-${randomUUID()}`,
+    last_heartbeat: new Date().toISOString(),
+  };
+  db.live_session_presence[cleanId] = next;
+  saveDatabase(db);
+  return next;
+}
+
+export function endDbLiveSession(sessionId: string): void {
+  const db = loadDatabase();
+  if (!db.live_session_presence) return;
+  delete db.live_session_presence[String(sessionId || "").trim().toLowerCase()];
+  saveDatabase(db);
+}
+
+export function getDbActiveLiveSessions() {
+  const db = loadDatabase();
+  const cutoff = Date.now() - 30_000;
+  return Object.values(db.live_session_presence || {}).filter((presence) => {
+    const heartbeat = new Date(presence.last_heartbeat).getTime();
+    return Number.isFinite(heartbeat) && heartbeat >= cutoff;
+  });
 }
 
 // ----------------- Assessments & Profile -----------------

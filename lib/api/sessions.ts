@@ -11,6 +11,11 @@ export const endSession = (id: string) => apiRequest(`/api/sessions/${encodeURIC
 export const getSessionAttendance = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/attendance/`);
 export const getSessionChat = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`);
 export const sendSessionChatMessage = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`, { method: "POST", body: JSON.stringify(payload) });
+export const getActiveLiveSessions = () => apiRequest("/api/live-sessions/active");
+export const heartbeatLiveSession = (id: string, payload: Record<string, unknown>) =>
+  apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/heartbeat`, { method: "POST", body: JSON.stringify(payload) });
+export const endLivePresence = (id: string) =>
+  apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/end`, { method: "POST", body: JSON.stringify({}) });
 
 export const getLiveJoinRequests = (sessionId = "all") =>
   apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests`);
