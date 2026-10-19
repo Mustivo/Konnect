@@ -747,6 +747,26 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-19T07:51:01.397Z",
-  "live_join_requests": {}
+  "updated_at": "2026-10-19T08:02:15.377Z",
+  "live_join_requests": {
+    "python-web-dev": [
+      {
+        "id": "req-1792396761709-w6oq",
+        "session_id": "python-web-dev",
+        "class_title": "Interactive Python OOP & Web APIs",
+        "teacher_name": "Instructor",
+        "learner_id": "learner-1",
+        "learner_name": "Learner",
+        "status": "denied",
+        "requested_at": "2026-10-19T07:59:21.709Z",
+        "updated_at": "2026-10-19T07:59:30.496Z",
+        "sessionId": "python-web-dev",
+        "classTitle": "Interactive Python OOP & Web APIs",
+        "teacherName": "Instructor",
+        "learnerId": "learner-1",
+        "learnerName": "Learner",
+        "requestedAt": "2026-10-19T07:59:21.709Z"
+      }
+    ]
+  }
 }
