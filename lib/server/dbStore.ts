@@ -23,6 +23,13 @@ export interface LiveJoinRequestItem {
   status: "waiting" | "admitted" | "denied";
   requested_at: string;
   updated_at?: string;
+  // Compatibility camelCase aliases
+  sessionId?: string;
+  classTitle?: string;
+  teacherName?: string;
+  learnerId?: string | number;
+  learnerName?: string;
+  requestedAt?: string;
 }
 
 export interface DatabaseSchema {
@@ -484,37 +491,89 @@ export function addDbLiveJoinRequest(
   const db = loadDatabase();
   const cleanId = String(sessionId || "general").toLowerCase();
   if (!db.live_join_requests) db.live_join_requests = {};
-  const list = db.live_join_requests[cleanId] || [];
 
-  const reqId = request.id || `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const filtered = list.filter((r) => String(r.learner_id) !== String(request.learner_id) && r.id !== reqId);
+  const reqAny = request as Record<string, unknown>;
+  const reqId = request.id || String(reqAny.requestId || `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+  const learnerId = String(request.learner_id || reqAny.learnerId || "learner-1");
+  const learnerName = String(request.learner_name || reqAny.learnerName || "Learner");
+  const classTitle = String(request.class_title || reqAny.classTitle || "Live Class");
+  const teacherName = String(request.teacher_name || reqAny.teacherName || "Instructor");
+
+  // Enforce learner attends/requests only 1 class at a time across all sessions
+  for (const sId of Object.keys(db.live_join_requests)) {
+    db.live_join_requests[sId] = (db.live_join_requests[sId] || []).filter(
+      (r) => String(r.learner_id) !== learnerId && String(r.learnerId) !== learnerId && r.id !== reqId
+    );
+  }
+
+  const list = db.live_join_requests[cleanId] || [];
 
   const newReq: LiveJoinRequestItem = {
     id: reqId,
     session_id: cleanId,
-    class_title: request.class_title || "Live Class",
-    teacher_name: request.teacher_name || "Instructor",
-    learner_id: request.learner_id || "learner-1",
-    learner_name: request.learner_name || "Learner",
+    class_title: classTitle,
+    teacher_name: teacherName,
+    learner_id: learnerId,
+    learner_name: learnerName,
     status: (request.status as "waiting" | "admitted" | "denied") || "waiting",
-    requested_at: request.requested_at || new Date().toISOString(),
+    requested_at: request.requested_at || String(reqAny.requestedAt || new Date().toISOString()),
     updated_at: new Date().toISOString(),
+    // Client-friendly camelCase aliases
+    sessionId: cleanId,
+    classTitle,
+    teacherName,
+    learnerId,
+    learnerName,
+    requestedAt: request.requested_at || String(reqAny.requestedAt || new Date().toISOString()),
   };
 
-  filtered.push(newReq);
-  db.live_join_requests[cleanId] = filtered;
+  list.push(newReq);
+  db.live_join_requests[cleanId] = list;
   saveDatabase(db);
   return newReq;
 }
 
-export function getDbLiveJoinRequests(sessionId?: string): LiveJoinRequestItem[] {
+export function getDbLiveJoinRequests(sessionId?: string, teacherClassesOnly = false): LiveJoinRequestItem[] {
   const db = loadDatabase();
   if (!db.live_join_requests) db.live_join_requests = {};
-  if (!sessionId || sessionId === "all") {
-    return Object.values(db.live_join_requests).flat();
+
+  let allRequests = Object.values(db.live_join_requests).flat();
+
+  if (sessionId && sessionId !== "all") {
+    const cleanId = String(sessionId).toLowerCase();
+    allRequests = db.live_join_requests[cleanId] || [];
   }
-  const cleanId = String(sessionId).toLowerCase();
-  return db.live_join_requests[cleanId] || [];
+
+  if (teacherClassesOnly) {
+    const teacherClassIds = new Set(
+      db.classes
+        .filter((c) => c.is_teacher_default || c.teacher === 1)
+        .map((c) => String(c.id).toLowerCase())
+    );
+    // Also include default slugs
+    teacherClassIds.add("python-web-dev");
+    teacherClassIds.add("algebra");
+    teacherClassIds.add("geometry");
+
+    allRequests = allRequests.filter((r) => teacherClassIds.has(String(r.session_id).toLowerCase()));
+  }
+
+  return allRequests;
+}
+
+export function removeDbLiveJoinRequest(sessionId: string, requestIdOrLearnerId: string): void {
+  const db = loadDatabase();
+  if (!db.live_join_requests) return;
+  const cleanId = String(sessionId || "general").toLowerCase();
+
+  for (const [sId, list] of Object.entries(db.live_join_requests)) {
+    if (cleanId === "all" || sId === cleanId) {
+      db.live_join_requests[sId] = list.filter(
+        (r) => r.id !== requestIdOrLearnerId && String(r.learner_id) !== String(requestIdOrLearnerId)
+      );
+    }
+  }
+  saveDatabase(db);
 }
 
 export function updateDbLiveJoinRequestStatus(

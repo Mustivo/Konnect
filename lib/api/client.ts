@@ -1,8 +1,4 @@
-const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-
-if (!configuredApiBaseUrl) {
-  throw new Error("NEXT_PUBLIC_API_URL must be set in the environment.");
-}
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || "https://konnect-k0x2.onrender.com";
 
 function normalizeApiBaseUrl(rawUrl: string) {
   const parsed = new URL(rawUrl);

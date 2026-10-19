@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, Check, ClipboardList, GraduationCap, Loader2, Video } from "lucide-react";
+import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, Check, ClipboardList, GraduationCap, Loader2, Video, X } from "lucide-react";
 import { apiJson, getLearnerClasses, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
 import { currentUser, getLearnerProfile } from "@/lib/api/auth";
-import { requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, requestJoinSession } from "@/lib/api/sessions";
 
 type ActiveLiveSession = {
   sessionId: string;
@@ -221,8 +221,64 @@ export default function LearnerDashboardPage() {
     };
   }, [router]);
 
+  // Single-class limit: find if any session is currently requested/admitted
+  const activePendingSessionId = Object.keys(requestStatuses).find(
+    (sid) => requestStatuses[sid] === "waiting" || requestStatuses[sid] === "admitted"
+  ) || null;
+
+  async function handleCancelRequest(rawSessionId: string) {
+    const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
+
+    setRequestStatuses((prev) => {
+      const next = { ...prev };
+      delete next[cleanSessionId];
+      return next;
+    });
+
+    try {
+      window.localStorage.removeItem(`konnect-live-class-requested:${cleanSessionId}`);
+      window.localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
+      window.localStorage.removeItem(`konnect-live-class-admission:${cleanSessionId}`);
+
+      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsed = JSON.parse(rawAll);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(
+            (r: { sessionId?: string; learnerId?: string; id?: string }) =>
+              r.sessionId?.toLowerCase().trim() !== cleanSessionId &&
+              r.learnerId !== learnerIdRef.current &&
+              r.id !== learnerIdRef.current
+          );
+          window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const ch = new BroadcastChannel("konnect-live-class-admission");
+        ch.postMessage({
+          type: "cancel-request",
+          sessionId: cleanSessionId,
+          learnerId: learnerIdRef.current,
+          requestId: learnerIdRef.current,
+        });
+        ch.close();
+      }
+    } catch {}
+
+    void cancelLiveJoinRequest(cleanSessionId, learnerIdRef.current).catch(() => undefined);
+  }
+
   async function handleAskToJoin(rawSessionId: string, sessionTitle?: string) {
     const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
+
+    // STRICT 1-CLASS LIMIT: If learner is already waiting for or attending another class
+    if (activePendingSessionId && activePendingSessionId !== cleanSessionId) {
+      alert("You can only request to attend one live class at a time. Please wait for teacher approval or cancel your current request.");
+      return;
+    }
 
     // Allow only ONE request!
     if (requestStatuses[cleanSessionId] === "waiting" || requestStatuses[cleanSessionId] === "admitted") {
@@ -442,17 +498,31 @@ export default function LearnerDashboardPage() {
 
             <div className="flex shrink-0 items-center gap-2">
               {requestStatuses[activeLiveClass.sessionId.toLowerCase().trim()] === "waiting" ? (
-                <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2 text-[10px] font-bold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-                  </span>
-                  <span>Waiting for teacher approval...</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-3.5 py-2 text-[10px] font-bold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                    </span>
+                    <span>Waiting for teacher approval...</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCancelRequest(activeLiveClass.sessionId)}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#cfd8cb] bg-white px-2.5 text-[9.5px] font-bold text-[#576451] hover:bg-[#edf2e8] transition"
+                  >
+                    <X size={12} />
+                    <span>Cancel</span>
+                  </button>
                 </div>
               ) : requestStatuses[activeLiveClass.sessionId.toLowerCase().trim()] === "admitted" ? (
                 <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow">
                   <Check size={13} className="stroke-[3]" />
                   <span>Approved! Entering class...</span>
+                </div>
+              ) : activePendingSessionId && activePendingSessionId !== activeLiveClass.sessionId.toLowerCase().trim() ? (
+                <div className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#dfdfdf] bg-[#f5f5f5] px-3.5 py-2 text-[10px] font-semibold text-[#707070] dark:border-[#333] dark:bg-[#1a1a1a] dark:text-[#999] opacity-80 cursor-not-allowed">
+                  <span>1 Class Limit · Waiting for other class</span>
                 </div>
               ) : (
                 <button

@@ -733,72 +733,26 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-18T21:03:30.710Z",
+  "updated_at": "2026-10-19T07:05:10.207Z",
   "live_join_requests": {
     "algebra": [
       {
-        "id": "req-1792356754414-lghc",
+        "id": "req-1792393213135-8mis",
         "session_id": "algebra",
-        "class_title": "Algebra I — Linear Equations & Inequalities",
+        "class_title": "Live Class",
         "teacher_name": "Instructor",
         "learner_id": "learner-1",
         "learner_name": "Learner",
-        "status": "denied",
-        "requested_at": "2026-10-18T20:52:34.414Z",
-        "updated_at": "2026-10-18T21:03:20.957Z"
+        "status": "waiting",
+        "requested_at": "2026-10-19T07:00:13.135Z",
+        "updated_at": "2026-10-19T07:00:13.135Z"
       }
     ],
-    "geometry": [
-      {
-        "id": "req-1792356755630-x7sx",
-        "session_id": "geometry",
-        "class_title": "Triangle Congruence Proofs",
-        "teacher_name": "Instructor",
-        "learner_id": "learner-1",
-        "learner_name": "Learner",
-        "status": "denied",
-        "requested_at": "2026-10-18T20:52:35.630Z",
-        "updated_at": "2026-10-18T21:03:23.384Z"
-      }
-    ],
-    "react": [
-      {
-        "id": "req-1792356756786-22j4",
-        "session_id": "react",
-        "class_title": "React Component Patterns & Hooks",
-        "teacher_name": "Instructor",
-        "learner_id": "learner-1",
-        "learner_name": "Learner",
-        "status": "denied",
-        "requested_at": "2026-10-18T20:52:36.786Z",
-        "updated_at": "2026-10-18T21:03:24.382Z"
-      }
-    ],
-    "uiux": [
-      {
-        "id": "req-1792356757691-sr1v",
-        "session_id": "uiux",
-        "class_title": "Design systems & component libraries",
-        "teacher_name": "Instructor",
-        "learner_id": "learner-1",
-        "learner_name": "Learner",
-        "status": "denied",
-        "requested_at": "2026-10-18T20:52:37.691Z",
-        "updated_at": "2026-10-18T21:03:28.697Z"
-      }
-    ],
-    "math": [
-      {
-        "id": "req-1792356758609-4szg",
-        "session_id": "math",
-        "class_title": "Linear Functions & Problem Solving",
-        "teacher_name": "Instructor",
-        "learner_id": "learner-1",
-        "learner_name": "Learner",
-        "status": "denied",
-        "requested_at": "2026-10-18T20:52:38.609Z",
-        "updated_at": "2026-10-18T21:03:30.710Z"
-      }
-    ]
+    "geometry": [],
+    "react": [],
+    "uiux": [],
+    "math": [],
+    "python-web-dev": [],
+    "unowned-class-xyz": []
   }
 }

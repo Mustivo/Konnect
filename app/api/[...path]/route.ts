@@ -22,6 +22,7 @@ import {
   addDbLiveJoinRequest,
   getDbLiveJoinRequests,
   updateDbLiveJoinRequestStatus,
+  removeDbLiveJoinRequest,
 } from "@/lib/server/dbStore";
 import {
   getTeacherProfileByEmail,
@@ -281,10 +282,26 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
       sessionId = parts[1];
     }
 
-    // Check for admit / reject actions: /api/sessions/:id/live-requests/:reqId/admit or reject
-    if (normalized.endsWith("/admit") || normalized.endsWith("/reject") || normalized.endsWith("/deny")) {
+    // Check for admit / reject / cancel actions: /api/sessions/:id/live-requests/:reqId/admit or reject or cancel
+    if (
+      normalized.endsWith("/admit") ||
+      normalized.endsWith("/reject") ||
+      normalized.endsWith("/deny") ||
+      normalized.endsWith("/cancel") ||
+      method === "DELETE"
+    ) {
       const isAdmit = normalized.endsWith("/admit");
-      const reqId = parts[3] || requestBody?.requestId || requestBody?.id || "";
+      const isCancel = normalized.endsWith("/cancel") || method === "DELETE";
+      let reqId = parts[3] && parts[3] !== "cancel" && parts[3] !== "admit" && parts[3] !== "reject" && parts[3] !== "deny" ? parts[3] : "";
+      if (!reqId) {
+        reqId = String(requestBody?.requestId || requestBody?.id || requestBody?.learnerId || requestBody?.learner_id || "");
+      }
+
+      if (isCancel) {
+        removeDbLiveJoinRequest(sessionId, reqId);
+        return jsonResponse({ status: "cancelled", session_id: sessionId, id: reqId }, 200);
+      }
+
       const updated = updateDbLiveJoinRequestStatus(sessionId, reqId, isAdmit ? "admitted" : "denied");
       return jsonResponse(updated || { status: isAdmit ? "admitted" : "denied", session_id: sessionId, id: reqId }, 200);
     }
@@ -294,7 +311,7 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
       return jsonResponse(created, 201);
     }
 
-    const requests = getDbLiveJoinRequests(sessionId);
+    const requests = getDbLiveJoinRequests(sessionId, sessionId === "all");
     return jsonResponse({
       count: requests.length,
       results: requests,

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiJson, getLearnerClasses } from "@/lib/api";
 import { currentUser } from "@/lib/api/auth";
-import { getClassSessions, getLiveJoinRequests, requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, getClassSessions, getLiveJoinRequests, requestJoinSession } from "@/lib/api/sessions";
 import {
   CalendarDays,
   Check,
@@ -284,8 +284,64 @@ export default function LiveClassesPage() {
     };
   }, [router]);
 
+  // Single-class limit: find if any session is currently requested/admitted
+  const activePendingSessionId = Object.keys(requestStatuses).find(
+    (sid) => requestStatuses[sid] === "waiting" || requestStatuses[sid] === "admitted"
+  ) || null;
+
+  async function handleCancelRequest(rawSessionId: string) {
+    const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
+
+    setRequestStatuses((prev) => {
+      const next = { ...prev };
+      delete next[cleanSessionId];
+      return next;
+    });
+
+    try {
+      window.localStorage.removeItem(`konnect-live-class-requested:${cleanSessionId}`);
+      window.localStorage.removeItem(`konnect-live-class-request:${cleanSessionId}`);
+      window.localStorage.removeItem(`konnect-live-class-admission:${cleanSessionId}`);
+
+      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
+      if (rawAll) {
+        const parsed = JSON.parse(rawAll);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(
+            (r: { sessionId?: string; learnerId?: string; id?: string }) =>
+              r.sessionId?.toLowerCase().trim() !== cleanSessionId &&
+              r.learnerId !== learnerIdRef.current &&
+              r.id !== learnerIdRef.current
+          );
+          window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const ch = new BroadcastChannel("konnect-live-class-admission");
+        ch.postMessage({
+          type: "cancel-request",
+          sessionId: cleanSessionId,
+          learnerId: learnerIdRef.current,
+          requestId: learnerIdRef.current,
+        });
+        ch.close();
+      }
+    } catch {}
+
+    void cancelLiveJoinRequest(cleanSessionId, learnerIdRef.current).catch(() => undefined);
+  }
+
   async function handleAskToJoin(rawSessionId: string, sessionTitle?: string) {
     const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
+
+    // STRICT 1-CLASS LIMIT: If learner is already waiting for or attending another class
+    if (activePendingSessionId && activePendingSessionId !== cleanSessionId) {
+      alert("You can only request to attend one live class at a time. Please wait for teacher approval or cancel your current request.");
+      return;
+    }
 
     // Allow only ONE request! Do not resend if already waiting or admitted
     if (requestStatuses[cleanSessionId] === "waiting" || requestStatuses[cleanSessionId] === "admitted") {
@@ -515,12 +571,22 @@ export default function LiveClassesPage() {
 
             <div className="flex shrink-0 items-center gap-2">
               {requestStatuses[activeLiveSession.sessionId.toLowerCase().trim()] === "waiting" ? (
-                <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2 text-[10px] font-bold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-                  </span>
-                  <span>Waiting for teacher approval...</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-3.5 py-2 text-[10px] font-bold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                    </span>
+                    <span>Waiting for teacher approval...</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCancelRequest(activeLiveSession.sessionId)}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#cfd8cb] bg-white px-2.5 text-[9.5px] font-bold text-[#576451] hover:bg-[#edf2e8] transition"
+                  >
+                    <X size={12} />
+                    <span>Cancel</span>
+                  </button>
                 </div>
               ) : requestStatuses[activeLiveSession.sessionId.toLowerCase().trim()] === "admitted" ? (
                 <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-md">
@@ -539,6 +605,10 @@ export default function LiveClassesPage() {
                   >
                     Ask again
                   </button>
+                </div>
+              ) : activePendingSessionId && activePendingSessionId !== activeLiveSession.sessionId.toLowerCase().trim() ? (
+                <div className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#dfdfdf] bg-[#f5f5f5] px-3.5 py-2 text-[10px] font-semibold text-[#707070] dark:border-[#333] dark:bg-[#1a1a1a] dark:text-[#999] opacity-80 cursor-not-allowed">
+                  <span>1 Class Limit · Waiting for other class</span>
                 </div>
               ) : (
                 <button
@@ -618,12 +688,22 @@ export default function LiveClassesPage() {
 
                     {isThisLive ? (
                       currentStatus === "waiting" ? (
-                        <div className="shrink-0 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[8.5px] font-semibold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                          </span>
-                          <span>Waiting for approval...</span>
+                        <div className="shrink-0 flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[8px] font-semibold text-amber-800 dark:text-amber-200 shadow-sm animate-pulse">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                            </span>
+                            <span>Waiting for approval...</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelRequest(targetId)}
+                            className="rounded border border-[#cfd8cb] bg-white px-1.5 py-0.5 text-[7px] font-bold text-[#556450] hover:bg-[#edf2e8] transition"
+                            title="Cancel request"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       ) : currentStatus === "admitted" ? (
                         <div className="shrink-0 flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-[8.5px] font-bold text-white shadow-md">
@@ -643,6 +723,10 @@ export default function LiveClassesPage() {
                             Ask again
                           </button>
                         </div>
+                      ) : activePendingSessionId && activePendingSessionId !== cleanTargetId && activePendingSessionId !== cleanLessonId ? (
+                        <span className="shrink-0 rounded bg-[#e8ece4] px-2 py-0.5 text-[7.5px] font-medium text-[#707c6c] dark:bg-[#20271e] dark:text-[#8f9d8b] cursor-not-allowed" title="You can only request 1 live class at a time">
+                          1 Class Limit
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -655,10 +739,24 @@ export default function LiveClassesPage() {
                       )
                     ) : lesson.join ? (
                       currentStatus === "waiting" ? (
-                        <div className="shrink-0 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[8px] font-semibold text-amber-800 dark:text-amber-200 animate-pulse">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
-                          <span>Waiting approval...</span>
+                        <div className="shrink-0 flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[7.5px] font-semibold text-amber-800 dark:text-amber-200 animate-pulse">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                            <span>Waiting approval...</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelRequest(lesson.id)}
+                            className="rounded border border-[#cfd8cb] bg-white px-1 py-0.5 text-[7px] font-bold text-[#556450] hover:bg-[#edf2e8] transition"
+                            title="Cancel request"
+                          >
+                            Cancel
+                          </button>
                         </div>
+                      ) : activePendingSessionId && activePendingSessionId !== cleanLessonId ? (
+                        <span className="shrink-0 rounded bg-[#e8ece4] px-2 py-0.5 text-[7.5px] font-medium text-[#707c6c] dark:bg-[#20271e] dark:text-[#8f9d8b] cursor-not-allowed" title="You can only request 1 live class at a time">
+                          1 Class Limit
+                        </span>
                       ) : (
                         <button
                           type="button"

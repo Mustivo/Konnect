@@ -80,6 +80,16 @@ export default function TeacherClassCreator() {
           start_date: startDate.toISOString().slice(0, 10),
         }));
         setCreatedClass(newClass);
+
+        try {
+          const raw = window.localStorage.getItem("konnect-teacher-created-classes");
+          const list: string[] = raw ? JSON.parse(raw) : [];
+          if (!list.includes(newClass.id)) {
+            list.push(newClass.id);
+            window.localStorage.setItem("konnect-teacher-created-classes", JSON.stringify(list));
+          }
+          window.dispatchEvent(new CustomEvent("konnect-teacher-class-created", { detail: newClass }));
+        } catch {}
       }
 
       const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";

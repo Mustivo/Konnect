@@ -33,7 +33,28 @@ export default function ClassCompletePage() {
   const [recordingOpen, setRecordingOpen] = useState(false);
 
   useEffect(() => {
-    sessionStorage.removeItem("konnect-live-class-admitted:uiux");
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (
+          key &&
+          (key.startsWith("konnect-live-class-admitted:") ||
+            key.startsWith("konnect-live-class-requested:") ||
+            key.startsWith("konnect-live-class-request:"))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+
+      for (let i = 0; i < window.sessionStorage.length; i++) {
+        const key = window.sessionStorage.key(i);
+        if (key && key.startsWith("konnect-live-class-admitted:")) {
+          window.sessionStorage.removeItem(key);
+        }
+      }
+    } catch {}
   }, []);
 
   function toggleTopic(topic: string) {

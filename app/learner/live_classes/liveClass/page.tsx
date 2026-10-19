@@ -434,7 +434,21 @@ export default function LiveClassRoomPage() {
     if (sessionId) {
       void leaveSession(sessionId, { student_id: learnerIdRef.current }).catch(() => undefined);
     }
-    sessionStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
+    const cleanSession = sessionId ? sessionId.toLowerCase().trim() : "";
+    try {
+      if (sessionId) {
+        sessionStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
+        localStorage.removeItem(`konnect-live-class-admitted:${sessionId}`);
+        localStorage.removeItem(`konnect-live-class-requested:${sessionId}`);
+        localStorage.removeItem(`konnect-live-class-request:${sessionId}`);
+      }
+      if (cleanSession) {
+        sessionStorage.removeItem(`konnect-live-class-admitted:${cleanSession}`);
+        localStorage.removeItem(`konnect-live-class-admitted:${cleanSession}`);
+        localStorage.removeItem(`konnect-live-class-requested:${cleanSession}`);
+        localStorage.removeItem(`konnect-live-class-request:${cleanSession}`);
+      }
+    } catch {}
     router.push(`/learner/live_classes/class-complete?session=${encodeURIComponent(sessionId)}`);
   }
 

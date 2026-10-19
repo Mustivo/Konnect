@@ -32,3 +32,9 @@ export const rejectLiveJoinRequest = (sessionId: string, requestId: string, payl
     method: "POST",
     body: JSON.stringify(payload || {}),
   });
+
+export const cancelLiveJoinRequest = (sessionId: string, requestId: string) =>
+  apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/live-requests/${encodeURIComponent(requestId)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });

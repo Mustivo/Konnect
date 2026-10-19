@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import TeacherClassCreator from "@/components/dashboard/TeacherClassCreator";
@@ -97,6 +97,10 @@ export default function TeacherDashboardPage() {
   const pathname = usePathname();
   const isRosterView = pathname === "/teacher/student";
   const [activeClasses, setActiveClasses] = useState(classes);
+  const activeClassesRef = useRef(activeClasses);
+  useEffect(() => {
+    activeClassesRef.current = activeClasses;
+  }, [activeClasses]);
   const [approvals, setApprovals] = useState(initialApprovals);
   const [liveRequests, setLiveRequests] = useState<LiveClassJoinRequest[]>([]);
   const [liveActionNotice, setLiveActionNotice] = useState("");
@@ -241,6 +245,31 @@ export default function TeacherDashboardPage() {
       };
     }
 
+    function isRequestForMyClass(item: LiveClassJoinRequest): boolean {
+      const sId = String(item.sessionId || "").toLowerCase().trim();
+      const cTitle = String(item.classTitle || "").toLowerCase().trim();
+
+      // Check current activeClasses of this teacher
+      const myClasses = activeClassesRef.current;
+      if (myClasses.some((c) => c.id.toLowerCase().trim() === sId)) return true;
+      if (cTitle && myClasses.some((c) => c.title && c.title.toLowerCase().trim() === cTitle)) return true;
+
+      // Check classes created by this teacher stored in localStorage
+      try {
+        const stored = window.localStorage.getItem("konnect-teacher-created-classes");
+        if (stored) {
+          const ids: string[] = JSON.parse(stored);
+          if (Array.isArray(ids) && ids.some((id) => String(id).toLowerCase().trim() === sId)) return true;
+        }
+      } catch {}
+
+      // Teacher default classes
+      const defaultSlugs = ["python-web-dev", "algebra", "geometry"];
+      if (defaultSlugs.includes(sId)) return true;
+
+      return false;
+    }
+
     function syncRequests() {
       const discoveredMap = new Map<string, LiveClassJoinRequest>();
 
@@ -251,7 +280,9 @@ export default function TeacherDashboardPage() {
           if (Array.isArray(parsed)) {
             for (const item of parsed) {
               const parsedItem = parseJoinRequestItem(item);
-              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+              if (parsedItem && isRequestForMyClass(parsedItem)) {
+                discoveredMap.set(parsedItem.id, parsedItem);
+              }
             }
           }
         }
@@ -264,7 +295,9 @@ export default function TeacherDashboardPage() {
             const val = window.localStorage.getItem(key);
             if (val) {
               const parsedItem = parseJoinRequestItem(JSON.parse(val));
-              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+              if (parsedItem && isRequestForMyClass(parsedItem)) {
+                discoveredMap.set(parsedItem.id, parsedItem);
+              }
             }
           }
         }
@@ -276,11 +309,17 @@ export default function TeacherDashboardPage() {
           if (data?.results && Array.isArray(data.results)) {
             for (const item of data.results) {
               const parsedItem = parseJoinRequestItem(item);
-              if (parsedItem) discoveredMap.set(parsedItem.id, parsedItem);
+              if (parsedItem && isRequestForMyClass(parsedItem)) {
+                discoveredMap.set(parsedItem.id, parsedItem);
+              }
             }
           }
           const list = Array.from(discoveredMap.values());
           setLiveRequests((current) => {
+            if (current.length === 0 && list.length === 0) return current;
+            const currentIds = current.map((c) => c.id).join(",");
+            const listIds = list.map((l) => l.id).join(",");
+            if (currentIds === listIds) return current;
             if (list.length > current.length) {
               playJoinChime();
             }
@@ -289,7 +328,13 @@ export default function TeacherDashboardPage() {
         })
         .catch(() => {
           const list = Array.from(discoveredMap.values());
-          setLiveRequests(list);
+          setLiveRequests((current) => {
+            if (current.length === 0 && list.length === 0) return current;
+            const currentIds = current.map((c) => c.id).join(",");
+            const listIds = list.map((l) => l.id).join(",");
+            if (currentIds === listIds) return current;
+            return list;
+          });
         });
     }
 
@@ -302,13 +347,16 @@ export default function TeacherDashboardPage() {
         admissionChannel.onmessage = (event) => {
           if (event.data?.type === "join-request") {
             const parsed = parseJoinRequestItem(event.data);
-            if (parsed) {
+            if (parsed && isRequestForMyClass(parsed)) {
               setLiveRequests((prev) => {
                 if (prev.some((r) => r.id === parsed.id || r.learnerId === parsed.learnerId)) return prev;
                 playJoinChime();
                 return [parsed, ...prev];
               });
             }
+          } else if (event.data?.type === "cancel-request") {
+            const targetId = event.data.requestId || event.data.learnerId;
+            setLiveRequests((prev) => prev.filter((r) => r.id !== targetId && r.learnerId !== targetId));
           } else if (event.data?.status === "admitted" || event.data?.status === "denied") {
             const targetId = event.data.requestId || event.data.learnerId;
             setLiveRequests((prev) => prev.filter((r) => r.id !== targetId && r.learnerId !== targetId));
@@ -320,6 +368,7 @@ export default function TeacherDashboardPage() {
     function handleStorage(e: StorageEvent) {
       if (
         e.key === "konnect-all-live-requests" ||
+        e.key === "konnect-teacher-created-classes" ||
         (e.key && e.key.startsWith("konnect-live-class-request:")) ||
         (e.key && e.key.startsWith("konnect-live-class-admission:"))
       ) {
@@ -327,11 +376,17 @@ export default function TeacherDashboardPage() {
       }
     }
 
+    function handleCreatedClass() {
+      syncRequests();
+    }
+
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("konnect-teacher-class-created", handleCreatedClass);
     const interval = setInterval(syncRequests, 2000);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("konnect-teacher-class-created", handleCreatedClass);
       clearInterval(interval);
       admissionChannel?.close();
     };
