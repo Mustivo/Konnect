@@ -547,7 +547,7 @@
       "teacher_name": "Amara Okafor",
       "scheduled_start": "2026-10-17T18:56:28.235Z",
       "scheduled_end": "2026-10-17T20:26:28.235Z",
-      "status": "LIVE",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=uiux",
       "room_id": "room-uiux-live",
       "host": 102
@@ -561,7 +561,7 @@
       "teacher_name": "Sarah Mitchell",
       "scheduled_start": "2026-10-17T19:01:28.235Z",
       "scheduled_end": "2026-10-17T20:31:28.235Z",
-      "status": "LIVE",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=react",
       "room_id": "room-react-live",
       "host": 101
@@ -575,7 +575,7 @@
       "teacher_name": "Dr. Elena Ruiz",
       "scheduled_start": "2026-10-17T20:11:28.235Z",
       "scheduled_end": "2026-10-17T21:41:28.235Z",
-      "status": "LIVE",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=math",
       "room_id": "room-math-live",
       "host": 104
@@ -603,9 +603,23 @@
       "teacher_name": "Mutiti Stivo",
       "scheduled_start": "2026-10-17T21:11:28.235Z",
       "scheduled_end": "2026-10-17T22:11:28.235Z",
-      "status": "SCHEDULED",
+      "status": "COMPLETED",
       "meeting_url": "/learner/live_classes/waiting-room?session=geometry",
       "room_id": "room-geometry-live",
+      "host": 1
+    },
+    {
+      "id": "python-web-dev",
+      "class_room": "python-web-dev",
+      "course_title": "Python & Web Development",
+      "title": "Interactive Python OOP & Web APIs",
+      "agenda": "Object-oriented patterns, REST API endpoints, and live interactive coding.",
+      "teacher_name": "Mutiti Stivo",
+      "scheduled_start": "2026-10-19T18:00:00.000Z",
+      "scheduled_end": "2026-10-19T20:30:00.000Z",
+      "status": "SCHEDULED",
+      "meeting_url": "/learner/live_classes/waiting-room?session=python-web-dev",
+      "room_id": "room-python-live",
       "host": 1
     }
   ],
@@ -733,26 +747,6 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-19T07:05:10.207Z",
-  "live_join_requests": {
-    "algebra": [
-      {
-        "id": "req-1792393213135-8mis",
-        "session_id": "algebra",
-        "class_title": "Live Class",
-        "teacher_name": "Instructor",
-        "learner_id": "learner-1",
-        "learner_name": "Learner",
-        "status": "waiting",
-        "requested_at": "2026-10-19T07:00:13.135Z",
-        "updated_at": "2026-10-19T07:00:13.135Z"
-      }
-    ],
-    "geometry": [],
-    "react": [],
-    "uiux": [],
-    "math": [],
-    "python-web-dev": [],
-    "unowned-class-xyz": []
-  }
+  "updated_at": "2026-10-19T07:08:51.451Z",
+  "live_join_requests": {}
 }
