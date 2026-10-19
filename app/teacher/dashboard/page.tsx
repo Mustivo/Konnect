@@ -17,11 +17,15 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
+  Clock,
   Copy,
   Download,
   FileText,
+  Mic,
   MoreVertical,
+  Radio,
   Search,
   ThumbsUp,
   UserCheck,
@@ -55,9 +59,9 @@ const initialApprovals = [
 ];
 
 const rosterStudents = [
+  { name: "Steven Mwizerwa", id: "KA-000", email: "stevenmwizerwa1@gmail.com", joined: "07 Sep 2026", attendance: "98.5%" },
   { name: "Oliver James", id: "KA-001", email: "oliver.james@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
   { name: "David Peter", id: "KA-002", email: "david.peter@student.school.edu", joined: "07 Sep 2026", attendance: "96.4%" },
-  { name: "Steven Mwizerwa", id: "KA-000", email: "stevenmwizerwa1@gmail.com", joined: "07 Sep 2026", attendance: "98.5%" },
   { name: "Lilly Paul", id: "KA-003", email: "lilly.paul@student.school.edu", joined: "07 Sep 2026", attendance: "100%" },
   { name: "Emma Wilson", id: "KA-004", email: "emma.wilson@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
   { name: "Noah Williams", id: "KA-005", email: "noah.williams@student.school.edu", joined: "07 Sep 2026", attendance: "92.9%" },
@@ -114,6 +118,131 @@ export default function TeacherDashboardPage() {
   const [apiStudentCount, setApiStudentCount] = useState<number | null>(null);
   const [loadNotice, setLoadNotice] = useState("");
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
+  type LiveAttendedInfo = {
+    activeSessionId: string;
+    activeSessionTitle: string;
+    courseTitle: string;
+    teacherName: string;
+    isLiveNow: boolean;
+    attendedStudents: Array<{
+      id: string;
+      name: string;
+      email: string;
+      joinedAt: string;
+      status: string;
+      attendanceRate: string;
+      durationMinutes: number;
+      micOn: boolean;
+      cameraOn: boolean;
+    }>;
+  };
+
+  const [liveAttendanceData, setLiveAttendanceData] = useState<LiveAttendedInfo>({
+    activeSessionId: "python-web-dev",
+    activeSessionTitle: "Python & Web Development",
+    courseTitle: "Classroom Studio",
+    teacherName: "Mutiti Stivo",
+    isLiveNow: false,
+    attendedStudents: [
+      {
+        id: "KA-000",
+        name: "Steven Mwizerwa",
+        email: "stevenmwizerwa1@gmail.com",
+        joinedAt: "Today, 09:55 AM",
+        status: "Present",
+        attendanceRate: "98.5%",
+        durationMinutes: 15,
+        micOn: true,
+        cameraOn: true,
+      },
+    ],
+  });
+
+  useEffect(() => {
+    function checkLiveAttendance() {
+      let isLive = false;
+      let sId = "python-web-dev";
+      let sTitle = "Python & Web Development";
+      let cTitle = "Classroom Studio";
+      let tName = "Mutiti Stivo";
+
+      try {
+        const liveRaw = localStorage.getItem("konnect-active-live-session");
+        if (liveRaw) {
+          const parsed = JSON.parse(liveRaw);
+          if (parsed && (parsed.status === "LIVE" || parsed.sessionId)) {
+            isLive = true;
+            sId = parsed.sessionId || parsed.classId || sId;
+            sTitle = parsed.sessionTitle || parsed.courseTitle || sTitle;
+            cTitle = parsed.courseTitle || cTitle;
+            tName = parsed.teacherName || tName;
+          }
+        }
+      } catch {}
+
+      const cleanSessionId = sId.toLowerCase().trim();
+      let studentName = "Steven Mwizerwa";
+      let joinedAt = "Today, 09:55 AM";
+
+      try {
+        const connRaw = localStorage.getItem(`konnect-live-class-connected:${cleanSessionId}`) || localStorage.getItem(`konnect-live-class-connected:${sId}`);
+        if (connRaw) {
+          const conn = JSON.parse(connRaw);
+          if (conn) {
+            const raw = String(conn.name || "");
+            studentName = (!raw || raw === "Learner" || raw === "learner") ? "Steven Mwizerwa" : raw;
+            if (conn.connectedAt) {
+              joinedAt = new Date(conn.connectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            }
+          }
+        }
+      } catch {}
+
+      setLiveAttendanceData({
+        activeSessionId: sId,
+        activeSessionTitle: sTitle,
+        courseTitle: cTitle,
+        teacherName: tName,
+        isLiveNow: isLive,
+        attendedStudents: [
+          {
+            id: "KA-000",
+            name: studentName,
+            email: "stevenmwizerwa1@gmail.com",
+            joinedAt,
+            status: "Present",
+            attendanceRate: "98.5%",
+            durationMinutes: 15,
+            micOn: true,
+            cameraOn: true,
+          },
+        ],
+      });
+    }
+
+    checkLiveAttendance();
+    const interval = setInterval(checkLiveAttendance, 3000);
+
+    function handleLiveStorage(e: StorageEvent) {
+      if (
+        e.key === "konnect-active-live-session" ||
+        (e.key && e.key.startsWith("konnect-live-class-connected:")) ||
+        (e.key && e.key.startsWith("konnect-live-class-admitted:"))
+      ) {
+        checkLiveAttendance();
+      }
+    }
+
+    window.addEventListener("storage", handleLiveStorage);
+    window.addEventListener("konnect-active-live-session-updated", checkLiveAttendance);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("storage", handleLiveStorage);
+      window.removeEventListener("konnect-active-live-session-updated", checkLiveAttendance);
+    };
+  }, []);
 
   function playJoinChime() {
     if (typeof window === "undefined") return;
@@ -571,6 +700,141 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* LIVE CLASS ATTENDANCE & ATTENDED STUDENTS */}
+        {!isRosterView && (
+          <section
+            aria-label="Live class attendance and attended students"
+            className="overflow-hidden rounded-2xl border-2 border-[#3d7a31] bg-gradient-to-br from-[#ffffff] via-[#f7faf5] to-[#edf6ea] p-4 shadow-sm dark:border-[#2f4f26] dark:from-[#131d13] dark:via-[#162215] dark:to-[#1a2819]"
+          >
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e1ebd9] pb-3 dark:border-[#273924]">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3.5 w-3.5 shrink-0">
+                  <span className={`absolute inline-flex h-full w-full rounded-full ${liveAttendanceData.isLiveNow ? "animate-ping bg-[#348e24] opacity-75" : "bg-[#528442] opacity-40"}`} />
+                  <span className={`relative inline-flex h-3.5 w-3.5 rounded-full ${liveAttendanceData.isLiveNow ? "bg-[#287919]" : "bg-[#457337]"}`} />
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#244f1c] px-2.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-white shadow-xs">
+                      <Radio size={10} className={liveAttendanceData.isLiveNow ? "animate-pulse text-[#86efac]" : "text-[#b2e2a4]"} />
+                      {liveAttendanceData.isLiveNow ? "Live Studio Active" : "Classroom Attendance"}
+                    </span>
+                    <h2 className="text-[13.5px] font-extrabold text-[#192f15] dark:text-[#ecf3e9]">
+                      {liveAttendanceData.activeSessionTitle} · Attended Students
+                    </h2>
+                  </div>
+                  <p className="mt-0.5 text-[9px] text-[#55694f] dark:text-[#9bb094]">
+                    Real-time presence tracking for teacher studio session · Host: {liveAttendanceData.teacherName}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/teacher/live-classes/${encodeURIComponent(liveAttendanceData.activeSessionId)}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#274e1d] px-3.5 text-[10px] font-bold text-white shadow hover:bg-[#346627] transition-all hover:scale-105 active:scale-95"
+                >
+                  <Video size={13} className="text-[#86efac]" />
+                  <span>Open Live Studio →</span>
+                </Link>
+                <Link
+                  href="/teacher/attendance"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#c5d5bf] bg-white px-3 text-[10px] font-bold text-[#344d2c] hover:bg-[#f3f7f0] transition-all dark:border-[#2c3d28] dark:bg-[#182317] dark:text-[#cde0c7]"
+                >
+                  <UserCheck size={12} className="text-[#3b732d]" />
+                  <span>Full Roster</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Attended Students Content Grid */}
+            <div className="mt-3.5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+              {/* Attended Students List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[8px] font-bold uppercase tracking-wider text-[#526a4b] dark:text-[#9eb497]">
+                  <span>Attended Student in Classroom ({liveAttendanceData.attendedStudents.length})</span>
+                  <span>Live Status</span>
+                </div>
+
+                {liveAttendanceData.attendedStudents.map((st) => (
+                  <div
+                    key={st.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#cbe1c3] bg-white p-3 shadow-xs dark:border-[#2c4028] dark:bg-[#172115]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#2d5823] text-[10px] font-extrabold text-white shadow-xs">
+                        {st.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "SM"}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="truncate text-[11px] font-bold text-[#1a2818] dark:text-[#edf3eb]">
+                            {st.name}
+                          </p>
+                          <span className="rounded bg-[#e8f5e5] px-1.5 py-0.5 text-[7px] font-bold text-[#2a681e] border border-[#bfe2b4] dark:bg-[#1a2e18] dark:text-[#aee09f]">
+                            Enrolled Student
+                          </span>
+                        </div>
+                        <p className="truncate text-[8px] text-[#63725e] dark:text-[#9eab9a]">
+                          {st.email} · {st.id} · Joined {st.joinedAt}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="hidden sm:flex items-center gap-1.5 text-[8px] font-semibold text-[#3b6631] dark:text-[#aee09f]">
+                        <span className="flex items-center gap-1 rounded bg-[#f0f8ed] px-1.5 py-0.5 border border-[#cde5c5] dark:bg-[#1c2d1a] dark:border-[#2f492b]">
+                          <Video size={10} /> Cam On
+                        </span>
+                        <span className="flex items-center gap-1 rounded bg-[#f0f8ed] px-1.5 py-0.5 border border-[#cde5c5] dark:bg-[#1c2d1a] dark:border-[#2f492b]">
+                          <Mic size={10} /> Mic On
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf6e7] px-2.5 py-1 text-[8px] font-extrabold text-[#25611c] border border-[#b8dfb0] dark:bg-[#1b2f19] dark:text-[#86efac]">
+                        <Check size={11} className="text-[#3b872b]" />
+                        {st.status} · {st.attendanceRate}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Attendance Quick Stats Box */}
+              <div className="flex flex-col justify-between rounded-xl border border-[#d2e5ca] bg-[#f5fbf2] p-3 text-[9px] dark:border-[#2b3e28] dark:bg-[#162015]">
+                <div>
+                  <p className="font-extrabold text-[10px] text-[#243c1f] dark:text-[#edf2ea]">
+                    Live Attendance Metrics
+                  </p>
+                  <p className="text-[7.5px] text-[#687b62] dark:text-[#9ea999] mt-0.5">
+                    Verified for {liveAttendanceData.activeSessionTitle}
+                  </p>
+
+                  <div className="mt-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between rounded bg-white px-2 py-1 dark:bg-[#192318]">
+                      <span className="text-[#596d53] dark:text-[#97a992]">Attendance Rate:</span>
+                      <strong className="font-extrabold text-[#255e1c] dark:text-[#aee09f]">100% Present</strong>
+                    </div>
+                    <div className="flex items-center justify-between rounded bg-white px-2 py-1 dark:bg-[#192318]">
+                      <span className="text-[#596d53] dark:text-[#97a992]">Active Learners:</span>
+                      <strong className="font-bold text-[#1a2818] dark:text-[#edf2ea]">{liveAttendanceData.attendedStudents.length} Student</strong>
+                    </div>
+                    <div className="flex items-center justify-between rounded bg-white px-2 py-1 dark:bg-[#192318]">
+                      <span className="text-[#596d53] dark:text-[#97a992]">Classroom Feed:</span>
+                      <span className="font-bold text-[#2e7421] dark:text-[#86efac]">1080p Stream Live</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-[#dae8d4] dark:border-[#273824] flex items-center justify-between text-[7.5px] text-[#63785d] dark:text-[#9cae97]">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 size={11} className="text-[#387f28]" /> Synced with Studio
+                  </span>
+                  <span className="font-semibold">{liveAttendanceData.isLiveNow ? "Broadcasting" : "Recorded"}</span>
+                </div>
+              </div>
             </div>
           </section>
         )}

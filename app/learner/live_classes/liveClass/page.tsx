@@ -71,6 +71,7 @@ export default function LiveClassRoomPage() {
   const [admissionVerified, setAdmissionVerified] = useState(false);
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenFrame, setRemoteScreenFrame] = useState<string | null>(null);
+  const [teacherCameraFrame, setTeacherCameraFrame] = useState<string | null>(null);
   const [aliveSeconds, setAliveSeconds] = useState(0);
 
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
@@ -89,11 +90,30 @@ export default function LiveClassRoomPage() {
     setSessionId(activeSessionId);
 
     const cleanSession = activeSessionId.toLowerCase().trim();
-    const isAdmitted =
+    let isAdmitted =
       sessionStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) === "true" ||
       sessionStorage.getItem(`konnect-live-class-admitted:${cleanSession}`) === "true" ||
       localStorage.getItem(`konnect-live-class-admitted:${activeSessionId}`) === "true" ||
       localStorage.getItem(`konnect-live-class-admitted:${cleanSession}`) === "true";
+
+    // If teacher is currently live in studio right now, grant admission to attend
+    if (!isAdmitted) {
+      try {
+        const liveRaw = localStorage.getItem("konnect-active-live-session");
+        if (liveRaw) {
+          const parsed = JSON.parse(liveRaw);
+          if (
+            parsed &&
+            (parsed.sessionId === activeSessionId ||
+             parsed.sessionId === cleanSession ||
+             parsed.classId === activeSessionId ||
+             parsed.classId === cleanSession)
+          ) {
+            isAdmitted = true;
+          }
+        }
+      } catch {}
+    }
 
     if (!isAdmitted) {
       router.replace(`/learner/live_classes/waiting-room?session=${encodeURIComponent(activeSessionId)}`);
@@ -102,6 +122,8 @@ export default function LiveClassRoomPage() {
 
     sessionStorage.setItem(`konnect-live-class-admitted:${activeSessionId}`, "true");
     sessionStorage.setItem(`konnect-live-class-admitted:${cleanSession}`, "true");
+    localStorage.setItem(`konnect-live-class-admitted:${activeSessionId}`, "true");
+    localStorage.setItem(`konnect-live-class-admitted:${cleanSession}`, "true");
 
     setMounted(true);
     setAdmissionVerified(true);
@@ -115,9 +137,20 @@ export default function LiveClassRoomPage() {
       }
     } catch {}
 
+    let initialName = "Steven Mwizerwa";
+    try {
+      const cached = localStorage.getItem("konnect-user");
+      if (cached) {
+        const u = JSON.parse(cached);
+        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username;
+        if (full) initialName = full;
+      }
+    } catch {}
+    setCurrentUserName(initialName);
+
     currentUser()
       .then((u) => {
-        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
+        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Steven Mwizerwa";
         setCurrentUserName(full);
       })
       .catch(() => undefined);
@@ -146,6 +179,26 @@ export default function LiveClassRoomPage() {
       student_id: learnerIdRef.current,
       student_name: currentUserName,
     }).catch(() => undefined);
+
+    // Notify teacher studio via BroadcastChannel and localStorage that learner joined
+    const cleanSession = sessionId.toLowerCase().trim();
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const ch = new BroadcastChannel("konnect-live-class-admission");
+        ch.postMessage({
+          type: "learner-joined",
+          sessionId: cleanSession,
+          learnerId: learnerIdRef.current,
+          learnerName: currentUserName,
+        });
+        ch.close();
+      }
+      localStorage.setItem(`konnect-live-class-connected:${cleanSession}`, JSON.stringify({
+        learnerId: learnerIdRef.current,
+        name: currentUserName,
+        connectedAt: new Date().toISOString(),
+      }));
+    } catch {}
 
     const ticker = setInterval(() => {
       setAliveSeconds((sec) => sec + 1);
@@ -309,6 +362,14 @@ export default function LiveClassRoomPage() {
 
           if (data.type === "live-frame" && data.frame) {
             setRemoteScreenFrame(data.frame);
+          }
+
+          if (data.type === "teacher-camera-frame" && data.frame) {
+            setTeacherCameraFrame(data.frame);
+          }
+
+          if (data.type === "teacher-camera-ended") {
+            setTeacherCameraFrame(null);
           }
 
           if (data.type === "stream-ended") {
@@ -641,23 +702,40 @@ export default function LiveClassRoomPage() {
               {/* 1-on-1 Meeting Tiles Grid: Teacher & Learner only */}
               <div className="my-auto grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* 1. Teacher Tile */}
-                <div className="relative flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#131b13] p-5 text-center shadow-lg transition">
-                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[7px] font-semibold text-emerald-300 border border-emerald-500/30">
+                <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#131b13] p-5 text-center shadow-lg transition">
+                  {teacherCameraFrame ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={teacherCameraFrame}
+                      alt={sessionDetails.teacherName}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <>
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-800 text-lg font-bold text-white shadow-inner">
+                        {teacherInitials}
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-white">
+                        {sessionDetails.teacherName}
+                      </h3>
+                      <p className="mt-0.5 text-[8px] text-emerald-300">
+                        Course Instructor · Session Host
+                      </p>
+                      <p className="mt-3 rounded-full bg-white/5 px-3 py-1 text-[7px] text-gray-300 border border-white/5">
+                        Ready to teach · Waiting to share screen
+                      </p>
+                    </>
+                  )}
+                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[7px] font-semibold text-emerald-300 border border-emerald-500/30 backdrop-blur-sm">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Online &amp; Teaching
                   </div>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-800 text-lg font-bold text-white shadow-inner">
-                    {teacherInitials}
-                  </div>
-                  <h3 className="mt-3 text-sm font-bold text-white">
-                    {sessionDetails.teacherName}
-                  </h3>
-                  <p className="mt-0.5 text-[8px] text-emerald-300">
-                    Course Instructor · Session Host
-                  </p>
-                  <p className="mt-3 rounded-full bg-white/5 px-3 py-1 text-[7px] text-gray-300 border border-white/5">
-                    Ready to teach · Waiting to share screen
-                  </p>
+                  {teacherCameraFrame && (
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[7px] text-gray-200 backdrop-blur border border-white/10">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>{sessionDetails.teacherName}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Learner Tile (You) */}

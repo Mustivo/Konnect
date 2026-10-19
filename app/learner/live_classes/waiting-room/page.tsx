@@ -92,12 +92,23 @@ function LiveClassWaitingRoomContent() {
   const requestIdRef = useRef("");
   const admissionStorageKey = `konnect-live-class-admission:${cleanSessionId}`;
   const requestStorageKey = `konnect-live-class-request:${cleanSessionId}`;
-
   useEffect(() => {
+    let initialName = "Steven Mwizerwa";
+    try {
+      const cached = localStorage.getItem("konnect-user");
+      if (cached) {
+        const u = JSON.parse(cached);
+        const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username;
+        if (full) initialName = full;
+      }
+    } catch {}
+    setUserName(initialName);
+    setUserInitials(initialName.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "SM");
+
     currentUser().then((u) => {
-      const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Learner";
+      const full = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.name || u.username || "Steven Mwizerwa";
       setUserName(full);
-      const initials = full.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "L";
+      const initials = full.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "SM";
       setUserInitials(initials);
       try {
         localStorage.setItem("konnect-user", JSON.stringify(u));
@@ -275,16 +286,23 @@ function LiveClassWaitingRoomContent() {
 
     function applyAdmission(message: AdmissionMessage & { learnerId?: string }) {
       const msgSessionId = String(message.sessionId || "").toLowerCase().trim();
-      if (msgSessionId !== cleanSessionId && msgSessionId !== String(session.id || "").toLowerCase().trim()) return;
-      if (message.requestId && message.requestId !== requestIdRef.current) return;
-      if (message.learnerId && message.learnerId !== requestIdRef.current && message.learnerId !== "all") return;
-      setAdmissionState(message.status);
-      setRequestError("");
+      if (msgSessionId && msgSessionId !== cleanSessionId && msgSessionId !== String(session.id || "").toLowerCase().trim()) return;
+
+      if (message.status === "denied") {
+        setAdmissionState("denied");
+        setRequestError("The instructor declined the join request for this session.");
+        return;
+      }
 
       if (message.status === "admitted") {
+        setAdmissionState("admitted");
+        setRequestError("");
+
         try {
           sessionStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
           sessionStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
+          localStorage.setItem(`konnect-live-class-admitted:${cleanSessionId}`, "true");
+          localStorage.setItem(`konnect-live-class-admitted:${session.id}`, "true");
           localStorage.setItem(`konnect-live-class-connected:${cleanSessionId}`, JSON.stringify({
             learnerId: requestIdRef.current || "learner",
             name: userName,
@@ -293,11 +311,11 @@ function LiveClassWaitingRoomContent() {
           localStorage.removeItem(requestStorageKey);
         } catch {}
 
-        // Automatically enter classroom after 1.2 seconds of positive confirmation
+        // Enter classroom swiftly
         const timer = setTimeout(() => {
           streamRef.current?.getTracks().forEach((track) => track.stop());
           router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(cleanSessionId)}`);
-        }, 1200);
+        }, 700);
         return () => clearTimeout(timer);
       }
     }
@@ -307,6 +325,11 @@ function LiveClassWaitingRoomContent() {
     }
 
     function handleStorage(event: StorageEvent) {
+      if (!event.key) return;
+      if (event.key === `konnect-live-class-admitted:${cleanSessionId}` && event.newValue === "true") {
+        applyAdmission({ sessionId: cleanSessionId, status: "admitted" });
+        return;
+      }
       if (event.key !== admissionStorageKey || !event.newValue) return;
       try {
         applyAdmission(JSON.parse(event.newValue) as AdmissionMessage & { learnerId?: string });
@@ -317,7 +340,17 @@ function LiveClassWaitingRoomContent() {
 
     window.addEventListener("storage", handleStorage);
 
-    // Initial check and periodic polling while waiting
+    // Initial check: if already admitted in local/sessionStorage, enter immediately
+    const isAlreadyAdmitted =
+      localStorage.getItem(`konnect-live-class-admitted:${cleanSessionId}`) === "true" ||
+      localStorage.getItem(`konnect-live-class-admitted:${session.id}`) === "true" ||
+      sessionStorage.getItem(`konnect-live-class-admitted:${cleanSessionId}`) === "true" ||
+      sessionStorage.getItem(`konnect-live-class-admitted:${session.id}`) === "true";
+
+    if (isAlreadyAdmitted) {
+      applyAdmission({ sessionId: cleanSessionId, status: "admitted" });
+    }
+
     try {
       const cachedAdmission = localStorage.getItem(admissionStorageKey);
       if (cachedAdmission) applyAdmission(JSON.parse(cachedAdmission));
@@ -325,6 +358,13 @@ function LiveClassWaitingRoomContent() {
 
     const pollAdmission = setInterval(async () => {
       try {
+        if (
+          localStorage.getItem(`konnect-live-class-admitted:${cleanSessionId}`) === "true" ||
+          localStorage.getItem(`konnect-live-class-admitted:${session.id}`) === "true"
+        ) {
+          applyAdmission({ sessionId: cleanSessionId, status: "admitted" });
+          return;
+        }
         const raw = localStorage.getItem(admissionStorageKey) || localStorage.getItem(`konnect-live-class-admission:${session.id}`);
         if (raw) applyAdmission(JSON.parse(raw));
       } catch {}

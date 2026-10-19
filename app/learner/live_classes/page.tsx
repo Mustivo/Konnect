@@ -603,7 +603,18 @@ export default function LiveClassesPage() {
           } satisfies LiveLesson;
         });
 
-        if (active) setLessons(mapped);
+        // Deduplicate mapped sessions so no duplicate session IDs can ever exist
+        const seenIds = new Set<string>();
+        const uniqueMapped: LiveLesson[] = [];
+        for (const item of mapped) {
+          const itemKey = String(item.id).toLowerCase().trim();
+          if (!seenIds.has(itemKey)) {
+            seenIds.add(itemKey);
+            uniqueMapped.push(item);
+          }
+        }
+
+        if (active) setLessons(uniqueMapped.length > 0 ? uniqueMapped : previewLessons);
       } catch {
         // Keep the preview lessons available if the API has no live-session data.
       }
@@ -680,10 +691,14 @@ export default function LiveClassesPage() {
                   </button>
                 </div>
               ) : requestStatuses[activeLiveSession.sessionId.toLowerCase().trim()] === "admitted" ? (
-                <div className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-md">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(activeLiveSession.sessionId)}`)}
+                  className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-md hover:bg-emerald-500 transition cursor-pointer active:scale-95"
+                >
                   <Check size={14} className="stroke-[3]" />
-                  <span>Approved! Entering class...</span>
-                </div>
+                  <span>Approved! Enter Classroom Now →</span>
+                </button>
               ) : requestStatuses[activeLiveSession.sessionId.toLowerCase().trim()] === "denied" ? (
                 <div className="flex items-center gap-2">
                   <span className="rounded-lg bg-red-100 border border-red-300 px-3 py-1.5 text-[9px] font-semibold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300">
@@ -734,7 +749,7 @@ export default function LiveClassesPage() {
             </div>
 
             <div>
-              {lessons.map((lesson) => {
+              {lessons.map((lesson, idx) => {
                 const targetId = activeLiveSession?.sessionId || lesson.id;
                 const cleanLessonId = lesson.id.toLowerCase().trim();
                 const cleanTargetId = targetId.toLowerCase().trim();
@@ -749,7 +764,7 @@ export default function LiveClassesPage() {
 
                 return (
                   <div
-                    key={lesson.id}
+                    key={`${lesson.id}-${lesson.scheduledStart || lesson.date || idx}`}
                     className={`flex min-h-[48px] items-center gap-2 border-b border-[#dce6d4] py-1.5 last:border-0 dark:border-[#303b2d] ${
                       isThisLive && !isExpired ? "rounded-lg bg-[#f0f8ed] p-2 border border-[#428031] dark:bg-[#182618] dark:border-[#3a5e30] my-1" : ""
                     }`}
@@ -806,10 +821,14 @@ export default function LiveClassesPage() {
                           </button>
                         </div>
                       ) : currentStatus === "admitted" ? (
-                        <div className="shrink-0 flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-[8.5px] font-bold text-white shadow-md">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(cleanLessonId)}`)}
+                          className="shrink-0 flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-[8.5px] font-bold text-white shadow-md hover:bg-emerald-500 transition cursor-pointer active:scale-95"
+                        >
                           <Check size={11} className="stroke-[3]" />
-                          <span>Approved!</span>
-                        </div>
+                          <span>Approved! Join Class →</span>
+                        </button>
                       ) : currentStatus === "denied" ? (
                         <div className="shrink-0 flex items-center gap-1.5">
                           <span className="rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[7.5px] font-semibold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300">

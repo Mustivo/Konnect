@@ -525,20 +525,6 @@
   ],
   "sessions": [
     {
-      "id": "python-web-dev",
-      "class_room": "python-web-dev",
-      "course_title": "Python & Web Development",
-      "title": "Interactive Python OOP & Web APIs",
-      "agenda": "Object-oriented patterns, REST API endpoints, and live interactive coding.",
-      "teacher_name": "Mutiti Stivo",
-      "scheduled_start": "2026-10-18T18:00:00.000Z",
-      "scheduled_end": "2026-10-18T20:30:00.000Z",
-      "status": "COMPLETED",
-      "meeting_url": "/learner/live_classes/waiting-room?session=python-web-dev",
-      "room_id": "room-python-live",
-      "host": 1
-    },
-    {
       "id": "uiux",
       "class_room": "uiux",
       "course_title": "UI/UX Design — From Wireframes to Prototypes",
@@ -747,7 +733,7 @@
     "average_grade": 89
   },
   "seeded_at": "2026-10-17T19:11:28.284Z",
-  "updated_at": "2026-10-19T08:02:15.377Z",
+  "updated_at": "2026-10-19T08:19:26.884Z",
   "live_join_requests": {
     "python-web-dev": [
       {

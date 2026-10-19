@@ -315,29 +315,33 @@ export function endDbSession(sessionId: string): MockSessionItem {
   return session;
 }
 
-// ----------------- Attendance Operations -----------------
 export function getDbAttendance(sessionId: string): MockParticipant[] {
   const db = loadDatabase();
   const cleanId = String(sessionId || "").toLowerCase();
-  return (
-    db.attendance[cleanId] || [
-      {
-        id: "teacher-host",
-        name: getDbSessionById(sessionId).teacher_name || "Mutiti Stivo",
-        role: "teacher",
-        status: "active",
-        joined_at: new Date().toISOString(),
-        camera_on: true,
-        mic_on: true,
-      },
-    ]
-  );
+  const list = db.attendance[cleanId];
+  if (list && list.length > 0) {
+    return list.map((p) => ({
+      ...p,
+      name: (!p.name || p.name === "Learner" || p.name === "learner") ? "Steven Mwizerwa" : p.name,
+    }));
+  }
+  return [
+    {
+      id: "teacher-host",
+      name: getDbSessionById(sessionId).teacher_name || "Mutiti Stivo",
+      role: "teacher",
+      status: "active",
+      joined_at: new Date().toISOString(),
+      camera_on: true,
+      mic_on: true,
+    },
+  ];
 }
 
 export function recordDbAttendance(
   sessionId: string,
   studentId: string | number,
-  studentName = "Learner"
+  studentName = "Steven Mwizerwa"
 ): { status: string; detail: string; session: MockSessionItem } {
   const db = loadDatabase();
   const cleanId = String(sessionId || "").toLowerCase();
@@ -346,18 +350,26 @@ export function recordDbAttendance(
 
   enrollStudentDb(session.class_room, Number(studentId) || 1);
 
+  const cleanStudentName = (!studentName || studentName === "Learner" || studentName === "learner")
+    ? "Steven Mwizerwa"
+    : studentName;
+
   const participants = db.attendance[cleanId] || [];
   const existing = participants.find((p) => p.id === String(studentId));
   if (!existing) {
     participants.push({
       id: String(studentId),
-      name: studentName,
+      name: cleanStudentName,
       role: "learner",
       status: "active",
       joined_at: new Date().toISOString(),
       camera_on: true,
       mic_on: true,
     });
+    db.attendance[cleanId] = participants;
+    saveDatabase(db);
+  } else if (cleanStudentName && (!existing.name || existing.name === "Learner" || existing.name === "learner")) {
+    existing.name = cleanStudentName;
     db.attendance[cleanId] = participants;
     saveDatabase(db);
   }
