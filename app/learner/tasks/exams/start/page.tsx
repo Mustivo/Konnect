@@ -22,6 +22,8 @@ import {
   X,
 } from "lucide-react";
 import { getExamMediaStream, releaseExamMediaStream } from "@/app/learner/tasks/exams/examMedia";
+import { useVisionProctor } from "@/lib/vision/useVisionProctor";
+import ExamProctorHUD from "@/components/vision/ExamProctorHUD";
 
 type ExamQuestion = {
   topic: string;
@@ -79,6 +81,13 @@ export default function ExamStartPage() {
   const micAnalyserRef = useRef<AnalyserNode | null>(null);
   const micFrameRef = useRef<number | null>(null);
   const [micLevel, setMicLevel] = useState(0);
+
+  const proctor = useVisionProctor({
+    videoRef: cameraRef,
+    isActive: Boolean(stream) && !examSubmitted,
+    mode: "exam",
+    intervalMs: 1800,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -178,6 +187,11 @@ export default function ExamStartPage() {
 
   function finishExam() {
     setExamSubmitted(true);
+    try {
+      sessionStorage.setItem("exam_proctor_log", JSON.stringify(proctor.incidentLog));
+    } catch {
+      // Ignore storage errors
+    }
     releaseExamMediaStream();
     setStream(null);
     setSubmitDialogOpen(false);
@@ -220,14 +234,17 @@ export default function ExamStartPage() {
       </header>
 
       <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-[#e0e5dc] px-4 sm:px-7">
-        {isFullscreen ? (
-          <span className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c]"><Maximize size={11} /> Full-screen exam <span className="font-normal normal-case text-[#7d8579]">· In progress</span></span>
-        ) : (
-          <div className="flex min-w-0 items-center gap-2">
-            <button type="button" onClick={enterFullscreen} className="inline-flex shrink-0 items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c] hover:text-[#263d21]"><Maximize size={11} /> Enter fullscreen</button>
-            {fullscreenError && <span role="status" className="truncate text-[8px] text-[#907a53]">{fullscreenError}</span>}
-          </div>
-        )}
+        <div className="flex min-w-0 items-center gap-3">
+          {isFullscreen ? (
+            <span className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c]"><Maximize size={11} /> Full-screen exam <span className="font-normal normal-case text-[#7d8579]">· In progress</span></span>
+          ) : (
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" onClick={enterFullscreen} className="inline-flex shrink-0 items-center gap-1.5 text-[9px] font-semibold uppercase text-[#4b5f3c] hover:text-[#263d21]"><Maximize size={11} /> Enter fullscreen</button>
+              {fullscreenError && <span role="status" className="truncate text-[8px] text-[#907a53]">{fullscreenError}</span>}
+            </div>
+          )}
+          <ExamProctorHUD proctor={proctor} tabSwitchDetected={tabSwitchDetected} />
+        </div>
         <div className="flex min-w-0 items-center justify-end gap-3">
           {tabSwitchDetected && <span role="status" className="hidden text-[8px] font-semibold text-[#907a53] sm:inline">Exam tab switch detected</span>}
           <span className="hidden text-[9px] text-[#788172] sm:inline">6 October 2026 · 16:00–17:30 BST · 90 minutes · Teacher: Amara Okafor</span>
@@ -313,6 +330,21 @@ export default function ExamStartPage() {
           <div className="relative aspect-video bg-[#283328]">
             {cameraActive ? <video ref={cameraRef} autoPlay muted playsInline className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[10px] text-[#d7e0d0]">Camera unavailable</div>}
             <span className="absolute bottom-2 left-2 rounded bg-black/55 px-1.5 py-1 text-[8px]">Gabriella Igabe</span>
+            {proctor.violations.cellPhone && (
+              <span className="absolute top-2 left-2 flex items-center gap-1 rounded bg-amber-600/95 px-1.5 py-0.5 text-[7px] font-bold text-white shadow animate-pulse">
+                📱 Phone
+              </span>
+            )}
+            {proctor.violations.multiplePeople && (
+              <span className="absolute top-2 left-2 flex items-center gap-1 rounded bg-red-600/95 px-1.5 py-0.5 text-[7px] font-bold text-white shadow animate-pulse">
+                👥 Multiple Faces
+              </span>
+            )}
+            {proctor.violations.personAbsent && (
+              <span className="absolute top-2 left-2 flex items-center gap-1 rounded bg-red-600/95 px-1.5 py-0.5 text-[7px] font-bold text-white shadow animate-pulse">
+                ⚠️ Face Missing
+              </span>
+            )}
             <button type="button" aria-label="Minimize camera preview" onClick={() => setCameraMinimized(true)} className="absolute right-2 top-2 rounded bg-black/55 p-1 text-white"><VideoOff size={11} /></button>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-1.5 text-[8px]">

@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiJson } from "@/lib/api";
+import { getExams, LiveExamItem } from "@/lib/api/exams";
 import {
   CalendarDays,
   Camera,
@@ -23,7 +25,7 @@ type Exam = {
   duration: string;
 };
 
-const upcomingExams: Exam[] = [
+const fallbackExams: Exam[] = [
   {
     id: "maths",
     subject: "MATHEMATICS",
@@ -53,8 +55,6 @@ const upcomingExams: Exam[] = [
   },
 ];
 
-const subjects = ["All classes", "UI/UX Design", "Mathematics", "React.js", "Django"];
-
 const preparationSteps = [
   { icon: ShieldCheck, title: "Review the rules", detail: "Understand the exam and monitoring requirements." },
   { icon: Camera, title: "Check your devices", detail: "Allow camera and microphone access, then test both." },
@@ -63,16 +63,51 @@ const preparationSteps = [
 
 export default function ExamsPage() {
   const router = useRouter();
+  const [exams, setExams] = useState<Exam[]>(fallbackExams);
   const [activeTab, setActiveTab] = useState("Schedule");
   const [subjectFilter, setSubjectFilter] = useState("All classes");
+
+  // Load real exams from the database table /api/exams/
+  useEffect(() => {
+    getExams()
+      .then(async (res) => {
+        const data = await apiJson<LiveExamItem[]>(res);
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: Exam[] = data.map((item) => {
+            const dateObj = new Date(item.exam_date);
+            return {
+              id: item.id,
+              subject: (item.course_title || "General").split("—")[0].trim().toUpperCase(),
+              instructor: item.teacher_name || "Instructor",
+              title: item.title,
+              date: dateObj.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+              time: dateObj.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " BST",
+              duration: `${item.duration_minutes || 90} min`,
+            };
+          });
+          setExams(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Using fallback exams due to error loading from database:", err);
+      });
+  }, []);
+
+  const subjects = useMemo(() => {
+    const list = new Set(exams.map((e) => e.subject));
+    return ["All classes", ...Array.from(list)];
+  }, [exams]);
+
   const filteredExams = useMemo(
-    () => upcomingExams.filter((exam) => subjectFilter === "All classes" || exam.subject === subjectFilter.toUpperCase()),
-    [subjectFilter],
+    () => exams.filter((exam) => subjectFilter === "All classes" || exam.subject === subjectFilter.toUpperCase()),
+    [exams, subjectFilter],
   );
 
-  const tabs = ["Schedule", "Available now · 1", "Upcoming · 3"];
-  const showAvailableExam = activeTab !== "Upcoming · 3" && (subjectFilter === "All classes" || subjectFilter === "UI/UX Design");
-  const showUpcomingExams = activeTab !== "Available now · 1";
+  const availableCount = exams.length > 0 ? 1 : 0;
+  const upcomingCount = Math.max(0, exams.length - 1);
+  const tabs = ["Schedule", `Available now · ${availableCount}`, `Upcoming · ${upcomingCount}`];
+  const showAvailableExam = activeTab !== `Upcoming · ${upcomingCount}` && (subjectFilter === "All classes" || subjectFilter.toUpperCase().includes("UI/UX"));
+  const showUpcomingExams = activeTab !== `Available now · ${availableCount}`;
 
   return (
     <div className="space-y-4 pb-8 pt-1">

@@ -7,6 +7,9 @@ import { apiJson } from "@/lib/api";
 import { getSession, joinSession, leaveSession, heartbeatSession } from "@/lib/api/sessions";
 import { currentUser } from "@/lib/api/auth";
 import { useSessionChat } from "@/lib/useSessionChat";
+import { useVisionProctor } from "@/lib/vision/useVisionProctor";
+import LearnerEngagementBadge from "@/components/vision/LearnerEngagementBadge";
+import { useAttendance } from "@/lib/hooks/useAttendance";
 import {
   Bell,
   Camera,
@@ -41,6 +44,7 @@ export default function LiveClassRoomPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
   const { messages, chatError, sending, send } = useSessionChat(sessionId);
+  useAttendance(sessionId);
 
   const [sessionDetails, setSessionDetails] = useState<{
     title: string;
@@ -82,6 +86,13 @@ export default function LiveClassRoomPage() {
   const mediaStreamsRef = useRef<{ camera: MediaStream | null; microphone: MediaStream | null }>({
     camera: null,
     microphone: null,
+  });
+
+  const learnerVision = useVisionProctor({
+    videoRef: cameraPreviewRef,
+    isActive: cameraOn,
+    mode: "classroom",
+    intervalMs: 2400,
   });
 
   // Verify admission & load session + user info
@@ -740,9 +751,18 @@ export default function LiveClassRoomPage() {
 
                 {/* 2. Learner Tile (You) */}
                 <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#151c15] p-5 text-center shadow-lg transition">
-                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[7px] font-semibold text-gray-300">
-                    {cameraOn ? "Camera Active" : "Camera Off"}
+                  <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5">
+                    <LearnerEngagementBadge proctor={learnerVision} cameraOn={cameraOn} />
+                    <div className="rounded-full bg-white/10 px-2 py-0.5 text-[7px] font-semibold text-gray-300">
+                      {cameraOn ? "Camera Active" : "Camera Off"}
+                    </div>
                   </div>
+
+                  {cameraOn && learnerVision.violations.cellPhone && (
+                    <div className="absolute top-10 right-3 z-10 flex items-center gap-1.5 rounded-lg bg-amber-400/95 px-2.5 py-1 text-[8px] font-bold text-amber-950 shadow-md backdrop-blur animate-bounce">
+                      <span>💡 Phone in view — stay focused on class</span>
+                    </div>
+                  )}
 
                   {cameraOn ? (
                     <video
