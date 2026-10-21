@@ -12,7 +12,8 @@ import {
   getSession,
   getSessionAttendance,
   rejectLiveJoinRequest,
-  startSession,
+  sendLiveSignal,
+  getLiveSignals,
 } from "@/lib/api/sessions";
 import type { MockParticipant } from "@/lib/mock/classesTable";
 import {
@@ -41,11 +42,16 @@ import {
 
 type SessionDetails = {
   id: string;
-  title: string;
+  title?: string;
   course_title?: string;
   teacher_name?: string;
   agenda?: string;
   meeting_url?: string;
+  join_link?: string;
+  starts_at?: string;
+  ends_at?: string;
+  video_provider_configured?: boolean;
+  join_window_open?: boolean;
   status?: string;
 };
 
@@ -135,19 +141,18 @@ export default function TeacherLiveClassPage() {
         if (!active) return;
         setSession({
           id: sessionId,
-          title: details.title || "Live Course Session",
+          title: details.course_title || details.title || "Live Course Session",
           course_title: details.course_title || "Virtual Classroom",
           teacher_name: details.teacher_name || "Instructor",
           agenda: details.agenda,
-          meeting_url: details.meeting_url || learnerInviteLink,
-          status: details.status || "LIVE",
+          meeting_url: learnerInviteLink,
+          status: details.join_window_open ? "LIVE" : "SCHEDULED",
         });
       } catch {
         // Fallback session state
       }
     }
     void load();
-    void startSession(sessionId).catch(() => undefined);
     return () => {
       active = false;
     };
@@ -603,8 +608,11 @@ export default function TeacherLiveClassPage() {
     streamChannelRef.current = streamChannel;
     framesChannelRef.current = framesChannel;
 
-    streamChannel.onmessage = async (event) => {
-      const data = event.data;
+    const postSignal = (learnerId: string, payload: Record<string, unknown>) => {
+      void sendLiveSignal(sessionId, `teacher:${sessionId}`, payload, learnerId).catch(() => undefined);
+      streamChannel.postMessage(payload);
+    };
+    const handleSignal = async (data: any) => {
       if (!data || data.sessionId !== sessionId) return;
 
       if (data.type === "request-stream" && screenStreamRef.current) {
@@ -625,7 +633,7 @@ export default function TeacherLiveClassPage() {
 
           pc.onicecandidate = (e) => {
             if (e.candidate) {
-              streamChannel.postMessage({
+              postSignal(learnerId, {
                 type: "ice-candidate",
                 sessionId,
                 learnerId,
@@ -637,7 +645,7 @@ export default function TeacherLiveClassPage() {
 
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          streamChannel.postMessage({
+          postSignal(learnerId, {
             type: "webrtc-offer",
             sessionId,
             learnerId,
@@ -672,10 +680,34 @@ export default function TeacherLiveClassPage() {
         }
       }
     };
+    streamChannel.onmessage = (event) => { void handleSignal(event.data); };
+    const received = new Set<string>();
+    let polling = false;
+    const pollSignals = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const response = await getLiveSignals(sessionId, `teacher:${sessionId}`);
+        const data = await apiJson<{ results?: Array<{ id: string; payload: Record<string, unknown> }> }>(response);
+        for (const message of data.results || []) {
+          if (received.has(message.id)) continue;
+          received.add(message.id);
+          await handleSignal(message.payload);
+        }
+        if (received.size > 500) received.clear();
+      } catch {
+        // Local BroadcastChannel still supports same-browser previews when the signaling API is offline.
+      } finally {
+        polling = false;
+      }
+    };
+    void pollSignals();
+    const signalTimer = setInterval(() => { void pollSignals(); }, 800);
 
     return () => {
       streamChannel.close();
       framesChannel.close();
+      clearInterval(signalTimer);
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
       if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
@@ -698,6 +730,9 @@ export default function TeacherLiveClassPage() {
   }, [sharingScreen]);
 
   function notifyScreenShare(isSharing: boolean) {
+    void sendLiveSignal(sessionId, `teacher:${sessionId}`, {
+      type: "screen-sharing", sessionId, sharing: isSharing, teacherName: session.teacher_name,
+    }).catch(() => undefined);
     try {
       if (typeof BroadcastChannel !== "undefined") {
         const channel = new BroadcastChannel("konnect-live-screen-share");
@@ -823,8 +858,15 @@ export default function TeacherLiveClassPage() {
     }
   }
 
-  function admitLearner(learnerId: string, learnerName?: string) {
+  async function admitLearner(learnerId: string, learnerName?: string) {
     const cleanSessionId = String(sessionId || "general").toLowerCase().trim();
+    try {
+      const response = await admitLiveJoinRequest(cleanSessionId, learnerId, { learner_id: learnerId });
+      await apiJson(response);
+    } catch {
+      setCopyNotice("Could not save admission. Check the server connection and retry.");
+      return;
+    }
     const channel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("konnect-live-class-admission")
       : null;

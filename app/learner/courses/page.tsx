@@ -3,29 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiJson, browseClasses, enrollInClass, getLearnerClasses } from "@/lib/api";
+import { apiJson, currentUser, enrollInCourse, getCourses, getEnrollments } from "@/lib/api";
 import { BookOpen, Check, ChevronDown, Video } from "lucide-react";
 
-type ApiClass = {
+type ApiCourse = {
   id: string;
   title: string;
   description?: string;
   subject?: string;
   teacher_name?: string;
   banner_image?: string | null;
+  status?: string;
+  visibility?: string;
 };
 
 type ApiEnrollment = {
   id: string;
-  class_room: string;
-  class_title: string;
-  class_subject: string;
-  teacher_name: string;
-  status: "PENDING" | "ENROLLED" | "DROPPED" | "COMPLETED" | string;
+  course: string | { id?: string };
+  course_title?: string;
+  status: string;
 };
 
 type ApiCollection<T> = T[] | { results?: T[]; next?: string | null };
-type Course = ApiClass & { enrollmentStatus: ApiEnrollment["status"] | null };
+type Course = ApiCourse & { enrollmentStatus: string | null };
 
 const statusLabel: Record<string, string> = {
   PENDING: "Pending approval",
@@ -33,6 +33,19 @@ const statusLabel: Record<string, string> = {
   COMPLETED: "Completed",
   DROPPED: "Available",
 };
+
+function courseIdFromEnrollment(enrollment: ApiEnrollment) {
+  return typeof enrollment.course === "string" ? enrollment.course : String(enrollment.course?.id || "");
+}
+
+function enrollmentStatusLabel(status?: string) {
+  switch ((status || "").toLowerCase()) {
+    case "active": return "ENROLLED";
+    case "completed": return "COMPLETED";
+    case "cancelled": return "DROPPED";
+    default: return status ? status.toUpperCase() : "PENDING";
+  }
+}
 
 async function getAllPages<T>(requestPage: (query?: string) => Promise<Response>) {
   const records: T[] = [];
@@ -108,20 +121,19 @@ export default function LearnerCoursesPage() {
       }
       try {
         const [catalog, enrollments] = await Promise.all([
-          getAllPages<ApiClass>(browseClasses),
-          getAllPages<ApiEnrollment>(getLearnerClasses),
+          getAllPages<ApiCourse>(getCourses),
+          getAllPages<ApiEnrollment>(getEnrollments),
         ]);
         if (!active) return;
 
-        const enrollmentsByClass = new Map(enrollments.map((enrollment) => [enrollment.class_room, enrollment]));
+        const enrollmentsByClass = new Map(enrollments.map((enrollment) => [courseIdFromEnrollment(enrollment), enrollment]));
         const classesById = new Map(catalog.map((course) => [course.id, course]));
         for (const enrollment of enrollments) {
-          if (!classesById.has(enrollment.class_room) && enrollment.status !== "DROPPED") {
-            classesById.set(enrollment.class_room, {
-              id: enrollment.class_room,
-              title: enrollment.class_title,
-              subject: enrollment.class_subject,
-              teacher_name: enrollment.teacher_name,
+          const id = courseIdFromEnrollment(enrollment);
+          if (id && !classesById.has(id) && enrollmentStatusLabel(enrollment.status) !== "DROPPED") {
+            classesById.set(id, {
+              id,
+              title: enrollment.course_title || "Course",
               banner_image: null,
             });
           }
@@ -129,7 +141,7 @@ export default function LearnerCoursesPage() {
 
         setCourses([...classesById.values()].map((course) => ({
           ...course,
-          enrollmentStatus: enrollmentsByClass.get(course.id)?.status ?? null,
+          enrollmentStatus: enrollmentStatusLabel(enrollmentsByClass.get(course.id)?.status) || null,
         })));
       } catch (error) {
         if (active) setNotice(error instanceof Error ? error.message : "Courses could not be loaded. Please try again.");
@@ -156,17 +168,19 @@ export default function LearnerCoursesPage() {
     setEnrollingId(courseId);
     setNotice("");
     try {
-      await apiJson(await enrollInClass(courseId));
-      const enrollments = await getAllPages<ApiEnrollment>(getLearnerClasses);
-      const savedEnrollment = enrollments.find((enrollment) => enrollment.class_room === courseId);
+      const user = await currentUser();
+      await apiJson(await enrollInCourse(courseId, String(user.id)));
+      const enrollments = await getAllPages<ApiEnrollment>(getEnrollments);
+      const savedEnrollment = enrollments.find((enrollment) => courseIdFromEnrollment(enrollment) === courseId);
       if (!savedEnrollment) {
         setNotice("The request was sent, but it is not in your enrollment records yet. Refresh to check its status.");
         return;
       }
       setCourses((current) => current.map((course) => course.id === courseId
-        ? { ...course, enrollmentStatus: savedEnrollment.status }
+        ? { ...course, enrollmentStatus: enrollmentStatusLabel(savedEnrollment.status) }
         : course));
-      setNotice(`Course status: ${statusLabel[savedEnrollment.status] ?? savedEnrollment.status.toLowerCase()}.`);
+      const status = enrollmentStatusLabel(savedEnrollment.status);
+      setNotice(`Course status: ${statusLabel[status] ?? status.toLowerCase()}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not enroll in this course. Please try again.");
     } finally {

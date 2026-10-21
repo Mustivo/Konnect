@@ -40,10 +40,40 @@ export interface DatabaseSchema {
   attendance: Record<string, MockParticipant[]>;
   chat_messages: Record<string, MockChatMessage[]>;
   live_join_requests?: Record<string, LiveJoinRequestItem[]>;
+  live_signals?: Record<string, Array<{ id: string; sender_id: string; recipient_id?: string; payload: Record<string, unknown>; created_at: string }>>;
   assessments: typeof mockAssessmentSubmissions;
   learner_profile: typeof mockLearnerProfile;
   seeded_at: string;
   updated_at: string;
+}
+
+export function addDbLiveSignal(
+  sessionId: string,
+  senderId: string,
+  payload: Record<string, unknown>,
+  recipientId?: string,
+): { id: string; sender_id: string; recipient_id?: string; payload: Record<string, unknown>; created_at: string } {
+  const db = loadDatabase();
+  if (!db.live_signals) db.live_signals = {};
+  const key = String(sessionId || "").toLowerCase();
+  const messages = db.live_signals[key] || [];
+  const message = { id: `signal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, sender_id: senderId, recipient_id: recipientId, payload, created_at: new Date().toISOString() };
+  messages.push(message);
+  // Keep signaling transient and bounded so stale WebRTC offers do not accumulate.
+  db.live_signals[key] = messages.filter((item) => Date.now() - new Date(item.created_at).getTime() < 10 * 60 * 1000).slice(-250);
+  saveDatabase(db);
+  return message;
+}
+
+export function getDbLiveSignals(sessionId: string, recipientId: string, since?: string) {
+  const db = loadDatabase();
+  const messages = db.live_signals?.[String(sessionId || "").toLowerCase()] || [];
+  const sinceTime = since ? new Date(since).getTime() : 0;
+  return messages.filter((item) =>
+    item.sender_id !== recipientId &&
+    (!item.recipient_id || item.recipient_id === recipientId) &&
+    new Date(item.created_at).getTime() > sinceTime
+  );
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");

@@ -15,7 +15,6 @@ import {
   joinSessionRecord,
   leaveSessionRecord,
   heartbeatSessionRecord,
-  mockAssessmentSubmissions,
   mockLearnerProfile,
   registerTeacherEmail,
   startSessionRecord,
@@ -23,6 +22,8 @@ import {
   getDbLiveJoinRequests,
   updateDbLiveJoinRequestStatus,
   removeDbLiveJoinRequest,
+  addDbLiveSignal,
+  getDbLiveSignals,
 } from "@/lib/server/dbStore";
 import {
   getTeacherProfileByEmail,
@@ -60,7 +61,7 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
-function handleMockEndpoints(subpath: string, method: string, requestBody?: any) {
+function handleMockEndpoints(subpath: string, method: string, requestBody?: any, query?: URLSearchParams) {
   const normalized = subpath.replace(/\/+$/, "");
 
   // 1. Learner enrolled classes
@@ -183,45 +184,6 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
     return jsonResponse({ detail: "Invalid class code. Please check with your instructor." }, 400);
   }
 
-  // 7. General enrollments list
-  if (normalized === "enrollments") {
-    if (method === "POST" && requestBody) {
-      const classId = String(requestBody.school_class || requestBody.class_room || "");
-      const enrollment = enrollStudentInClass(classId);
-      return jsonResponse(enrollment, 201);
-    }
-    const enrollments = getEnrollmentsTable();
-    return jsonResponse({
-      count: enrollments.length,
-      next: null,
-      previous: null,
-      results: enrollments,
-    });
-  }
-
-  // 8. Assessments submissions for learner dashboard
-  if (normalized === "assessments/learner/my-submissions" || normalized.startsWith("assessments/learner/my-submissions/")) {
-    return jsonResponse({
-      count: mockAssessmentSubmissions.length,
-      next: null,
-      previous: null,
-      results: mockAssessmentSubmissions,
-    });
-  }
-
-  // 9. Class assessments for teacher side
-  if (normalized.startsWith("assessments/class/")) {
-    return jsonResponse({
-      count: 2,
-      next: null,
-      previous: null,
-      results: [
-        { id: "ass-1", title: "Practice Problem Set", due_date: "2026-10-20" },
-        { id: "ass-2", title: "Mid-Term Review Assessment", due_date: "2026-10-25" },
-      ],
-    });
-  }
-
   // 10. Student progress grades
   if (normalized === "students/learner/progress-grades" || normalized.startsWith("students/learner/progress-grades/")) {
     return jsonResponse({
@@ -316,6 +278,23 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
       count: requests.length,
       results: requests,
     }, 200);
+  }
+
+  // WebRTC signaling messages are routed through the server so different devices can exchange SDP/ICE data.
+  if (normalized.startsWith("sessions/") && normalized.endsWith("/signals")) {
+    const sessionId = normalized.split("/")[1];
+    const participantId = String(requestBody?.participant_id || query?.get("participant_id") || "").trim();
+    if (!participantId) return jsonResponse({ detail: "participant_id is required" }, 400);
+    if (method === "POST") {
+      const payload = requestBody?.payload;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return jsonResponse({ detail: "A signaling payload is required" }, 400);
+      }
+      const recipientId = requestBody?.recipient_id ? String(requestBody.recipient_id) : undefined;
+      return jsonResponse(addDbLiveSignal(sessionId, participantId, payload, recipientId), 201);
+    }
+    const since = query?.get("since") || undefined;
+    return jsonResponse({ results: getDbLiveSignals(sessionId, participantId, since) });
   }
 
   // 13. Specific session join: /api/sessions/:id/join/
@@ -426,21 +405,6 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any)
     });
   }
 
-  // 21. Live sessions list /api/live-sessions/
-  if (normalized === "live-sessions" || normalized.startsWith("live-sessions/")) {
-    if (method === "POST" && requestBody) {
-      const created = createClassSessionRecord(requestBody);
-      return jsonResponse(created, 201);
-    }
-    const sessions = getSessionsTable();
-    return jsonResponse({
-      count: sessions.length,
-      next: null,
-      previous: null,
-      results: sessions,
-    });
-  }
-
   // 22. Password reset endpoint: POST /api/auth/reset-password/ or /api/auth/password-reset/
   if (normalized === "auth/reset-password" || normalized === "auth/password-reset") {
     if (method === "POST" && requestBody) {
@@ -503,7 +467,7 @@ async function proxy(
   }
 
   // Check mock endpoints first for custom routes not present on Render backend
-  const mockResult = handleMockEndpoints(subpath, request.method, parsedBody);
+  const mockResult = handleMockEndpoints(subpath, request.method, parsedBody, request.nextUrl.searchParams);
   if (mockResult) {
     return mockResult;
   }
@@ -636,7 +600,7 @@ async function proxy(
     }
 
     // If teacher creates a class and backend returns 403/404, save into persistent database
-    if ((isClassesRoot || normalized === "courses") && request.method === "POST" && (!response.ok || response.status === 403 || response.status === 404)) {
+    if (isClassesRoot && request.method === "POST" && (!response.ok || response.status === 403 || response.status === 404)) {
       const created = addClassToTable(parsedBody || {});
       return jsonResponse({
         id: created.numeric_id,

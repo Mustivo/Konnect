@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { apiJson } from "@/lib/api";
-import { getSession, joinSession, leaveSession, heartbeatSession } from "@/lib/api/sessions";
+import { getSession, joinSession, leaveSession, getLiveSignals, sendLiveSignal } from "@/lib/api/sessions";
 import { currentUser } from "@/lib/api/auth";
 import { useSessionChat } from "@/lib/useSessionChat";
 import {
@@ -204,21 +204,14 @@ export default function LiveClassRoomPage() {
       setAliveSeconds((sec) => sec + 1);
     }, 1000);
 
-    // Heartbeat every 25s so server knows learner is actively alive
-    const heartbeat = setInterval(() => {
-      void heartbeatSession(sessionId, {
-        student_id: learnerIdRef.current,
-      }).catch(() => undefined);
-    }, 25000);
-
     // On tab close or navigation, cleanly record leave time and attendance duration
     function handleUnload() {
       try {
         const payload = JSON.stringify({ student_id: learnerIdRef.current });
         if (navigator.sendBeacon) {
-          navigator.sendBeacon(`/api/sessions/${encodeURIComponent(sessionId)}/leave/`, payload);
+          navigator.sendBeacon(`/api/attendance/sessions/${encodeURIComponent(sessionId)}/leave/`, payload);
         } else {
-          fetch(`/api/sessions/${encodeURIComponent(sessionId)}/leave/`, {
+          fetch(`/api/attendance/sessions/${encodeURIComponent(sessionId)}/leave/`, {
             method: "POST",
             body: payload,
             keepalive: true,
@@ -231,7 +224,6 @@ export default function LiveClassRoomPage() {
 
     return () => {
       clearInterval(ticker);
-      clearInterval(heartbeat);
       window.removeEventListener("beforeunload", handleUnload);
     };
   }, [admissionVerified, currentUserName, sessionId]);
@@ -259,23 +251,28 @@ export default function LiveClassRoomPage() {
     let channel: BroadcastChannel | null = null;
     let streamChannel: BroadcastChannel | null = null;
     let framesChannel: BroadcastChannel | null = null;
+    let signalTimer: ReturnType<typeof setInterval> | undefined;
 
     if (typeof BroadcastChannel !== "undefined") {
       try {
         channel = new BroadcastChannel("konnect-live-screen-share");
         streamChannel = new BroadcastChannel("konnect-live-webrtc-stream");
         framesChannel = new BroadcastChannel("konnect-live-screen-frames");
+        const postSignal = (payload: Record<string, unknown>, recipientId?: string) => {
+          void sendLiveSignal(sessionId, learnerIdRef.current, payload, recipientId).catch(() => undefined);
+          streamChannel?.postMessage(payload);
+        };
 
         channel.onmessage = (event) => {
           if (event.data?.sessionId === sessionId) {
             const isSharing = Boolean(event.data.sharing);
             setTeacherSharingScreen(isSharing);
             if (isSharing) {
-              streamChannel?.postMessage({
+              postSignal({
                 type: "request-stream",
                 sessionId,
                 learnerId: learnerIdRef.current,
-              });
+              }, `teacher:${sessionId}`);
             } else {
               setRemoteScreenStream(null);
               setRemoteScreenFrame(null);
@@ -283,17 +280,28 @@ export default function LiveClassRoomPage() {
           }
         };
 
-        streamChannel.onmessage = async (event) => {
-          const data = event.data;
+        const handleSignal = async (data: any) => {
           if (!data || data.sessionId !== sessionId) return;
+
+          if (data.type === "screen-sharing") {
+            const isSharing = Boolean(data.sharing);
+            setTeacherSharingScreen(isSharing);
+            if (isSharing) {
+              postSignal({ type: "request-stream", sessionId, learnerId: learnerIdRef.current }, `teacher:${sessionId}`);
+            } else {
+              setRemoteScreenStream(null);
+              setRemoteScreenFrame(null);
+            }
+            return;
+          }
 
           if (data.type === "stream-available") {
             setTeacherSharingScreen(true);
-            streamChannel?.postMessage({
+            postSignal({
               type: "request-stream",
               sessionId,
               learnerId: learnerIdRef.current,
-            });
+            }, `teacher:${sessionId}`);
           }
 
           if (data.type === "webrtc-offer" && data.learnerId === learnerIdRef.current && data.sdp) {
@@ -314,13 +322,13 @@ export default function LiveClassRoomPage() {
 
               pc.onicecandidate = (iceEvent) => {
                 if (iceEvent.candidate) {
-                  streamChannel?.postMessage({
+                  postSignal({
                     type: "ice-candidate",
                     sessionId,
                     learnerId: learnerIdRef.current,
                     candidate: iceEvent.candidate,
                     sender: "learner",
-                  });
+                  }, `teacher:${sessionId}`);
                 }
               };
 
@@ -328,12 +336,12 @@ export default function LiveClassRoomPage() {
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
 
-              streamChannel?.postMessage({
+              postSignal({
                 type: "webrtc-answer",
                 sessionId,
                 learnerId: learnerIdRef.current,
                 sdp: pc.localDescription,
-              });
+              }, `teacher:${sessionId}`);
             } catch (err) {
               console.error("Learner WebRTC answer error:", err);
             }
@@ -355,6 +363,29 @@ export default function LiveClassRoomPage() {
             learnerPcRef.current = null;
           }
         };
+        streamChannel.onmessage = (event) => { void handleSignal(event.data); };
+        const receivedSignals = new Set<string>();
+        let pollingSignals = false;
+        const pollSignals = async () => {
+          if (pollingSignals) return;
+          pollingSignals = true;
+          try {
+            const response = await getLiveSignals(sessionId, learnerIdRef.current);
+            const data = await apiJson<{ results?: Array<{ id: string; payload: Record<string, unknown> }> }>(response);
+            for (const signal of data.results || []) {
+              if (receivedSignals.has(signal.id)) continue;
+              receivedSignals.add(signal.id);
+              await handleSignal(signal.payload);
+            }
+            if (receivedSignals.size > 500) receivedSignals.clear();
+          } catch {
+            // Local preview remains available while the signaling service is offline.
+          } finally {
+            pollingSignals = false;
+          }
+        };
+        void pollSignals();
+        signalTimer = setInterval(() => { void pollSignals(); }, 800);
 
         framesChannel.onmessage = (event) => {
           const data = event.data;
@@ -398,6 +429,7 @@ export default function LiveClassRoomPage() {
       channel?.close();
       streamChannel?.close();
       framesChannel?.close();
+      if (signalTimer) clearInterval(signalTimer);
       learnerPcRef.current?.close();
       learnerPcRef.current = null;
     };

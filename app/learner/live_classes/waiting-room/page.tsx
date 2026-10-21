@@ -31,6 +31,10 @@ type ApiSession = {
   title?: string;
   course_title?: string;
   teacher_name?: string;
+  starts_at?: string;
+  ends_at?: string;
+  join_window_open?: boolean;
+  video_provider_configured?: boolean;
   scheduled_start?: string;
   scheduled_end?: string;
   class_room?: string | { title?: string; subject?: string; teacher_name?: string };
@@ -163,12 +167,12 @@ function LiveClassWaitingRoomContent() {
       try {
         const detail = await apiJson<ApiSession>(await getSession(sessionId));
         const classRoom = typeof detail.class_room === "object" ? detail.class_room : null;
-        const start = detail.scheduled_start ? new Date(detail.scheduled_start) : null;
-        const end = detail.scheduled_end ? new Date(detail.scheduled_end) : null;
+        const start = detail.starts_at ? new Date(detail.starts_at) : null;
+        const end = detail.ends_at ? new Date(detail.ends_at) : null;
         if (!active) return;
         setSession({
           id: sessionId,
-          title: detail.title || fallbackSession.title,
+          title: detail.title || detail.course_title || fallbackSession.title,
           course: detail.course_title || classRoom?.title || classRoom?.subject || fallbackSession.course,
           teacher: detail.teacher_name || classRoom?.teacher_name || fallbackSession.teacher,
           time: start && Number.isFinite(start.getTime())
@@ -185,7 +189,7 @@ function LiveClassWaitingRoomContent() {
 
   // Monitor teacher live presence
   useEffect(() => {
-    function checkLive() {
+    async function checkLive() {
       try {
         const stored = window.localStorage.getItem("konnect-active-live-session");
         if (stored) {
@@ -198,7 +202,13 @@ function LiveClassWaitingRoomContent() {
           }
         }
       } catch {}
-      setIsTeacherLive(false);
+      try {
+        const response = await getSession(sessionId);
+        const detail = await apiJson<ApiSession & { status?: string }>(response);
+        setIsTeacherLive(Boolean(detail.join_window_open));
+      } catch {
+        setIsTeacherLive(false);
+      }
     }
     checkLive();
 
@@ -217,7 +227,7 @@ function LiveClassWaitingRoomContent() {
       } catch {}
     }
 
-    const interval = setInterval(checkLive, 2500);
+    const interval = setInterval(() => { void checkLive(); }, 2500);
     return () => {
       clearInterval(interval);
       channel?.close();
