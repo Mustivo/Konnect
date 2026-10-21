@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
 import { ATTENDANCE_CONFIG } from "./config";
 
@@ -26,52 +24,19 @@ export interface FinalAttendanceRecord {
   synced_to_backend?: boolean;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DATA_DIR, "database.json");
-
-// In-memory cache
+// Attendance is owned by the backend. This cache only keeps a single server
+// process coherent while the backend finalizes attendance records.
 let inMemorySessions: AttendanceSessionRecord[] = [];
 let inMemoryFinalRecords: Record<string, FinalAttendanceRecord[]> = {};
 let isInitialized = false;
 
 function loadFromDisk(): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      const data = JSON.parse(raw);
-      inMemorySessions = Array.isArray(data.attendance_sessions) ? data.attendance_sessions : [];
-      inMemoryFinalRecords = data.final_attendances || {};
-    }
-    isInitialized = true;
-  } catch (err) {
-    console.warn("[Attendance Store] Read error:", err);
-    inMemorySessions = [];
-    inMemoryFinalRecords = {};
-    isInitialized = true;
-  }
+  isInitialized = true;
 }
 
 function saveToDisk(): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    let fullDb: Record<string, unknown> = {};
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      fullDb = JSON.parse(raw);
-    }
-    fullDb.attendance_sessions = inMemorySessions;
-    fullDb.final_attendances = inMemoryFinalRecords;
-    fullDb.updated_at = new Date().toISOString();
-
-    fs.writeFileSync(DB_FILE, JSON.stringify(fullDb, null, 2), "utf-8");
-  } catch (err) {
-    console.error("[Attendance Store] Write error:", err);
-  }
+  // The backend persists finalized attendance. There is intentionally no
+  // filesystem fallback here because it produces different data per instance.
 }
 
 function ensureInit(): void {

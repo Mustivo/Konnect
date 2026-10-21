@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiJson, browseClasses, enrollInClass, getLearnerClasses } from "@/lib/api";
+import { apiJson, currentUser, enrollInClass, getCourses, getLearnerEnrollments } from "@/lib/api";
 import { BookOpen, Check, ChevronDown, Video } from "lucide-react";
+import { mockCourses } from "@/lib/mock/courses";
 
 type ApiClass = {
   id: string;
@@ -13,19 +14,21 @@ type ApiClass = {
   subject?: string;
   teacher_name?: string;
   banner_image?: string | null;
+  status?: string;
+  isDemo?: boolean;
 };
 
 type ApiEnrollment = {
   id: string;
-  class_room: string;
-  class_title: string;
-  class_subject: string;
-  teacher_name: string;
-  status: "PENDING" | "ENROLLED" | "DROPPED" | "COMPLETED" | string;
+  course: string;
+  course_title: string;
+  student: string;
+  status: string;
 };
 
 type ApiCollection<T> = T[] | { results?: T[]; next?: string | null };
-type Course = ApiClass & { enrollmentStatus: ApiEnrollment["status"] | null };
+type EnrollmentStatus = "PENDING" | "ENROLLED" | "DROPPED" | "COMPLETED";
+type Course = ApiClass & { enrollmentStatus: EnrollmentStatus | null; isDemo?: boolean };
 
 const statusLabel: Record<string, string> = {
   PENDING: "Pending approval",
@@ -33,6 +36,16 @@ const statusLabel: Record<string, string> = {
   COMPLETED: "Completed",
   DROPPED: "Available",
 };
+
+function normalizeEnrollmentStatus(status: string): EnrollmentStatus {
+  switch (status.toLowerCase()) {
+    case "active": return "ENROLLED";
+    case "completed": return "COMPLETED";
+    case "cancelled": return "DROPPED";
+    case "pending": return "PENDING";
+    default: return status.toUpperCase() as EnrollmentStatus;
+  }
+}
 
 async function getAllPages<T>(requestPage: (query?: string) => Promise<Response>) {
   const records: T[] = [];
@@ -107,21 +120,23 @@ export default function LearnerCoursesPage() {
         return;
       }
       try {
-        const [catalog, enrollments] = await Promise.all([
-          getAllPages<ApiClass>(browseClasses),
-          getAllPages<ApiEnrollment>(getLearnerClasses),
+        const [catalogResult, enrollmentsResult] = await Promise.allSettled([
+          getAllPages<ApiClass>(getCourses),
+          getAllPages<ApiEnrollment>(getLearnerEnrollments),
         ]);
         if (!active) return;
 
-        const enrollmentsByClass = new Map(enrollments.map((enrollment) => [enrollment.class_room, enrollment]));
-        const classesById = new Map(catalog.map((course) => [course.id, course]));
+        const catalog = catalogResult.status === "fulfilled" ? catalogResult.value : [];
+        const usingMockCourses = catalog.length === 0;
+        const enrollments = enrollmentsResult.status === "fulfilled" ? enrollmentsResult.value : [];
+
+        const enrollmentsByCourse = new Map(enrollments.map((enrollment) => [enrollment.course, normalizeEnrollmentStatus(enrollment.status)]));
+        const classesById = new Map((usingMockCourses ? mockCourses : catalog).map((course) => [course.id, course]));
         for (const enrollment of enrollments) {
-          if (!classesById.has(enrollment.class_room) && enrollment.status !== "DROPPED") {
-            classesById.set(enrollment.class_room, {
-              id: enrollment.class_room,
-              title: enrollment.class_title,
-              subject: enrollment.class_subject,
-              teacher_name: enrollment.teacher_name,
+          if (!classesById.has(enrollment.course) && normalizeEnrollmentStatus(enrollment.status) !== "DROPPED") {
+            classesById.set(enrollment.course, {
+              id: enrollment.course,
+              title: enrollment.course_title,
               banner_image: null,
             });
           }
@@ -129,8 +144,15 @@ export default function LearnerCoursesPage() {
 
         setCourses([...classesById.values()].map((course) => ({
           ...course,
-          enrollmentStatus: enrollmentsByClass.get(course.id)?.status ?? null,
+          enrollmentStatus: course.isDemo ? null : enrollmentsByCourse.get(course.id) ?? null,
         })));
+        if (usingMockCourses && catalogResult.status === "rejected") {
+          setNotice(`Live courses could not be loaded (${catalogResult.reason instanceof Error ? catalogResult.reason.message : "request failed"}). Showing sample courses from this project; sample courses cannot be enrolled in.`);
+        } else if (usingMockCourses) {
+          setNotice("No live courses are published yet. Showing sample courses from this project; sample courses cannot be enrolled in.");
+        } else if (enrollmentsResult.status === "rejected") {
+          setNotice(`/api/enrollments/ failed: ${enrollmentsResult.reason instanceof Error ? enrollmentsResult.reason.message : "Request failed"}. Courses are shown, but enrollment status is unavailable.`);
+        }
       } catch (error) {
         if (active) setNotice(error instanceof Error ? error.message : "Courses could not be loaded. Please try again.");
       } finally {
@@ -153,20 +175,26 @@ export default function LearnerCoursesPage() {
   });
 
   async function enroll(courseId: string) {
+    if (courses.some((course) => course.id === courseId && course.isDemo)) {
+      setNotice("This is a sample course from the project data. It must be published to the API before learners can enroll.");
+      return;
+    }
     setEnrollingId(courseId);
     setNotice("");
     try {
-      await apiJson(await enrollInClass(courseId));
-      const enrollments = await getAllPages<ApiEnrollment>(getLearnerClasses);
-      const savedEnrollment = enrollments.find((enrollment) => enrollment.class_room === courseId);
+      const user = await currentUser();
+      await apiJson(await enrollInClass(courseId, String(user.id)));
+      const enrollments = await getAllPages<ApiEnrollment>(getLearnerEnrollments);
+      const savedEnrollment = enrollments.find((enrollment) => enrollment.course === courseId);
       if (!savedEnrollment) {
         setNotice("The request was sent, but it is not in your enrollment records yet. Refresh to check its status.");
         return;
       }
       setCourses((current) => current.map((course) => course.id === courseId
-        ? { ...course, enrollmentStatus: savedEnrollment.status }
+        ? { ...course, enrollmentStatus: normalizeEnrollmentStatus(savedEnrollment.status) }
         : course));
-      setNotice(`Course status: ${statusLabel[savedEnrollment.status] ?? savedEnrollment.status.toLowerCase()}.`);
+      const status = normalizeEnrollmentStatus(savedEnrollment.status);
+      setNotice(`Course status: ${statusLabel[status] ?? status.toLowerCase()}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not enroll in this course. Please try again.");
     } finally {
@@ -223,7 +251,7 @@ export default function LearnerCoursesPage() {
                   <p className="truncate text-[8px] font-bold uppercase tracking-wide text-[#718064] dark:text-[#a8be97]">{course.subject || "Course"}</p>
                   <h2 className="mt-1 text-[12px] font-semibold leading-snug text-[#1b2219] dark:text-[#f0f4ee]">{course.title}</h2>
                 </div>
-                {status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
+                {course.isDemo ? <span className="inline-flex shrink-0 rounded-full bg-[#f4eedb] px-2 py-1 text-[8px] font-semibold text-[#78622e]">Sample</span> : status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
               </div>
               <p className="mt-3 line-clamp-3 flex-1 text-[10px] leading-relaxed text-[#58645b] dark:text-[#a6aea0]">{course.description || "No course description has been added yet."}</p>
               <p className="mt-3 text-[9px] text-[#687463] dark:text-[#9aa592]">{course.teacher_name || "Instructor not listed"}</p>
@@ -251,6 +279,8 @@ export default function LearnerCoursesPage() {
                     View Class Schedule
                   </Link>
                 </div>
+              ) : course.isDemo ? (
+                <button type="button" disabled className="mt-3 min-h-9 cursor-not-allowed rounded-md border border-[#dfe5da] bg-[#f7f8f5] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:bg-[#1a2118] dark:text-[#9aa592]">Sample only</button>
               ) : isPending ? (
                 <button
                   type="button"

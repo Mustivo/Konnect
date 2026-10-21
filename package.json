@@ -10,7 +10,8 @@
     "build:clean": "npm run clean && npm run build",
     "start": "next start",
     "lint": "next lint",
-    "db:status": "node scripts/seed-database.js"
+    "db:status": "node scripts/seed-database.js",
+    "db:migrate-live": "node scripts/seed_live_api.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",

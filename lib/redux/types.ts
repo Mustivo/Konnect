@@ -30,6 +30,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
+  password_confirm?: string;
   student_number: string;
   date_of_birth?: string | null;
 }
@@ -43,7 +44,6 @@ export interface AuthMessageState {
     label: string;
     href?: string;
   };
-  autoDismiss?: boolean | number;
 }
 
 export interface SchoolClass {

@@ -1,20 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { BookOpen, BriefcaseBusiness, CircleAlert, GraduationCap, MessageSquareText, ShieldCheck, Users } from "lucide-react";
+import { getPendingAccounts, getPendingTeachers, type PendingAccount } from "@/lib/api/admin";
 
 const stats = [
   { label: "Teachers", value: "25", note: "Faculty & instructors active", icon: Users, tone: "bg-[#f4f7f2] text-[#34482f]" },
   { label: "Learners", value: "1,248", note: "86 this week", icon: GraduationCap, tone: "bg-[#eef4ff] text-[#3b5f9d]" },
   { label: "Classes", value: "63", note: "Across 25 teachers", icon: BookOpen, tone: "bg-[#f7f3ea] text-[#8d6b2f]" },
   { label: "Live now", value: "3", note: "1 waiting room", icon: MessageSquareText, tone: "bg-[#fdf1f4] text-[#ab5b6d]" },
-];
-
-const approvals = [
-  { initials: "SC", name: "Sarah Chen", subject: "Mathematics", date: "13 Oct 2026" },
-  { initials: "JW", name: "James Wilson", subject: "Science", date: "13 Oct 2026" },
-  { initials: "AY", name: "Amina Yusuf", subject: "English", date: "13 Oct 2026" },
-  { initials: "DB", name: "Daniel Brooks", subject: "History", date: "13 Oct 2026" },
 ];
 
 const liveClasses = [
@@ -39,6 +35,14 @@ function InitialsPill({ initials }: { initials: string }) {
 }
 
 export default function AdminDashboardPage() {
+  const [pendingTeacherCount, setPendingTeacherCount] = useState<number | null>(null);
+  const [pendingAccounts, setPendingAccounts] = useState<PendingAccount[] | null>(null);
+
+  useEffect(() => {
+    getPendingTeachers().then((teachers) => setPendingTeacherCount(teachers.length)).catch(() => setPendingTeacherCount(null));
+    getPendingAccounts().then(setPendingAccounts).catch(() => setPendingAccounts(null));
+  }, []);
+
   return (
     <DashboardShell role="admin">
       <div className="space-y-5 pb-8 pt-1">
@@ -88,37 +92,48 @@ export default function AdminDashboardPage() {
               <ShieldCheck size={14} className="text-[#35522b]" />
               <h2 className="text-[15px] font-bold text-[#172115]">Pending teacher approvals</h2>
             </div>
-            <span className="rounded-full bg-[#fef4e8] px-2 py-1 text-[9px] font-bold text-[#b36a10]">4 pending</span>
+            <span className="rounded-full bg-[#fef4e8] px-2 py-1 text-[9px] font-bold text-[#b36a10]">{pendingTeacherCount === null ? "Unavailable" : `${pendingTeacherCount} pending`}</span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-[#e2e7dd]">
-            <div className="grid grid-cols-[1.4fr_1fr_0.8fr] bg-[#f4f6f1] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#687564]">
-              <span>Teacher</span>
-              <span>Submitted</span>
-              <span className="text-right">Actions</span>
+          <div className="rounded-lg border border-dashed border-[#dfe4dc] bg-[#fbfcfa] px-4 py-5 text-center">
+            <p className="text-[11px] text-[#5a6758]">{pendingTeacherCount === null ? "Pending applications could not be loaded. Check your admin access." : pendingTeacherCount === 0 ? "There are no teacher applications waiting for review." : `${pendingTeacherCount} teacher ${pendingTeacherCount === 1 ? "application is" : "applications are"} waiting for review.`}</p>
+            <Link href="/admin/approval" className="mt-3 inline-flex rounded-md bg-[#23351f] px-3 py-1.5 text-[10px] font-semibold text-white">Review applications</Link>
+          </div>
+
+        </section>
+
+        <section className="rounded-xl border border-[#e2e7dd] bg-white p-4 shadow-[0_1px_3px_rgba(21,32,18,0.04)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-bold text-[#172115]">Pending accounts</h2>
+              <p className="mt-1 text-[10px] text-[#687564]">Accounts waiting for administrator review.</p>
             </div>
-
-            {approvals.map((teacher) => (
-              <div key={teacher.name} className="grid grid-cols-[1.4fr_1fr_0.8fr] items-center gap-3 border-t border-[#e2e7dd] bg-white px-3 py-3 text-[11px]">
-                <div className="flex items-center gap-2.5">
-                  <InitialsPill initials={teacher.initials} />
+            <span className="rounded-full bg-[#fef4e8] px-2 py-1 text-[9px] font-bold text-[#b36a10]">
+              {pendingAccounts === null ? "Unavailable" : `${pendingAccounts.length} pending`}
+            </span>
+          </div>
+          {pendingAccounts === null ? (
+            <p className="rounded-lg border border-dashed border-[#dfe4dc] bg-[#fbfcfa] px-4 py-5 text-center text-[11px] text-[#5a6758]">
+              Pending accounts could not be loaded. Check your admin access.
+            </p>
+          ) : pendingAccounts.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-[#dfe4dc] bg-[#fbfcfa] px-4 py-5 text-center text-[11px] text-[#5a6758]">
+              No pending accounts were returned by the backend.
+            </p>
+          ) : (
+            <div className="divide-y divide-[#eef1eb]">
+              {pendingAccounts.map((account) => (
+                <div key={account.id || account.email} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-1 last:pb-1">
                   <div>
-                    <p className="font-bold text-[#172115]">{teacher.name}</p>
-                    <p className="text-[10px] text-[#6d766d]">{teacher.subject}</p>
+                    <p className="text-[11px] font-bold text-[#172115]">{account.name}</p>
+                    <p className="mt-1 text-[10px] text-[#687564]">{account.email || "Email not provided"} · {account.role}</p>
                   </div>
+                  <span className="rounded-full bg-[#fef4e8] px-2 py-1 text-[9px] font-semibold text-[#8d5d19]">{account.status}</span>
                 </div>
-                <div className="text-[#5a6758]">{teacher.date}</div>
-                <div className="flex justify-end gap-2">
-                  <button type="button" className="rounded-md bg-[#23351f] px-3 py-1.5 text-[10px] font-semibold text-white">Approve</button>
-                  <button type="button" className="rounded-md border border-[#dfe4dc] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#5a6758]">Reject</button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-3">
-            <button type="button" className="text-[10px] font-semibold text-[#35522b]">View all applications →</button>
-          </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-[10px] text-[#687564]">Teacher profile review and approval actions are on the <Link href="/admin/approval" className="font-semibold text-[#35522b] hover:underline">Teacher Approvals</Link> page.</p>
         </section>
 
         <section className="rounded-xl border border-[#e2e7dd] bg-white p-4 shadow-[0_1px_3px_rgba(21,32,18,0.04)]">

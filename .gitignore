@@ -23,3 +23,6 @@ staticfiles/
 # Database (Keep pre-seeded SQLite for instant team onboarding)
 *.sqlite3
 !backend/db.sqlite3
+
+# Local plaintext credentials
+data/auth_credentials.json

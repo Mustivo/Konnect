@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import { apiJson, getClassAssessments, getTeacherClasses } from "@/lib/api";
+import { apiJson, currentUser, deleteCourse, deleteLiveSession, deleteTeacherClass, getClassAssessments, getCourses, getLiveSessions, getTeacherClasses, updateCourse, updateLiveSession, updateTeacherClass } from "@/lib/api";
 import {
   ArrowRight,
   BookOpen,
@@ -11,8 +11,11 @@ import {
   ClipboardList,
   Clock3,
   Copy,
+  CalendarDays,
   Info,
+  Pencil,
   Plus,
+  Trash2,
   Users,
   Video,
 } from "lucide-react";
@@ -44,6 +47,8 @@ type ApiClassRoom = {
   status?: string;
 };
 type ApiAssessmentList = { results?: Array<{ id: string }> } | Array<{ id: string }>;
+type ApiLiveSession = { id: string | number; course: string | number; starts_at: string; ends_at: string };
+type ApiCourse = { id: string | number; title: string; description?: string; teacher?: string | number | { id?: string | number }; created_by?: string | number | { id?: string | number } };
 
 function toTeacherClass(classRoom: ApiClassRoom, activities: number): TeacherClass {
   const date = classRoom.start_date ? new Date(`${classRoom.start_date.slice(0, 10)}T00:00:00`) : null;
@@ -77,6 +82,9 @@ export default function TeacherClassesPage() {
   const [classTab, setClassTab] = useState<"active" | "completed">("active");
   const [loadNotice, setLoadNotice] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [liveClassIds, setLiveClassIds] = useState<string[]>([]);
+  const [liveSessions, setLiveSessions] = useState<ApiLiveSession[]>([]);
+  const [ownedCourses, setOwnedCourses] = useState<ApiCourse[]>([]);
 
   function copyLearnerLink(classId: string) {
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
@@ -93,7 +101,24 @@ export default function TeacherClassesPage() {
     let cancelled = false;
 
     async function loadClasses() {
+      let ownCourseIds: string[] = [];
       try {
+        try {
+          const [user, coursePayload] = await Promise.all([
+            currentUser(),
+            apiJson<ApiCourse[] | { results?: ApiCourse[] }>(await getCourses()),
+          ]);
+          const courses = Array.isArray(coursePayload) ? coursePayload : coursePayload.results ?? [];
+          const ownCourses = courses.filter((course) => {
+            const owner = course.teacher ?? course.created_by;
+            const ownerId = typeof owner === "object" && owner !== null ? owner.id : owner;
+            return ownerId != null && String(ownerId) === String(user.id);
+          });
+          ownCourseIds = ownCourses.map((course) => String(course.id));
+          if (!cancelled) setOwnedCourses(ownCourses);
+        } catch {
+          if (!cancelled) setLoadNotice("Your course records could not be loaded.");
+        }
         const response = await getTeacherClasses();
         const payload = await apiJson<ApiClassRoom[] | { results?: ApiClassRoom[] }>(response);
         const records = Array.isArray(payload) ? payload : payload.results ?? [];
@@ -112,8 +137,16 @@ export default function TeacherClassesPage() {
           const active = mapped.filter((item) => !item.isCompleted);
           const completed = mapped.filter((item) => item.isCompleted);
           setClasses(mapped);
+          setLiveClassIds(mapped.map((item) => item.id));
           setActiveClassIds(active.map((item) => item.id));
           setCompletedClassIds(completed.map((item) => item.id));
+          try {
+            const sessionPayload = await apiJson<ApiLiveSession[] | { results?: ApiLiveSession[] }>(await getLiveSessions());
+            const sessions = Array.isArray(sessionPayload) ? sessionPayload : sessionPayload.results ?? [];
+            if (!cancelled) setLiveSessions(sessions.filter((session) => mapped.some((item) => item.id === String(session.course)) || ownCourseIds.includes(String(session.course))));
+          } catch {
+            if (!cancelled) setLoadNotice("Classes loaded, but live sessions could not be loaded.");
+          }
         }
       } catch {
         if (!cancelled) setLoadNotice("Live class data is unavailable. Showing the sample classes.");
@@ -123,6 +156,102 @@ export default function TeacherClassesPage() {
     void loadClasses();
     return () => { cancelled = true; };
   }, []);
+
+  async function editOwnedCourse(course: ApiCourse) {
+    const titleValue = window.prompt("Course name", course.title);
+    if (titleValue === null) return;
+    const title = titleValue.trim();
+    if (!title) { setLoadNotice("Course name cannot be empty."); return; }
+    const descriptionValue = window.prompt("Course description", course.description ?? "");
+    if (descriptionValue === null) return;
+    const description = descriptionValue.trim();
+    if (title === course.title && description === (course.description ?? "")) return;
+    try {
+      await apiJson(await updateCourse(String(course.id), { title, description: description ?? course.description ?? "" }));
+      setOwnedCourses((current) => current.map((row) => row.id === course.id ? { ...row, title, description: description ?? row.description } : row));
+      setLoadNotice("Course updated.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Course could not be updated.");
+    }
+  }
+
+  async function removeOwnedCourse(course: ApiCourse) {
+    if (!window.confirm(`Delete “${course.title}”? Related live sessions may also be removed.`)) return;
+    try {
+      const response = await deleteCourse(String(course.id));
+      if (!response.ok) throw new Error(`Delete failed (${response.status}).`);
+      setOwnedCourses((current) => current.filter((row) => row.id !== course.id));
+      setLoadNotice("Course deleted.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Course could not be deleted.");
+    }
+  }
+
+  async function editClass(item: TeacherClass) {
+    const titleValue = window.prompt("Class name", item.title);
+    if (titleValue === null) return;
+    const title = titleValue.trim();
+    if (!title) { setLoadNotice("Class name cannot be empty."); return; }
+    const descriptionValue = window.prompt("Class description", item.topic);
+    if (descriptionValue === null) return;
+    const description = descriptionValue.trim();
+    if (title === item.title && description === item.topic) return;
+    try {
+      await apiJson(await updateTeacherClass(item.id, { title, description: description ?? item.topic }));
+      setClasses((current) => current.map((row) => row.id === item.id ? { ...row, title, topic: description || item.topic } : row));
+      setLoadNotice("Class updated.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Class could not be updated.");
+    }
+  }
+
+  async function removeClass(item: TeacherClass) {
+    if (!window.confirm(`Delete “${item.title}”? This may also remove its associated records.`)) return;
+    try {
+      const response = await deleteTeacherClass(item.id);
+      if (!response.ok) throw new Error(`Delete failed (${response.status}).`);
+      setClasses((current) => current.filter((row) => row.id !== item.id));
+      setLiveClassIds((current) => current.filter((id) => id !== item.id));
+      setActiveClassIds((current) => current.filter((id) => id !== item.id));
+      setCompletedClassIds((current) => current.filter((id) => id !== item.id));
+      setLiveSessions((current) => current.filter((session) => String(session.course) !== item.id));
+      setLoadNotice("Class deleted.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Class could not be deleted.");
+    }
+  }
+
+  async function editSession(session: ApiLiveSession) {
+    const start = window.prompt("New start time (ISO date and time)", new Date(session.starts_at).toISOString())?.trim();
+    if (!start) return;
+    const startDate = new Date(start);
+    if (!Number.isFinite(startDate.getTime())) {
+      setLoadNotice("Enter a valid date and time.");
+      return;
+    }
+    const duration = Math.max(60_000, new Date(session.ends_at).getTime() - new Date(session.starts_at).getTime());
+    const starts_at = startDate.toISOString();
+    const ends_at = new Date(startDate.getTime() + duration).toISOString();
+    try {
+      await apiJson(await updateLiveSession(String(session.id), { starts_at, ends_at }));
+      setLiveSessions((current) => current.map((row) => String(row.id) === String(session.id) ? { ...row, starts_at, ends_at } : row));
+      setLoadNotice("Live session updated.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Live session could not be updated.");
+    }
+  }
+
+  async function removeSession(session: ApiLiveSession) {
+    if (!window.confirm("Delete this live session?")) return;
+    try {
+      const response = await deleteLiveSession(String(session.id));
+      if (!response.ok) throw new Error(`Delete failed (${response.status}).`);
+      setLiveSessions((current) => current.filter((row) => String(row.id) !== String(session.id)));
+      setLoadNotice("Live session deleted.");
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : "Live session could not be deleted.");
+    }
+  }
 
   const visibleClasses = classTab === "active"
     ? classes.filter((item) => activeClassIds.includes(item.id))
@@ -247,10 +376,31 @@ export default function TeacherClassesPage() {
                     <button type="button" disabled={activeClassIds.length >= 3} onClick={() => reactivateClass(item.id)} className="rounded-lg px-2 py-1.5 text-[8px] font-semibold text-[#34482d] hover:bg-[#f1f5ed] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#c9d7c1] dark:hover:bg-[#1b2819]">Reactivate</button>
                   )}
                 </div>
+                {liveClassIds.includes(item.id) && <div className="mt-2 flex justify-end gap-2">
+                  <button type="button" onClick={() => void editClass(item)} className="inline-flex items-center gap-1 rounded-full border border-[#dce3d7] px-2.5 py-1.5 text-[8px] font-semibold text-[#405439] hover:bg-[#edf2ea]"><Pencil size={10} /> Edit class</button>
+                  <button type="button" onClick={() => void removeClass(item)} className="inline-flex items-center gap-1 rounded-full border border-[#efceca] px-2.5 py-1.5 text-[8px] font-semibold text-[#9a3e32] hover:bg-[#fff4f2]"><Trash2 size={10} /> Delete</button>
+                </div>}
               </article>
             );
           })}
         </div>
+
+        {ownedCourses.length > 0 && <section className="rounded-2xl border border-[#e2e7dd] bg-white p-4 dark:border-[#212f1f] dark:bg-[#141d13]">
+          <div className="mb-3"><h2 className="text-[11px] font-bold text-[#172115] dark:text-[#ecf1ea]">Your courses</h2><p className="mt-1 text-[8px] text-[#707c6c]">Update or delete courses assigned to your teacher account.</p></div>
+          <div className="divide-y divide-[#edf0e9] dark:divide-[#293627]">
+            {ownedCourses.map((course) => <div key={course.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5"><div><p className="text-[9px] font-bold text-[#253322] dark:text-[#d6dfd2]">{course.title}</p><p className="mt-0.5 text-[8px] text-[#707c6c]">{course.description || "No description"}</p></div><div className="flex gap-2"><button type="button" onClick={() => void editOwnedCourse(course)} className="rounded-full border border-[#dce3d7] px-2.5 py-1.5 text-[8px] font-semibold text-[#405439]">Edit</button><button type="button" onClick={() => void removeOwnedCourse(course)} className="rounded-full border border-[#efceca] px-2.5 py-1.5 text-[8px] font-semibold text-[#9a3e32]">Delete</button></div></div>)}
+          </div>
+        </section>}
+
+        {liveClassIds.length > 0 && <section className="rounded-2xl border border-[#e2e7dd] bg-white p-4 dark:border-[#212f1f] dark:bg-[#141d13]">
+          <div className="mb-3"><h2 className="text-[11px] font-bold text-[#172115] dark:text-[#ecf1ea]">Your scheduled live sessions</h2><p className="mt-1 text-[8px] text-[#707c6c]">Edit or remove sessions for your classes.</p></div>
+          {liveSessions.length === 0 ? <p className="text-[8px] text-[#707c6c]">No live sessions are available.</p> : <div className="divide-y divide-[#edf0e9] dark:divide-[#293627]">
+            {liveSessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+              <div className="flex items-center gap-2 text-[8px] text-[#405439] dark:text-[#c4d0bd]"><CalendarDays size={12} /><span>{classes.find((item) => item.id === String(session.course))?.title ?? "Class"}</span><span>{new Date(session.starts_at).toLocaleString()}</span></div>
+              <div className="flex gap-2"><button type="button" onClick={() => void editSession(session)} className="rounded-full border border-[#dce3d7] px-2.5 py-1.5 text-[8px] font-semibold text-[#405439]">Edit</button><button type="button" onClick={() => void removeSession(session)} className="rounded-full border border-[#efceca] px-2.5 py-1.5 text-[8px] font-semibold text-[#9a3e32]">Delete</button></div>
+            </div>)}
+          </div>}
+        </section>}
 
         {classTab === "active" && (
           <article className="rounded-2xl border border-[#e6ebe2] bg-white p-3 shadow-[0_2px_8px_rgba(21,32,18,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] sm:p-4">

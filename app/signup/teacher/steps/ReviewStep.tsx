@@ -51,8 +51,8 @@ export default function ReviewStep({ hidden, onEdit, onBack, onSubmit, reviewDat
       </div>
       <section className="rounded-lg border border-[#e0e3d9] bg-white p-3 text-[0.55rem] dark:border-white/10 dark:bg-white/5">
         <div className="mb-2 flex justify-between"><h3 className="font-semibold">Documents &amp; credentials</h3><button type="button" onClick={() => onEdit(3)} className="font-semibold text-[#526d43]">Edit</button></div>
-        <p><span className="text-[#84907a]">Degree certificate:</span> {reviewData?.degreeFileName ? `Uploaded (${reviewData.degreeFileName})` : "Uploaded"}</p>
-        <p><span className="text-[#84907a]">CV / résumé:</span> {reviewData?.cvFileName ? `Uploaded (${reviewData.cvFileName})` : "None added (optional)"}</p>
+        <p><span className="text-[#84907a]">Degree certificate:</span> {reviewData?.degreeFileName ? `Selected (${reviewData.degreeFileName})` : "Selected"}</p>
+        <p><span className="text-[#84907a]">CV / résumé:</span> {reviewData?.cvFileName ? `Selected (${reviewData.cvFileName})` : "None added (optional)"}</p>
       </section>
       <section className="space-y-2 rounded-lg bg-[#f0f1e9] p-3 text-[0.55rem]">
         <h3 className="font-semibold">Declarations</h3>
@@ -61,7 +61,7 @@ export default function ReviewStep({ hidden, onEdit, onBack, onSubmit, reviewDat
         <label className="flex items-start gap-2"><input required type="checkbox" defaultChecked className="mt-0.5 accent-[#263d21]" />I accept Konnect’s safeguarding standards and Instructor Code of Conduct.</label>
       </section>
       <p className="rounded bg-[#edf2e8] px-3 py-2 text-[0.5rem] text-[#52644a]">
-        After submission, verify your email to start review. You can’t teach or access teaching tools until an administrator approves your application.
+        Your teacher profile is submitted to the API for administrator review. The current API does not accept certificate/CV uploads or headline, teaching mode, and portfolio fields, so those items are not saved. You can’t teach or access teaching tools until an administrator approves your application.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={onBack} className="rounded border border-[#e0e3d9] px-4 py-2.5 text-xs font-semibold">Back</button>

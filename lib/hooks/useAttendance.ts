@@ -27,10 +27,12 @@ export function useAttendance(classId: string | null | undefined): void {
 
     const sendEvent = async (event: "join" | "ping" | "leave") => {
       try {
+        const token = window.localStorage.getItem("konnect-access-token");
         await fetch(targetUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ classId, event, deviceId }),
           keepalive: event === "leave",
@@ -43,17 +45,16 @@ export function useAttendance(classId: string | null | undefined): void {
     const sendBeaconLeave = () => {
       try {
         const payload = JSON.stringify({ classId, event: "leave", deviceId });
-        if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-          const blob = new Blob([payload], { type: "text/plain" });
-          navigator.sendBeacon(targetUrl, blob);
-        } else {
-          void fetch(targetUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload,
-            keepalive: true,
-          }).catch(() => undefined);
-        }
+        const token = window.localStorage.getItem("konnect-access-token");
+        void fetch(targetUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: payload,
+          keepalive: true,
+        }).catch(() => undefined);
       } catch {
         // Fail silently
       }

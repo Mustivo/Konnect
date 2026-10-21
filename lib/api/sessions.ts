@@ -12,6 +12,9 @@ export const getSessionAttendance = (id: string) => apiRequest(`/api/sessions/${
 export const getSessionChat = (id: string) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`);
 export const sendSessionChatMessage = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/sessions/${encodeURIComponent(id)}/chat/`, { method: "POST", body: JSON.stringify(payload) });
 export const getActiveLiveSessions = () => apiRequest("/api/live-sessions/active");
+export const getLiveSessions = () => apiRequest("/api/live-sessions/");
+export const updateLiveSession = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/`, { method: "PATCH", body: JSON.stringify(payload) });
+export const deleteLiveSession = (id: string) => apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/`, { method: "DELETE" });
 export const heartbeatLiveSession = (id: string, payload: Record<string, unknown>) =>
   apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/heartbeat`, { method: "POST", body: JSON.stringify(payload) });
 export const endLivePresence = (id: string) =>

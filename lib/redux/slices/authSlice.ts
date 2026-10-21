@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import type { ApiUser, AuthMessageState, LoginCredentials, RegisterData, TokenPair } from "../types";
+import { currentUser as getCurrentUser, login as apiLogin, register as apiRegister } from "../../api/auth";
 
 interface AuthState {
   user: ApiUser | null;
@@ -37,6 +38,23 @@ function parseApiErrorMessage(data: unknown, fallback: string): string {
   return messages.length > 0 ? messages.join(". ") : fallback;
 }
 
+function loginFailureMessage(payload: unknown): string {
+  const backendMessage = parseApiErrorMessage(payload, "").trim();
+  const normalized = backendMessage.toLowerCase();
+
+  if (/(email|account|user).{0,40}(not found|does not exist|isn't registered|not registered)/.test(normalized)) {
+    return "We couldn't find an account for that email address. Check the spelling or create an account first.";
+  }
+  if (/(password|credentials).{0,40}(incorrect|invalid|wrong|don't match|do not match)/.test(normalized)) {
+    return "The password doesn't match this account. Check it and try again, or reset your password.";
+  }
+  if (/(pending|awaiting|inactive|not active|no active account|not approved|unapproved).{0,60}(approval|administrator|admin|activation|active|verification)?|(?:approval|administrator|admin).{0,60}(pending|awaiting|required)/.test(normalized)) {
+    return "This account is waiting for administrator approval. Ask a superadmin to open Admin → Teacher Approvals → Pending learner accounts and approve it, then sign in again.";
+  }
+
+  return "We couldn't sign you in with these credentials. Check the password. If it is correct, the account may be inactive or still awaiting approval.";
+}
+
 function getBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!envUrl) return "https://konnect-k0x2.onrender.com";
@@ -65,48 +83,10 @@ export const loginWithRedux = createAsyncThunk<
   LoginCredentials,
   { rejectValue: AuthMessageState }
 >("auth/loginWithRedux", async (credentials, { rejectWithValue }) => {
+  let tokenReceived = false;
   try {
-    const tokenResponse = await fetch(getApiEndpoint("/api/auth/token/"), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    const tokenData = await tokenResponse.json().catch(() => null);
-
-    if (!tokenResponse.ok) {
-      if (tokenResponse.status === 401) {
-        return rejectWithValue({
-          type: "error",
-          title: "Incorrect email or password",
-          message: "The email address or password you entered doesn’t match our records. Please verify your credentials and try again.",
-          action: {
-            label: "Forgot your password?",
-            href: "/forgot-password",
-          },
-        });
-      }
-
-      const parsedMessage = parseApiErrorMessage(tokenData, "Sign in failed. Please verify your details.");
-      return rejectWithValue({
-        type: "error",
-        title: "Unable to sign in",
-        message: parsedMessage,
-      });
-    }
-
-    const tokens = tokenData as TokenPair | null;
-
-    if (!tokens || typeof tokens !== "object" || !tokens.access) {
-      return rejectWithValue({
-        type: "error",
-        title: "Authentication error",
-        message: "Invalid response received from the authentication server.",
-      });
-    }
+    const tokens = await apiLogin(credentials.email.trim().toLowerCase(), credentials.password);
+    tokenReceived = true;
 
     if (typeof window !== "undefined") {
       const email = String(credentials.email || "").trim().toLowerCase();
@@ -119,30 +99,8 @@ export const loginWithRedux = createAsyncThunk<
       document.cookie = `konnect-access-token=${tokens.access}; path=/; max-age=604800; SameSite=Lax`;
     }
 
-    // Fetch user profile
-    const userResponse = await fetch(getApiEndpoint("/api/users/me/"), {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${tokens.access}`,
-      },
-    });
-
-    if (!userResponse.ok) {
-      const userErr = await userResponse.json().catch(() => null);
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem("konnect-access-token");
-        window.localStorage.removeItem("konnect-refresh-token");
-        window.localStorage.removeItem("konnect-user-email");
-        document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
-      }
-      return rejectWithValue({
-        type: "error",
-        title: "Account profile unavailable",
-        message: parseApiErrorMessage(userErr, "We could not load your user profile. Please try logging in again."),
-      });
-    }
-
-    const user = (await userResponse.json()) as ApiUser;
+    const user = await getCurrentUser(credentials.email.trim().toLowerCase()) as unknown as ApiUser;
+    user.name = user.name || `${user.first_name} ${user.last_name}`.trim() || user.username || user.email;
     if (!user.first_name && user.name) {
       const parts = user.name.split(" ");
       user.first_name = parts[0] || "";
@@ -160,9 +118,26 @@ export const loginWithRedux = createAsyncThunk<
 
     return { tokens, user };
   } catch (error) {
+    const apiError = error as { status?: number; payload?: unknown };
+    if (tokenReceived && typeof window !== "undefined") {
+      window.localStorage.removeItem("konnect-access-token");
+      window.localStorage.removeItem("konnect-refresh-token");
+      window.localStorage.removeItem("konnect-user-email");
+      window.localStorage.removeItem("konnect-user");
+      document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
+    }
+    if (apiError.status === 401) {
+      return rejectWithValue({
+        type: "error",
+        title: "Unable to sign in",
+        message: loginFailureMessage(apiError.payload),
+        action: { label: "Forgot your password?", href: "/forgot-password" },
+      });
+    }
     return rejectWithValue({
       type: "error",
-      title: "Connection error",
+      title: tokenReceived ? "Account profile unavailable" : "Unable to sign in",
       message: error instanceof Error ? error.message : "We couldn’t reach the Konnect server. Please check your internet connection.",
     });
   }
@@ -174,44 +149,25 @@ export const registerWithRedux = createAsyncThunk<
   { rejectValue: AuthMessageState }
 >("auth/registerWithRedux", async (payload, { rejectWithValue }) => {
   try {
-    const response = await fetch(getApiEndpoint("/api/auth/register/"), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+    const [firstName, ...lastNameParts] = payload.name.trim().split(/\s+/);
+    const email = payload.email.trim().toLowerCase();
+    const username = `${email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 16) || "learner"}_${Math.random().toString(36).slice(2, 6)}`;
+    const data = await apiRegister({
+      ...payload,
+      email,
+      username,
+      role: "LEARNER",
+      full_name: payload.name.trim(),
+      first_name: firstName || "Learner",
+      last_name: lastNameParts.join(" "),
     });
-
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      const fieldErrors: Record<string, string[] | string> = {};
-      if (data && typeof data === "object") {
-        for (const [key, val] of Object.entries(data)) {
-          if (Array.isArray(val)) {
-            fieldErrors[key] = val.map(String);
-          } else if (typeof val === "string") {
-            fieldErrors[key] = val;
-          }
-        }
-      }
-
-      const formatted = parseApiErrorMessage(data, "Registration could not be completed. Please review your details.");
-      return rejectWithValue({
-        type: "error",
-        title: "Could not create account",
-        message: formatted,
-        fieldErrors,
-      });
-    }
-
-    return data as Partial<RegisterData>;
+    return data as unknown as Partial<RegisterData>;
   } catch (error) {
+    const apiError = error as { payload?: unknown };
     return rejectWithValue({
       type: "error",
-      title: "Connection error",
-      message: error instanceof Error ? error.message : "Unable to reach the registration server. Please try again in a moment.",
+      title: "Could not create account",
+      message: parseApiErrorMessage(apiError.payload, error instanceof Error ? error.message : "Unable to reach the registration server. Please try again in a moment."),
     });
   }
 });

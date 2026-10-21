@@ -26,11 +26,13 @@ export default function AccountForm() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("registered") === "1") {
+      const role = params.get("role");
+      const roleLabel = role === "teacher" ? "teacher" : "learner";
       dispatch(
         setNotice({
           type: "success",
-          title: "Account created successfully!",
-          message: "Welcome to Konnect. You can now log in with your credentials to access your courses.",
+          title: `${roleLabel[0].toUpperCase()}${roleLabel.slice(1)} registration submitted`,
+          message: `Your ${roleLabel} account is waiting for administrator approval. You can sign in after your account is approved.`,
         })
       );
       window.history.replaceState({}, "", window.location.pathname);
@@ -40,7 +42,6 @@ export default function AccountForm() {
           type: "success",
           title: "Logout successful",
           message: "You have been logged out successfully. Please sign in to access your classes and courses.",
-          autoDismiss: 4000,
         })
       );
       window.history.replaceState({}, "", window.location.pathname);
@@ -49,16 +50,6 @@ export default function AccountForm() {
       dispatch(clearNotice());
     }
   }, [dispatch]);
-
-  // Fallback timer to ensure logout notice cleanly disappears after short duration
-  useEffect(() => {
-    if (notice?.title === "Logout successful") {
-      const timer = window.setTimeout(() => {
-        dispatch(clearNotice());
-      }, 4300);
-      return () => window.clearTimeout(timer);
-    }
-  }, [notice?.title, dispatch]);
 
   const hasAuthError = notice?.type === "error";
 
@@ -93,7 +84,7 @@ export default function AccountForm() {
       const profile = actionResult.payload.user;
       const normalizedRole = String(profile.role ?? "").trim().toUpperCase();
 
-      if (normalizedRole === "ADMIN") {
+      if (["ADMIN", "SUPERADMIN", "SUPER_ADMIN"].includes(normalizedRole)) {
         router.replace("/admin/dashboard");
       } else if (normalizedRole === "TEACHER") {
         router.replace("/teacher/dashboard");
