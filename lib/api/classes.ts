@@ -16,6 +16,5 @@ export const getAdminClasses = () => apiRequest("/api/classes/admin/all-classes/
 export const createAdminClass = (payload: FormData | Record<string, unknown>) => apiRequest("/api/classes/admin/all-classes/", { method: "POST", body: payload instanceof FormData ? payload : JSON.stringify(payload) });
 export const updateAdminClass = (id: string, payload: FormData | Record<string, unknown>) => apiRequest(`/api/classes/admin/all-classes/${encodeURIComponent(id)}/`, { method: "PATCH", body: payload instanceof FormData ? payload : JSON.stringify(payload) });
 export const deleteAdminClass = (id: string) => apiRequest(`/api/classes/admin/all-classes/${encodeURIComponent(id)}/`, { method: "DELETE" });
-export const getCourses = (query = "") => apiRequest(`/api/courses/${query}`);
 export const updateCourse = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/courses/${encodeURIComponent(id)}/`, { method: "PATCH", body: JSON.stringify(payload) });
 export const deleteCourse = (id: string) => apiRequest(`/api/courses/${encodeURIComponent(id)}/`, { method: "DELETE" });

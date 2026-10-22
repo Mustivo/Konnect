@@ -1,6 +1,16 @@
 import { apiRequest } from "./client";
 
 // Live session and attendance records belong to the configured external API.
+export const getLiveSessions = (query = "") => apiRequest(`/api/live-sessions/${query}`);
+export const getActiveLiveSessions = () => apiRequest("/api/live-sessions/active/");
+export const updateLiveSession = (id: string, payload: Record<string, unknown>) =>
+  apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+export const deleteLiveSession = (id: string) =>
+  apiRequest(`/api/live-sessions/${encodeURIComponent(id)}/`, { method: "DELETE" });
+
 export async function getClassSessions(classId: string, query = "") {
   const response = await apiRequest(`/api/live-sessions/${query}`);
   const wanted = String(classId).toLowerCase();
