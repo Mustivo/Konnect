@@ -483,7 +483,7 @@ function handleMockEndpoints(subpath: string, method: string, requestBody?: any,
   return null;
 }
 
-async function proxy(
+async function handleProxyRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
 ) {
@@ -977,8 +977,8 @@ async function proxy(
   }
 }
 
-export const GET = proxy;
-export const POST = proxy;
-export const PUT = proxy;
-export const PATCH = proxy;
-export const DELETE = proxy;
+export const GET = handleProxyRequest;
+export const POST = handleProxyRequest;
+export const PUT = handleProxyRequest;
+export const PATCH = handleProxyRequest;
+export const DELETE = handleProxyRequest;

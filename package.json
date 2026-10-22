@@ -2,6 +2,9 @@
   "name": "konnect-web",
   "version": "0.1.0",
   "private": true,
+  "allowScripts": {
+    "core-js": false
+  },
   "scripts": {
     "dev": "next dev",
     "clean": "node -e \"const fs = require('fs'); fs.rmSync('.next', { recursive: true, force: true }); console.log('✓ .next cache cleared');\"",
