@@ -75,7 +75,9 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
     );
 
     if (registerWithRedux.fulfilled.match(result)) {
-      router.replace("/login?registered=1&role=learner");
+      const courseId = new URLSearchParams(window.location.search).get("courseId");
+      const enrollmentQuery = courseId ? `&courseId=${encodeURIComponent(courseId)}` : "";
+      router.replace(`/login?registered=1&role=learner${enrollmentQuery}`);
     } else {
       setNotice(
         result.payload ?? {

@@ -48,6 +48,14 @@ function normalizeBackendBase(url?: string): string {
 }
 
 const BACKEND_BASE = normalizeBackendBase(process.env.NEXT_PUBLIC_API_URL);
+const REQUEST_HEADERS_TO_SKIP = new Set([
+  "host",
+  "connection",
+  "content-length",
+  "origin",
+  "referer",
+  "expect",
+]);
 
 const activeSessionEmailByToken = new Map<string, string>();
 
@@ -538,27 +546,13 @@ async function proxy(
     if (!REQUEST_HEADERS_TO_SKIP.has(key.toLowerCase())) headers.set(key, value);
   });
   headers.set("Accept", "application/json");
-  return headers;
-}
-
-async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const { path } = await context.params;
-  const subpath = path.map(encodeURIComponent).join("/");
-
-  let target: URL;
-  try {
-    target = new URL(`/api/${subpath}/`, getBackendBase());
-  } catch (error) {
-    console.error("API proxy configuration error:", error);
-    return NextResponse.json({ detail: "The API service is not configured." }, { status: 503 });
-  }
-  target.search = request.nextUrl.search;
+  const target = targetUrl;
 
   try {
     const response = await fetch(target, {
       method: request.method,
-      headers: buildHeaders(request),
-      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
+      headers,
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : bodyBuffer,
       cache: "no-store",
     });
 

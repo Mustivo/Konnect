@@ -18,6 +18,6 @@ export const mockCourses: MockCourse[] = (database.classes as DatabaseCourse[]).
   description: course.description || course.subtitle || "Sample course content for the learner dashboard.",
   subject: course.subject || course.category || "General",
   teacher_name: course.teacher_name || course.instructor || "Konnect instructor",
-  banner_image: null,
+  banner_image: course.banner_image || course.image || null,
   isDemo: true,
 }));

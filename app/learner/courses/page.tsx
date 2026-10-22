@@ -9,13 +9,18 @@ import { mockCourses } from "@/lib/mock/courses";
 
 type ApiCourse = {
   id: string;
-  title: string;
+  title?: string;
+  name?: string;
   description?: string;
   subject?: string;
+  category?: string;
   teacher_name?: string;
+  instructor?: string;
   banner_image?: string | null;
+  image?: string | null;
   status?: string;
   visibility?: string;
+  isDemo?: boolean;
 };
 
 type ApiEnrollment = {
@@ -26,7 +31,11 @@ type ApiEnrollment = {
 };
 
 type ApiCollection<T> = T[] | { results?: T[]; next?: string | null };
-type Course = ApiCourse & { enrollmentStatus: string | null };
+type Course = ApiCourse & {
+  title: string;
+  enrollmentStatus: string | null;
+  isDemo?: boolean;
+};
 
 const statusLabel: Record<string, string> = {
   PENDING: "Pending approval",
@@ -121,14 +130,18 @@ export default function LearnerCoursesPage() {
         return;
       }
       try {
-        const [catalog, enrollments] = await Promise.all([
+        const [catalogResult, enrollmentsResult] = await Promise.allSettled([
           getAllPages<ApiCourse>(getCourses),
           getAllPages<ApiEnrollment>(getEnrollments),
         ]);
         if (!active) return;
 
+        const catalog = catalogResult.status === "fulfilled" ? catalogResult.value : [];
+        const enrollments = enrollmentsResult.status === "fulfilled" ? enrollmentsResult.value : [];
+        const usingMockCourses = catalog.length === 0;
+        const availableCourses: ApiCourse[] = usingMockCourses ? mockCourses : catalog;
         const enrollmentsByClass = new Map(enrollments.map((enrollment) => [courseIdFromEnrollment(enrollment), enrollment]));
-        const classesById = new Map(catalog.map((course) => [course.id, course]));
+        const classesById = new Map(availableCourses.map((course) => [course.id, course]));
         for (const enrollment of enrollments) {
           const id = courseIdFromEnrollment(enrollment);
           if (id && !classesById.has(id) && enrollmentStatusLabel(enrollment.status) !== "DROPPED") {
@@ -142,7 +155,13 @@ export default function LearnerCoursesPage() {
 
         setCourses([...classesById.values()].map((course) => ({
           ...course,
-          enrollmentStatus: enrollmentStatusLabel(enrollmentsByClass.get(course.id)?.status) || null,
+          title: course.title || course.name || "Course",
+          subject: course.subject || course.category,
+          teacher_name: course.teacher_name || course.instructor,
+          banner_image: course.banner_image || course.image || null,
+          enrollmentStatus: enrollmentsByClass.has(course.id)
+            ? enrollmentStatusLabel(enrollmentsByClass.get(course.id)?.status)
+            : null,
         })));
         if (usingMockCourses && catalogResult.status === "rejected") {
           setNotice(`Live courses could not be loaded (${catalogResult.reason instanceof Error ? catalogResult.reason.message : "request failed"}). Showing sample courses from this project; sample courses cannot be enrolled in.`);

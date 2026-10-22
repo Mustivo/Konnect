@@ -9,6 +9,16 @@ import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { clearNotice, loginWithRedux, setNotice } from "@/lib/redux/slices/authSlice";
 import AuthMessage from "@/components/ui/AuthMessage";
 
+type EnrollmentCourseSummary = {
+  id: string;
+  title: string;
+  subject: string;
+  teacher_name: string;
+  description: string;
+  banner_image: string | null;
+  isDemo: boolean;
+};
+
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
@@ -21,10 +31,28 @@ export default function AccountForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [selectedCourse, setSelectedCourse] = useState<EnrollmentCourseSummary | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const courseId = params.get("courseId");
+    if (courseId) {
+      try {
+        const storedCourse = JSON.parse(sessionStorage.getItem("konnect-enrollment-course") || "null") as EnrollmentCourseSummary | null;
+        if (storedCourse?.id === courseId) setSelectedCourse(storedCourse);
+      } catch {
+        setSelectedCourse(null);
+      }
+    }
+    const cleanAuthParams = () => {
+      params.delete("registered");
+      params.delete("role");
+      params.delete("logged_out");
+      params.delete("logout");
+      const search = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
+    };
     if (params.get("registered") === "1") {
       const role = params.get("role");
       const roleLabel = role === "teacher" ? "teacher" : "learner";
@@ -35,7 +63,7 @@ export default function AccountForm() {
           message: `Your ${roleLabel} account is waiting for administrator approval. You can sign in after your account is approved.`,
         })
       );
-      window.history.replaceState({}, "", window.location.pathname);
+      cleanAuthParams();
     } else if (params.get("logged_out") === "1" || params.get("logout") === "1") {
       dispatch(
         setNotice({
@@ -44,7 +72,7 @@ export default function AccountForm() {
           message: "You have been logged out successfully. Please sign in to access your classes and courses.",
         })
       );
-      window.history.replaceState({}, "", window.location.pathname);
+      cleanAuthParams();
     } else if (notice?.title === "Welcome back!") {
       // Clear previous login success message when arriving on the login screen
       dispatch(clearNotice());
@@ -89,9 +117,11 @@ export default function AccountForm() {
       } else if (normalizedRole === "TEACHER") {
         router.replace("/teacher/dashboard");
       } else if (normalizedRole === "STUDENT" || normalizedRole === "LEARNER") {
-        router.replace("/learner/dashboard");
+        const courseId = new URLSearchParams(window.location.search).get("courseId");
+        router.replace(courseId ? `/learner/courses/enroll?courseId=${encodeURIComponent(courseId)}` : "/learner/dashboard");
       } else {
-        router.replace("/learner/dashboard");
+        const courseId = new URLSearchParams(window.location.search).get("courseId");
+        router.replace(courseId ? `/learner/courses/enroll?courseId=${encodeURIComponent(courseId)}` : "/learner/dashboard");
       }
     }
   };
@@ -112,8 +142,19 @@ export default function AccountForm() {
           Continue learning.
         </h1>
         <p className="mt-2 text-xs leading-5 text-[#6c7469] dark:text-[#b0b8aa]">
-          Log in to join your next live class, revisit feedback, or keep building momentum.
+          {selectedCourse ? "Log in to continue with this course." : "Log in to join your next live class, revisit feedback, or keep building momentum."}
         </p>
+        {selectedCourse && (
+          <section className="mt-4 overflow-hidden rounded-lg border border-[#dfe5da] bg-white dark:border-white/10 dark:bg-white/5" aria-label="Selected course">
+            {selectedCourse.banner_image && <img src={selectedCourse.banner_image} alt="" className="h-28 w-full object-cover" />}
+            <div className="p-3">
+              <p className="text-[0.55rem] font-semibold uppercase tracking-wide text-[#687c50]">Selected course · {selectedCourse.subject}</p>
+              <h2 className="mt-1 text-sm font-semibold">{selectedCourse.title}</h2>
+              <p className="mt-1 text-[0.62rem] text-[#70786d]">Instructor: {selectedCourse.teacher_name}</p>
+              <p className="mt-2 line-clamp-2 text-[0.62rem] leading-4 text-[#70786d]">{selectedCourse.description}</p>
+            </div>
+          </section>
+        )}
         <p className="mt-2 text-[0.58rem] text-[#70786d] dark:text-[#b0b8aa]">Email and password are required.</p>
 
         {/* Prominent Auth Alert / Return Message */}
@@ -253,7 +294,7 @@ export default function AccountForm() {
 
         <p className="mt-4 text-center text-[0.62rem] text-[#70786d] dark:text-[#b0b8aa]">
           New to Konnect?{" "}
-          <Link href="/signup" className="font-semibold text-[#263d21] hover:underline dark:text-[#a8bd8c]">
+          <Link href={selectedCourse ? `/signup?courseId=${encodeURIComponent(selectedCourse.id)}` : "/signup"} className="font-semibold text-[#263d21] hover:underline dark:text-[#a8bd8c]">
             Sign up
           </Link>
         </p>

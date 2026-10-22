@@ -1,21 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { getCourseCatalog, type CourseCatalogItem } from "@/lib/courses/catalog";
 
 type Level = "Beginner" | "Intermediate" | "Advanced";
 
 interface Course {
-  id: number;
+  id: string | number;
   category: string;
   title: string;
   instructor: string;
   rating: number;
-  level: Level;
+  level: string;
   duration: string;
   price: string;
   image: string;
+  description?: string;
+  isDemo?: boolean;
 }
 
 const img = (
@@ -149,6 +153,7 @@ const LEVELS: Level[] = [
 const PAGE_SIZE = 6;
 
 function Stars({ rating }: { rating: number }) {
+  if (rating <= 0) return null;
   return (
     <div className="flex items-center gap-1">
       <span className="text-[11px] tracking-tight text-amber-500">
@@ -162,7 +167,7 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function CourseCard({ course }: { course: Course }) {
+function CourseCard({ course, onEnroll }: { course: Course; onEnroll: (course: Course) => void }) {
   return (
     <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md">
       <img
@@ -184,6 +189,8 @@ function CourseCard({ course }: { course: Course }) {
           {course.title}
         </h3>
 
+        {course.description && <p className="mt-2 line-clamp-3 min-h-[3.75rem] text-xs leading-5 text-[var(--muted)]">{course.description}</p>}
+
         <p className="mt-2 text-xs text-[var(--muted)]">
           with {course.instructor}
         </p>
@@ -193,9 +200,9 @@ function CourseCard({ course }: { course: Course }) {
             {course.level} · {course.duration}
           </span>
 
-          <span className="font-semibold text-[var(--foreground)]">
-            {course.price}
-          </span>
+          <button type="button" onClick={() => onEnroll(course)} className="rounded-md bg-[#2f4a2a] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#243a20]">
+            Enroll in course
+          </button>
         </div>
       </div>
     </article>
@@ -203,14 +210,69 @@ function CourseCard({ course }: { course: Course }) {
 }
 
 export default function CoursesPage() {
+  const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
   const [filter, setFilter] = useState("All subjects");
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
 
+  useEffect(() => {
+    let active = true;
+    void getCourseCatalog().then((catalog) => {
+      if (!active) return;
+      setCourses(catalog.map((course) => ({
+        id: course.id,
+        category: course.subject,
+        title: course.title,
+        instructor: course.teacher_name,
+        rating: 0,
+        level: course.level || "Course",
+        duration: course.lessons ? `${course.lessons} lessons` : "Self-paced",
+        price: course.isDemo ? "Sample course" : "Enroll to join",
+        image: course.banner_image || "/courses/mathematics.jpg",
+        description: course.description,
+        isDemo: course.isDemo,
+      })));
+    }).finally(() => {
+      if (active) setLoadingCourses(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const filters = useMemo(() => [
+    "All subjects",
+    ...new Set(courses.map((course) => course.category)),
+    ...LEVELS,
+  ], [courses]);
+
+  function continueEnrollment(course: Course) {
+    const courseId = String(course.id);
+    const courseSummary: CourseCatalogItem = {
+      id: courseId,
+      title: course.title,
+      description: course.description || "Course details coming soon.",
+      subject: course.category,
+      teacher_name: course.instructor,
+      banner_image: course.image,
+      isDemo: Boolean(course.isDemo),
+      level: course.level,
+    };
+    try {
+      sessionStorage.setItem("konnect-enrollment-course", JSON.stringify(courseSummary));
+    } catch {}
+    const enrollmentPath = `/learner/courses/enroll?courseId=${encodeURIComponent(courseId)}`;
+    if (window.localStorage.getItem("konnect-access-token")) {
+      router.push(enrollmentPath);
+    } else {
+      router.push(`/login?courseId=${encodeURIComponent(courseId)}`);
+    }
+  }
+
   const filteredCourses = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
 
-    return COURSES.filter((course) => {
+    return courses.filter((course) => {
       let matchesFilter = true;
 
       if (filter !== "All subjects") {
@@ -225,11 +287,12 @@ export default function CoursesPage() {
         searchTerm.length === 0 ||
         course.title.toLowerCase().includes(searchTerm) ||
         course.instructor.toLowerCase().includes(searchTerm) ||
-        course.category.toLowerCase().includes(searchTerm);
+        course.category.toLowerCase().includes(searchTerm) ||
+        course.description?.toLowerCase().includes(searchTerm);
 
       return matchesFilter && matchesSearch;
     });
-  }, [filter, query]);
+  }, [courses, filter, query]);
 
   const visibleCourses = filteredCourses.slice(0, visible);
 
@@ -276,55 +339,53 @@ export default function CoursesPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[11px] text-[var(--muted)]">
-            <span>40 live courses</span>
-            <span>40 verified publishers</span>
-            <span>New release every week</span>
+            <span>{loadingCourses ? "Loading courses…" : `${courses.length} courses available`}</span>
+            <span>Courses taught by verified educators</span>
+            <span>Learn at your own pace</span>
           </div>
         </section>
 
         {/* FEATURED COURSE */}
-        <section className="border-y border-[var(--border)] bg-[var(--surface-soft)] py-10 transition-colors duration-300">
+        {courses[0] && <section className="border-y border-[var(--border)] bg-[var(--surface-soft)] py-10 transition-colors duration-300">
           <div className="mx-auto grid max-w-6xl items-center gap-8 px-6 md:grid-cols-2">
             <img
-              src={img("konnect-featured", 1000, 700)}
-              alt="Sustainable Spaces course"
+              src={courses[0].image}
+              alt={courses[0].title}
               className="h-72 w-full rounded-xl object-cover shadow-md"
             />
 
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-                Featured · Best of Sept · Starts 14 October
+                Featured course · {courses[0].category}
               </p>
 
               <h2 className="mt-3 text-3xl font-bold leading-tight text-[var(--foreground)]">
-                Sustainable Spaces: Design for Real Life
+                {courses[0].title}
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-                Turn climate principles into thoughtful, buildable design
-                choices through live studios and a personal capstone.
+                {courses[0].description}
               </p>
 
               <p className="mt-4 text-xs text-[var(--muted)]">
-                with Amara Okafor · Architect & educator
+                with {courses[0].instructor}
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
-                <Stars rating={4.8} />
-                <span>Intermediate</span>
-                <span>6 weeks</span>
-                <span>1 project</span>
+                <span>{courses[0].level}</span>
+                <span>{courses[0].duration}</span>
               </div>
 
               <button
                 type="button"
+                onClick={() => continueEnrollment(courses[0])}
                 className="mt-6 rounded-md bg-[#2f4a2a] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#243a20] dark:bg-[#879b5c] dark:text-[#0b0d0b] dark:hover:bg-[#9aad6e]"
               >
-                View featured course
+                Enroll in this course
               </button>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* ALL COURSES */}
         <section className="mx-auto max-w-6xl px-6 py-12">
@@ -349,7 +410,7 @@ export default function CoursesPage() {
 
           {/* FILTERS */}
           <div className="mt-6 flex flex-wrap gap-2">
-            {FILTERS.map((item) => {
+              {filters.map((item) => {
               const isActive = filter === item;
 
               return (
@@ -373,7 +434,9 @@ export default function CoursesPage() {
           </div>
 
           {/* COURSES */}
-          {visibleCourses.length === 0 ? (
+          {loadingCourses ? (
+            <p className="py-16 text-center text-sm text-[var(--muted)]">Loading courses from the learner catalogue…</p>
+          ) : visibleCourses.length === 0 ? (
             <div className="py-20 text-center">
               <p className="text-sm text-[var(--muted)]">
                 No courses match your search yet.
@@ -397,6 +460,7 @@ export default function CoursesPage() {
                 <CourseCard
                   key={course.id}
                   course={course}
+                  onEnroll={continueEnrollment}
                 />
               ))}
             </div>
