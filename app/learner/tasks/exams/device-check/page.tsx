@@ -20,6 +20,8 @@ import {
   VideoOff,
 } from "lucide-react";
 import { releaseExamMediaStream, setExamMediaStream } from "@/app/learner/tasks/exams/examMedia";
+import { useFaceVisibility } from "@/lib/vision/useFaceVisibility";
+import { useVisionProctor } from "@/lib/vision/useVisionProctor";
 
 const initialMeter = Array.from({ length: 32 }, (_, index) => index);
 
@@ -31,7 +33,6 @@ export default function ExamDeviceCheckPage() {
   const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState("");
   const [microphoneId, setMicrophoneId] = useState("");
-  const [faceVisible, setFaceVisible] = useState(true);
   const [monitoringAccepted, setMonitoringAccepted] = useState(false);
   const [testingMicrophone, setTestingMicrophone] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -41,6 +42,13 @@ export default function ExamDeviceCheckPage() {
   const preserveStreamOnRouteRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  const proctor = useVisionProctor({
+    videoRef,
+    isActive: !!stream?.getVideoTracks().some((track) => track.readyState === "live"),
+    mode: "exam",
+    intervalMs: 1800,
+  });
 
   useEffect(() => setMounted(true), []);
 
@@ -56,6 +64,8 @@ export default function ExamDeviceCheckPage() {
 
   const cameraReady = !!stream?.getVideoTracks().some((track) => track.readyState === "live");
   const microphoneReady = !!stream?.getAudioTracks().some((track) => track.readyState === "live");
+  const faceCheck = useFaceVisibility(videoRef, cameraReady);
+  const faceVisible = faceCheck.faceVisible;
   const checks = [cameraReady, microphoneReady, faceVisible, monitoringAccepted];
   const completedChecks = checks.filter(Boolean).length;
   const allChecksPassed = completedChecks === checks.length;
@@ -195,15 +205,17 @@ export default function ExamDeviceCheckPage() {
                     </div>
                   </>
                 )}
-                <button
-                  type="button"
-                  aria-pressed={faceVisible}
-                  disabled={!cameraReady}
-                  onClick={() => setFaceVisible((visible) => !visible)}
-                  className={`absolute bottom-2 rounded-full px-2.5 py-1 text-[8px] font-medium disabled:cursor-not-allowed disabled:opacity-90 ${faceVisible ? "bg-[#eaf0e3] text-[#3f5633]" : "bg-white/95 text-[#586552]"}`}
-                >
-                  {faceVisible ? "Face clearly visible · Confirmed" : "I can see my face clearly in preview"}
-                </button>
+                <div className="absolute bottom-2 flex flex-wrap items-center gap-2">
+                  <span role="status" aria-live="polite" className={`rounded-full px-2.5 py-1 text-[8px] font-medium shadow-sm ${faceVisible ? "bg-[#eaf0e3] text-[#3f5633]" : "bg-white/95 text-[#586552]"}`}>
+                    {faceCheck.status === "loading" ? "Loading face check…" : faceCheck.status === "checking" ? "Hold still · checking face…" : faceCheck.status === "clear" ? "Face clearly visible ✓" : faceCheck.status === "multiple_faces" ? "More than one face detected" : faceCheck.status === "error" ? "Face check unavailable · retry" : cameraReady ? "Center your face in the preview" : "Camera needed for face check"}
+                  </span>
+
+                  {proctor.violations.cellPhone && (
+                    <span className="rounded-full bg-amber-500/95 px-2.5 py-1 text-[8px] font-bold text-amber-950 shadow-sm animate-pulse">
+                      📱 Phone detected in view — put away before starting
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -257,7 +269,7 @@ export default function ExamDeviceCheckPage() {
                   {[
                     { title: "Camera permission & video", complete: cameraReady },
                     { title: "Microphone permission & input", complete: microphoneReady },
-                    { title: "Face clearly visible in preview", complete: faceVisible },
+                    { title: "Face detected clearly in preview", complete: faceVisible },
                     { title: "Monitoring acknowledgement", complete: monitoringAccepted },
                   ].map((check) => (
                     <li key={check.title} className="flex items-center gap-2 text-[9px]">

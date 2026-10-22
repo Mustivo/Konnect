@@ -1,6 +1,6 @@
 /**
  * KONNECT Live API Seeding Script
- * Inserts all mocked courses and live sessions from lib/mock/classesTable.ts
+ * Migrates the pre-existing course and session records from data/database.json
  * directly into the live Render backend database tables (POST /api/courses/ & POST /api/live-sessions/).
  */
 
@@ -70,12 +70,16 @@ async function main() {
   console.log("==================================================================");
   console.log(`Target API: ${BACKEND_URL}`);
 
-  // 1. Resolve Access Token & Admin Credentials
+  // 1. Resolve an explicitly supplied administrator credential.
+  // Never keep credentials in source code or fall back to a shared password.
   let token = process.env.KONNECT_TOKEN || process.argv.find((a, i, arr) => arr[i - 1] === "--token");
-  const email = (process.env.KONNECT_EMAIL || process.argv.find((a, i, arr) => arr[i - 1] === "--email") || "superadmin@gmail.com").toLowerCase().trim();
-  const password = process.env.KONNECT_PASSWORD || process.argv.find((a, i, arr) => arr[i - 1] === "--password") || "nono@123";
+  const email = (process.env.KONNECT_EMAIL || process.argv.find((a, i, arr) => arr[i - 1] === "--email") || "").toLowerCase().trim();
+  const password = process.env.KONNECT_PASSWORD || process.argv.find((a, i, arr) => arr[i - 1] === "--password");
 
   if (!token) {
+    if (!email || !password) {
+      throw new Error("Provide KONNECT_TOKEN, or both KONNECT_EMAIL and KONNECT_PASSWORD. Credentials are never read from source files.");
+    }
     console.log(`\n1. Authenticating as: ${email}...`);
     try {
       token = await obtainToken(email, password);

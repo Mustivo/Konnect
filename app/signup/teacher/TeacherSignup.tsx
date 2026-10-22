@@ -10,7 +10,7 @@ import DocumentsStep from "./steps/DocumentsStep";
 import ReviewStep, { type TeacherReviewData } from "./steps/ReviewStep";
 import EmailVerification from "./screens/EmailVerification";
 import ApplicationStatus from "./screens/ApplicationStatus";
-import { apiErrorMessage, login, register, updateTeacherProfile } from "@/lib/api";
+import { apiErrorMessage, registerTeacher } from "@/lib/api";
 import AuthMessage from "@/components/ui/AuthMessage";
 
 type TeacherSignupProps = {
@@ -99,70 +99,36 @@ export default function TeacherSignup({ role, onRoleChange }: TeacherSignupProps
     const values = new FormData(applicationForm.current);
     const emailAddress = String(values.get("email") ?? "").trim().toLowerCase();
     const fullName = String(values.get("fullName") ?? "").trim();
-    const [firstName, ...lastNameParts] = fullName.split(/\s+/);
     const password = String(values.get("password") ?? "");
     const passwordConfirm = String(values.get("confirmPassword") ?? "");
-    let accountCreated = false;
-
     setSubmitting(true);
     setNotice("");
     try {
-      const cleanUsername = (emailAddress.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "teacher") + "_" + Math.random().toString(36).slice(2, 6);
       const phoneNumber = String(values.get("phone") ?? "").trim();
+      const splitList = (value: FormDataEntryValue | null) => String(value ?? "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-      await register({
+      await registerTeacher({
         email: emailAddress,
-        username: cleanUsername,
-        name: fullName || "Instructor",
-        full_name: fullName || "Instructor",
-        first_name: firstName || "Instructor",
-        last_name: lastNameParts.join(" ") || "Teacher",
-        phone_number: phoneNumber || undefined,
         password,
-        password_confirm: passwordConfirm,
-        role: "TEACHER",
+        full_name: fullName || "Instructor",
+        full_legal_name: fullName || "Instructor",
+        display_name: String(values.get("displayName") ?? fullName).trim(),
+        phone_number: phoneNumber,
+        country: String(values.get("country") ?? "").trim(),
+        bio: String(values.get("bio") ?? "").trim(),
+        years_of_experience: String(values.get("experience") ?? "").trim(),
+        education_level_taught: String(values.get("educationLevel") ?? "").trim(),
+        current_institution: String(values.get("institution") ?? "").trim(),
+        subjects_expertise: splitList(values.get("subjects")),
+        languages: splitList(values.get("languages")),
       });
-      accountCreated = true;
-
-      const tokens = await login(emailAddress, password);
-      localStorage.setItem("konnect-access-token", tokens.access);
-      localStorage.setItem("konnect-refresh-token", tokens.refresh);
-
-      const profile = new FormData();
-      profile.set("email", emailAddress);
-      profile.set("full_legal_name", fullName);
-      profile.set("display_name", String(values.get("displayName") ?? fullName).trim());
-      profile.set("phone_number", phoneNumber);
-      profile.set("country", String(values.get("country") ?? "").trim());
-      profile.set("headline", String(values.get("headline") ?? "").trim());
-      profile.set("bio", String(values.get("bio") ?? "").trim());
-      profile.set("years_of_experience", String(values.get("experience") ?? "").trim());
-      profile.set("education_level_taught", String(values.get("educationLevel") ?? "").trim());
-      profile.set("current_institution", String(values.get("institution") ?? "").trim());
-      profile.set("teaching_mode", String(values.get("teachingMode") ?? "").trim());
-      profile.set("subjects_expertise", String(values.get("subjects") ?? "").trim());
-      profile.set("languages", String(values.get("languages") ?? "").trim());
-      profile.set("portfolio_url", String(values.get("portfolio") ?? "").trim());
-      profile.set("legal_name_on_documents", String(values.get("documentName") ?? fullName).trim());
-
-      const degreeCert = values.get("degree_certificate");
-      if (degreeCert instanceof File && degreeCert.size > 0) {
-        profile.set("degree_certificate", degreeCert);
-      }
-      const cvFile = values.get("cv");
-      if (cvFile instanceof File && cvFile.size > 0) {
-        profile.set("cv", cvFile);
-      }
-      const profilePhoto = values.get("profilePhoto");
-      if (profilePhoto instanceof File && profilePhoto.size > 0) {
-        profile.set("profile_picture", profilePhoto);
-      }
-
-      await updateTeacherProfile(profile);
-      router.replace("/login?registered=1");
+      router.replace("/login?registered=1&role=teacher");
     } catch (error) {
       const message = apiErrorMessage(error instanceof Error && "payload" in error ? error.payload : error, "Please review your details and try again.");
-      setNotice(accountCreated ? `Your account was created, but the teacher profile could not be submitted: ${message}` : message);
+      setNotice(message);
     } finally {
       setSubmitting(false);
     }

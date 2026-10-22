@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import type { AuthMessageState } from "@/lib/redux/types";
@@ -17,7 +17,6 @@ export interface AuthMessageProps {
     onClick?: () => void;
   };
   onDismiss?: () => void;
-  autoDismissTimeout?: number;
   className?: string;
 }
 
@@ -29,7 +28,6 @@ export default function AuthMessage({
   fieldErrors,
   action,
   onDismiss,
-  autoDismissTimeout,
   className = "",
 }: AuthMessageProps) {
   const [isDismissing, setIsDismissing] = useState(false);
@@ -59,32 +57,6 @@ export default function AuthMessage({
     currentFieldErrors = notice.fieldErrors || currentFieldErrors;
     currentAction = notice.action || currentAction;
   }
-
-  const autoDismissMs =
-    autoDismissTimeout ??
-    (typeof notice === "object" && notice && typeof notice.autoDismiss === "number"
-      ? notice.autoDismiss
-      : typeof notice === "object" && notice && notice.autoDismiss === true
-      ? 4000
-      : undefined);
-
-  useEffect(() => {
-    if (!autoDismissMs || !onDismiss) return;
-    setIsDismissing(false);
-
-    const startExitTimer = setTimeout(() => {
-      setIsDismissing(true);
-    }, autoDismissMs);
-
-    const finishDismissTimer = setTimeout(() => {
-      onDismiss();
-    }, autoDismissMs + 280);
-
-    return () => {
-      clearTimeout(startExitTimer);
-      clearTimeout(finishDismissTimer);
-    };
-  }, [autoDismissMs, onDismiss, currentTitle, currentMessage]);
 
   const hasContent = Boolean(
     currentMessage ||
@@ -242,25 +214,6 @@ export default function AuthMessage({
         )}
       </div>
 
-      {/* Subtle Auto-dismiss Progress Bar */}
-      {autoDismissMs && !isDismissing && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-black/5 dark:bg-white/10 overflow-hidden">
-          <div
-            className={`h-full ${
-              currentType === "success"
-                ? "bg-emerald-500/80 dark:bg-emerald-400"
-                : currentType === "info"
-                ? "bg-[#3b5934]/70 dark:bg-[#a5c29a]"
-                : currentType === "warning"
-                ? "bg-amber-500/80"
-                : "bg-red-500/80"
-            }`}
-            style={{
-              animation: `auth-progress ${autoDismissMs}ms linear forwards`,
-            }}
-          />
-        </div>
-      )}
     </aside>
   );
 }

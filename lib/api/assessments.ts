@@ -7,5 +7,6 @@ export const updateAssessment = (id: string, payload: Record<string, unknown>) =
 export const deleteAssessment = (id: string) => apiRequest(`/api/assessments/${encodeURIComponent(id)}/`, { method: "DELETE" });
 export const getAssessmentSubmissions = (assessmentId: string, query = "") => apiRequest(`/api/assessments/${encodeURIComponent(assessmentId)}/submissions/${query}`);
 export const submitAssessment = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/assessments/${encodeURIComponent(id)}/submit/`, { method: "POST", body: JSON.stringify(payload) });
-export const getMyAssessmentSubmissions = (query = "") => apiRequest(`/api/assessments/learner/my-submissions/${query}`);
+// The live API scopes this list to the authenticated student.
+export const getMyAssessmentSubmissions = (query = "") => apiRequest(`/api/submissions/${query}`);
 export const gradeAssessmentSubmission = (id: string, payload: Record<string, unknown>) => apiRequest(`/api/assessments/submissions/${encodeURIComponent(id)}/grade/`, { method: "POST", body: JSON.stringify(payload) });

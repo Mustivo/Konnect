@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import { currentUser, updateCurrentUser } from "@/lib/api/auth";
+import { currentUser, deleteCurrentUser, updateCurrentUser } from "@/lib/api/auth";
 import {
   Check,
   ChevronDown,
@@ -65,6 +66,7 @@ const initialAuditEntries: AuditEntry[] = [
 ];
 
 export default function AdminSettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"platform" | "notifications" | "security" | "audit">("platform");
 
   // Platform settings state
@@ -93,6 +95,8 @@ export default function AdminSettingsPage() {
   const [adminName, setAdminName] = useState("Alex Morgan");
   const [adminEmail, setAdminEmail] = useState("alex.morgan@konnect.edu");
   const [adminRole, setAdminRole] = useState("Platform Administrator");
+  const [editingAdminAccount, setEditingAdminAccount] = useState(false);
+  const [savingAdminAccount, setSavingAdminAccount] = useState(false);
 
   // Feedback notifications
   const [notice, setNotice] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -133,6 +137,33 @@ export default function AdminSettingsPage() {
       setSavingPlatform(false);
       showNotice("Platform settings updated successfully.");
     }, 400);
+  }
+
+  async function handleSaveAdminAccount() {
+    setSavingAdminAccount(true);
+    try {
+      const [first_name, ...lastParts] = adminName.trim().split(/\s+/);
+      await updateCurrentUser({ first_name, last_name: lastParts.join(" "), email: adminEmail });
+      setEditingAdminAccount(false);
+      showNotice("Admin profile updated.");
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Admin profile could not be updated.", "error");
+    } finally {
+      setSavingAdminAccount(false);
+    }
+  }
+
+  async function handleDeleteAdminAccount() {
+    if (!window.confirm("Delete your administrator account? This may remove your access to the admin portal.")) return;
+    try {
+      const response = await deleteCurrentUser();
+      if (!response.ok) throw new Error(`Account deletion failed (${response.status}).`);
+      localStorage.removeItem("konnect-access-token");
+      localStorage.removeItem("konnect-refresh-token");
+      router.replace("/login");
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Your account could not be deleted.", "error");
+    }
   }
 
   function handleSaveNotifications(e: FormEvent) {
@@ -490,22 +521,27 @@ export default function AdminSettingsPage() {
                 <h2 className="text-[14px] font-bold text-[#172115] dark:text-[#edf2ea]">
                   Your admin account
                 </h2>
-                <p className="mt-1.5 text-[17px] font-extrabold text-[#172115] dark:text-[#edf2ea]">
-                  {adminName}
-                </p>
+                {editingAdminAccount ? <div className="mt-3 space-y-2">
+                  <label className="block text-[9px] font-semibold text-[#63715d]">Name<input value={adminName} onChange={(event) => setAdminName(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-[#e9ece4] bg-white px-3 text-[11px] text-[#172115] outline-none focus:border-[#263a20]" /></label>
+                  <label className="block text-[9px] font-semibold text-[#63715d]">Email<input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-[#e9ece4] bg-white px-3 text-[11px] text-[#172115] outline-none focus:border-[#263a20]" /></label>
+                </div> : <p className="mt-1.5 text-[17px] font-extrabold text-[#172115] dark:text-[#edf2ea]">{adminName}</p>}
                 <p className="text-[10px] text-[#707c6c] dark:text-[#9ea999]">
                   {adminRole}
                 </p>
 
-                <div className="mt-2.5">
+                {!editingAdminAccount && <div className="mt-2.5">
                   <span className="inline-block rounded-full bg-[#eef6eb] px-3 py-1 font-mono text-[9.5px] font-semibold text-[#276a1f] dark:bg-[#1f2f1c] dark:text-[#86efac]">
                     {adminEmail}
                   </span>
-                </div>
+                </div>}
 
                 <p className="mt-3.5 border-t border-[#edf1ea] pt-2 text-[8.5px] text-[#828f7f] dark:border-[#243021] dark:text-[#9ea999]">
                   Active session · 16 Oct 2026, 09:20
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {editingAdminAccount ? <><button type="button" disabled={savingAdminAccount} onClick={() => void handleSaveAdminAccount()} className="rounded-full bg-[#263a20] px-3 py-1.5 text-[9px] font-semibold text-white disabled:opacity-50">{savingAdminAccount ? "Saving…" : "Save profile"}</button><button type="button" onClick={() => setEditingAdminAccount(false)} className="rounded-full bg-[#f2f5ee] px-3 py-1.5 text-[9px] font-semibold text-[#263a20]">Cancel</button></> : <button type="button" onClick={() => setEditingAdminAccount(true)} className="rounded-full bg-[#f2f5ee] px-3 py-1.5 text-[9px] font-semibold text-[#263a20]">Edit profile</button>}
+                  <button type="button" onClick={() => void handleDeleteAdminAccount()} className="rounded-full border border-[#e9c7c2] px-3 py-1.5 text-[9px] font-semibold text-[#913f34]">Delete account</button>
+                </div>
               </section>
             </div>
           </div>

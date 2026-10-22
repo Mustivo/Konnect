@@ -69,12 +69,13 @@ export default function LearnerSignup({ onRoleChange }: LearnerSignupProps) {
         name,
         email,
         password,
+        password_confirm: passwordConfirm,
         student_number: studentNumber,
       })
     );
 
     if (registerWithRedux.fulfilled.match(result)) {
-      router.replace("/login?registered=1");
+      router.replace("/login?registered=1&role=learner");
     } else {
       setNotice(
         result.payload ?? {

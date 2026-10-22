@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import { Bell, Info, Play, Search } from "lucide-react";
+import { apiJson, deleteCourse, deleteLiveSession, getCourses, getLiveSessions, updateCourse, updateLiveSession } from "@/lib/api";
+import { Bell, Info, Play, Search, Pencil, Trash2, CalendarDays } from "lucide-react";
 
 type TabId = "all" | "live" | "records";
 
@@ -36,6 +37,9 @@ type RecordRow = {
   minutes: number;
   incident: string | null;
 };
+
+type ManagedClass = { id: string | number; title: string; description?: string; subject?: string; teacher?: string | { full_name?: string }; enrolled_count?: number };
+type ManagedSession = { id: string | number; course: string | number; starts_at: string; ends_at: string };
 
 const MAX_LEARNERS = 100;
 const TOTAL_CLASSES = 62;
@@ -148,6 +152,86 @@ export default function AdminClassesPage() {
   const [activeTab, setActiveTab] = useState<TabId>("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("algebra-a");
+  const [managedClasses, setManagedClasses] = useState<ManagedClass[]>([]);
+  const [managedSessions, setManagedSessions] = useState<ManagedSession[]>([]);
+  const [manageNotice, setManageNotice] = useState("");
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("konnect-access-token")) return;
+    let cancelled = false;
+    Promise.all([
+      getCourses().then((response) => apiJson<ManagedClass[] | { results?: ManagedClass[] }>(response)),
+      getLiveSessions().then((response) => apiJson<ManagedSession[] | { results?: ManagedSession[] }>(response)),
+    ]).then(([classPayload, sessionPayload]) => {
+      if (cancelled) return;
+      setManagedClasses(Array.isArray(classPayload) ? classPayload : classPayload.results ?? []);
+      setManagedSessions(Array.isArray(sessionPayload) ? sessionPayload : sessionPayload.results ?? []);
+    }).catch((error) => {
+      if (!cancelled) setManageNotice(error instanceof Error ? error.message : "Live class records could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function editManagedClass(item: ManagedClass) {
+    const titleValue = window.prompt("Course name", item.title);
+    if (titleValue === null) return;
+    const title = titleValue.trim();
+    if (!title) { setManageNotice("Course name cannot be empty."); return; }
+    const originalDescription = item.description ?? item.subject ?? "";
+    const descriptionValue = window.prompt("Course description", originalDescription);
+    if (descriptionValue === null) return;
+    const description = descriptionValue.trim();
+    if (title === item.title && description === originalDescription) return;
+    try {
+      await apiJson(await updateCourse(String(item.id), { title, description: description ?? item.description ?? "" }));
+      setManagedClasses((current) => current.map((row) => row.id === item.id ? { ...row, title, description: description ?? row.description } : row));
+      setManageNotice("Class updated.");
+    } catch (error) {
+      setManageNotice(error instanceof Error ? error.message : "Class could not be updated.");
+    }
+  }
+
+  async function removeManagedClass(item: ManagedClass) {
+    if (!window.confirm(`Delete “${item.title}”? Associated sessions or learner records may also be affected.`)) return;
+    try {
+      const response = await deleteCourse(String(item.id));
+      if (!response.ok) throw new Error(`Delete failed (${response.status}).`);
+      setManagedClasses((current) => current.filter((row) => row.id !== item.id));
+      setManagedSessions((current) => current.filter((row) => String(row.course) !== String(item.id)));
+      setManageNotice("Class deleted.");
+    } catch (error) {
+      setManageNotice(error instanceof Error ? error.message : "Class could not be deleted.");
+    }
+  }
+
+  async function editManagedSession(item: ManagedSession) {
+    const start = window.prompt("New start time (ISO date and time)", new Date(item.starts_at).toISOString())?.trim();
+    if (!start) return;
+    const startDate = new Date(start);
+    if (!Number.isFinite(startDate.getTime())) { setManageNotice("Enter a valid date and time."); return; }
+    const duration = Math.max(60_000, new Date(item.ends_at).getTime() - new Date(item.starts_at).getTime());
+    const starts_at = startDate.toISOString();
+    const ends_at = new Date(startDate.getTime() + duration).toISOString();
+    try {
+      await apiJson(await updateLiveSession(String(item.id), { starts_at, ends_at }));
+      setManagedSessions((current) => current.map((row) => row.id === item.id ? { ...row, starts_at, ends_at } : row));
+      setManageNotice("Live session updated.");
+    } catch (error) {
+      setManageNotice(error instanceof Error ? error.message : "Live session could not be updated.");
+    }
+  }
+
+  async function removeManagedSession(item: ManagedSession) {
+    if (!window.confirm("Delete this live session?")) return;
+    try {
+      const response = await deleteLiveSession(String(item.id));
+      if (!response.ok) throw new Error(`Delete failed (${response.status}).`);
+      setManagedSessions((current) => current.filter((row) => row.id !== item.id));
+      setManageNotice("Live session deleted.");
+    } catch (error) {
+      setManageNotice(error instanceof Error ? error.message : "Live session could not be deleted.");
+    }
+  }
 
   const q = query.trim().toLowerCase();
   const match = (...parts: string[]) =>
@@ -281,6 +365,25 @@ export default function AdminClassesPage() {
             after a class ends.
           </p>
         </div>
+
+        <section className={`${card} mt-6 px-[22px] py-5`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className={cardTitle}>Manage live database records</h2><p className={cardSub}>Update or delete courses and sessions using your administrator access.</p></div>
+          </div>
+          {manageNotice && <p role="status" className="mt-3 text-[10px] text-[#8a5c32]">{manageNotice}</p>}
+          {managedClasses.length === 0 ? <p className="mt-4 text-[10px] text-[#63715d]">No live courses loaded. Sign in as an administrator to manage database records.</p> : <div className="mt-4 space-y-2">
+            {managedClasses.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#edf0e9] px-3 py-2.5">
+              <div><p className="text-[11px] font-bold text-[#172115]">{item.title}</p><p className="mt-0.5 text-[9px] text-[#707c6c]">{item.description ?? item.subject ?? "Course"} · {typeof item.teacher === "string" ? item.teacher : item.teacher?.full_name ?? "Teacher"}</p></div>
+              <div className="flex gap-2"><button type="button" onClick={() => void editManagedClass(item)} className="inline-flex items-center gap-1 rounded-full border border-[#dce3d7] px-3 py-1.5 text-[9px] font-semibold text-[#405439]"><Pencil size={11} /> Edit</button><button type="button" onClick={() => void removeManagedClass(item)} className="inline-flex items-center gap-1 rounded-full border border-[#efceca] px-3 py-1.5 text-[9px] font-semibold text-[#9a3e32]"><Trash2 size={11} /> Delete</button></div>
+            </div>)}
+          </div>}
+          {managedClasses.length > 0 && <div className="mt-5 border-t border-[#edf0e9] pt-4">
+            <h3 className="text-[12px] font-bold text-[#172115]">Live sessions</h3>
+            {managedSessions.length === 0 ? <p className="mt-2 text-[10px] text-[#63715d]">No live sessions found.</p> : <div className="mt-2 divide-y divide-[#edf0e9]">
+              {managedSessions.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5"><p className="flex items-center gap-2 text-[10px] text-[#405439]"><CalendarDays size={12} />{managedClasses.find((course) => String(course.id) === String(item.course))?.title ?? "Course"} · {new Date(item.starts_at).toLocaleString()}</p><div className="flex gap-2"><button type="button" onClick={() => void editManagedSession(item)} className="rounded-full border border-[#dce3d7] px-3 py-1.5 text-[9px] font-semibold text-[#405439]">Edit</button><button type="button" onClick={() => void removeManagedSession(item)} className="rounded-full border border-[#efceca] px-3 py-1.5 text-[9px] font-semibold text-[#9a3e32]">Delete</button></div></div>)}
+            </div>}
+          </div>}
+        </section>
 
         {/* All classes */}
         <section

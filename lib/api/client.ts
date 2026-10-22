@@ -39,6 +39,10 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}) 
     const accessToken = window.localStorage.getItem("konnect-access-token");
     if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
     const response = await send();
+    if (response.status === 404 || response.status === 405) {
+      lastResponse = response;
+      continue;
+    }
     if (response.status !== 404 && response.status !== 405) {
       if (response.status !== 401 || candidatePath.includes("/auth/token/refresh/") || candidatePath.includes("/auth/token/") || candidatePath.includes("/auth/login/") || candidatePath.includes("/api/token/") || candidatePath.includes("/api/token/refresh/")) {
         return response;
@@ -52,14 +56,20 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}) 
     if (!refresh) return response;
 
     try {
-      let refreshResponse = await fetch(`${apiBaseUrl}/api/auth/token/refresh/`, {
+      const refreshUrl = typeof window !== "undefined"
+        ? "/api/auth/token/refresh/"
+        : `${apiBaseUrl}/api/auth/token/refresh/`;
+      let refreshResponse = await fetch(refreshUrl, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
         credentials: "include",
       });
       if (refreshResponse.status === 404) {
-        refreshResponse = await fetch(`${apiBaseUrl}/api/token/refresh/`, {
+        const fallbackRefreshUrl = typeof window !== "undefined"
+          ? "/api/token/refresh/"
+          : `${apiBaseUrl}/api/token/refresh/`;
+        refreshResponse = await fetch(fallbackRefreshUrl, {
           method: "POST",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
           body: JSON.stringify({ refresh }),

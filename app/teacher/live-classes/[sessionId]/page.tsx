@@ -15,7 +15,7 @@ import {
   sendLiveSignal,
   getLiveSignals,
 } from "@/lib/api/sessions";
-import type { MockParticipant } from "@/lib/mock/classesTable";
+import type { LiveParticipant } from "@/lib/api/live";
 import {
   Bell,
   Camera,
@@ -166,7 +166,7 @@ export default function TeacherLiveClassPage() {
     async function syncAttendance() {
       try {
         const res = await getSessionAttendance(sessionId);
-        const data = await apiJson<{ results?: MockParticipant[] }>(res);
+        const data = await apiJson<{ results?: LiveParticipant[] }>(res);
         if (!active) return;
         const learners = (data?.results || []).filter((p) => p.role === "learner");
         if (learners.length > 0) {

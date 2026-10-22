@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiJson, getLearnerClasses } from "@/lib/api";
 import { currentUser } from "@/lib/api/auth";
-import { cancelLiveJoinRequest, getClassSessions, getLiveJoinRequests, requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, getActiveLiveSessions, getClassSessions, getLiveJoinRequests, requestJoinSession } from "@/lib/api/sessions";
 import {
   CalendarDays,
   Check,
@@ -227,6 +227,13 @@ export default function LiveClassesPage() {
   const learnerIdRef = useRef<string>("learner-" + Math.random().toString(36).slice(2, 8));
 
   useEffect(() => {
+    const key = "konnect-live-class-learner-id";
+    const saved = window.localStorage.getItem(key);
+    if (saved) learnerIdRef.current = saved;
+    else window.localStorage.setItem(key, learnerIdRef.current);
+  }, []);
+
+  useEffect(() => {
     requestStatusesRef.current = requestStatuses;
   }, [requestStatuses]);
 
@@ -339,9 +346,9 @@ export default function LiveClassesPage() {
     }
     window.addEventListener("storage", handleStorage);
 
-    const pollTimer = setInterval(() => {
+    const pollTimer = setInterval(async () => {
       const currentMap = requestStatusesRef.current;
-      Object.keys(currentMap).forEach((sid) => {
+      await Promise.all(Object.keys(currentMap).map(async (sid) => {
         if (currentMap[sid] === "waiting") {
           try {
             const raw = window.localStorage.getItem(`konnect-live-class-admission:${sid}`);
@@ -352,8 +359,25 @@ export default function LiveClassesPage() {
               }
             }
           } catch {}
+
+          try {
+            const response = await getLiveJoinRequests(sid);
+            const data = await apiJson<{ results?: Array<{ id: string; learner_id: string | number; status: "waiting" | "admitted" | "denied" }> }>(response);
+            const request = data.results?.find((item) => String(item.learner_id) === learnerIdRef.current);
+            if (request?.status === "admitted" || request?.status === "denied") {
+              setRequestStatuses((prev) => ({ ...prev, [sid]: request.status }));
+              if (request.status === "admitted") {
+                window.localStorage.setItem(`konnect-live-class-admitted:${sid}`, "true");
+                window.sessionStorage.setItem(`konnect-live-class-admitted:${sid}`, "true");
+                window.localStorage.removeItem(`konnect-live-class-requested:${sid}`);
+                router.push(`/learner/live_classes/liveClass?session=${encodeURIComponent(sid)}`);
+              } else {
+                window.localStorage.removeItem(`konnect-live-class-requested:${sid}`);
+              }
+            }
+          } catch {}
         }
-      });
+      }));
     }, 1200);
 
     return () => {
@@ -471,8 +495,10 @@ export default function LiveClassesPage() {
 
       // 3. Backend API
       await requestJoinSession(cleanSessionId, {
-        student_id: learnerIdRef.current,
-        student_name: currentUserName,
+        id: learnerIdRef.current,
+        requestId: learnerIdRef.current,
+        learner_id: learnerIdRef.current,
+        learner_name: currentUserName,
         class_title: sessionTitle || "Live Class Session",
       }).catch(() => undefined);
     } catch {}
@@ -530,6 +556,32 @@ export default function LiveClassesPage() {
     window.addEventListener("storage", handleStorage);
     window.addEventListener("konnect-active-live-session-updated", onCustomUpdate);
 
+    async function syncServerLiveSession() {
+      try {
+        const response = await getActiveLiveSessions();
+        const data = await apiJson<{ results?: Array<{ session_id: string; title: string; course_title: string; teacher_name: string; meeting_url?: string; last_heartbeat: string }> }>(response);
+        const presence = data.results?.[0];
+        if (!presence) {
+          setActiveLiveSession(null);
+          return;
+        }
+        setActiveLiveSession({
+          sessionId: presence.session_id,
+          classId: presence.session_id,
+          sessionTitle: presence.title,
+          courseTitle: presence.course_title,
+          teacherName: presence.teacher_name,
+          meetingUrl: presence.meeting_url,
+          status: "LIVE",
+          lastHeartbeat: new Date(presence.last_heartbeat).getTime(),
+        });
+      } catch {
+        // Preserve same-browser presence if the server cannot be reached.
+      }
+    }
+    void syncServerLiveSession();
+    const serverLiveTimer = setInterval(() => void syncServerLiveSession(), 5000);
+
     // Fast poll to catch teacher entering studio in another tab
     const interval = setInterval(() => {
       checkLiveSession();
@@ -542,6 +594,7 @@ export default function LiveClassesPage() {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("konnect-active-live-session-updated", onCustomUpdate);
       clearInterval(interval);
+      clearInterval(serverLiveTimer);
       liveChannel?.close();
     };
   }, []);

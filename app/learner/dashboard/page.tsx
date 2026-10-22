@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, Check, ClipboardList, GraduationCap, Loader2, Video, X } from "lucide-react";
-import { apiJson, getLearnerClasses, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
+import { apiJson, getCourses, getLearnerEnrollments, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
 import { currentUser, getLearnerProfile } from "@/lib/api/auth";
 import { cancelLiveJoinRequest, requestJoinSession } from "@/lib/api/sessions";
+import { mockCourses } from "@/lib/mock/courses";
 
 type ActiveLiveSession = {
   sessionId: string;
@@ -28,6 +29,22 @@ type Enrollment = {
   status?: string;
 };
 
+type ApiEnrollment = {
+  id: string;
+  course: string;
+  course_title: string;
+  status: string;
+};
+
+type AvailableCourse = {
+  id: string;
+  title: string;
+  description?: string;
+  teacher_name?: string;
+  status?: string;
+  isDemo?: boolean;
+};
+
 type Submission = {
   id: string;
   assessment_title: string;
@@ -37,9 +54,18 @@ type Submission = {
   teacher_feedback?: string;
 };
 
+type ApiSubmission = {
+  id: string;
+  assignment_title: string;
+  score: number | null;
+  submitted_at: string | null;
+  teacher_feedback?: string;
+};
+
 type LearnerData = {
   name: string;
   classes: Enrollment[];
+  courses: AvailableCourse[];
   submissions: Submission[];
   learningGoals: string;
   attendanceRate: number | null;
@@ -69,6 +95,7 @@ async function allPages<T>(requestPage: (query: string) => Promise<Response>) {
 const initialData: LearnerData = {
   name: "Learner",
   classes: [],
+  courses: [],
   submissions: [],
   learningGoals: "",
   attendanceRate: null,
@@ -82,6 +109,11 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function findAttendanceRate(value: unknown, depth = 0): number | null {
   if (Array.isArray(value)) {
+    const attendanceRecords = value.map(record).filter((item): item is Record<string, unknown> => item !== null);
+    if (attendanceRecords.length && attendanceRecords.every((item) => typeof item.status === "string")) {
+      const attended = attendanceRecords.filter((item) => ["PRESENT", "LATE", "ATTENDED"].includes(String(item.status).toUpperCase())).length;
+      return Math.round((attended / attendanceRecords.length) * 100);
+    }
     for (const field of value) {
       const nestedRate = findAttendanceRate(field, depth + 1);
       if (nestedRate !== null) return nestedRate;
@@ -451,28 +483,55 @@ export default function LearnerDashboardPage() {
           return;
         }
 
-        const [classesResult, submissionsResult, progressResult, profileResult] = await Promise.allSettled([
-          allPages<Enrollment>(getLearnerClasses),
-          allPages<Submission>(getMyAssessmentSubmissions),
+        const [classesResult, submissionsResult, progressResult, profileResult, coursesResult] = await Promise.allSettled([
+          allPages<ApiEnrollment>(getLearnerEnrollments),
+          allPages<ApiSubmission>(getMyAssessmentSubmissions),
           jsonRequest<unknown>(getLearnerProgressGrades()),
           getLearnerProfile(),
+          allPages<AvailableCourse>(getCourses),
         ]);
         if (!active) return;
 
-        const failures = [classesResult, submissionsResult, progressResult, profileResult].filter((result) => result.status === "rejected").length;
-        const classes = classesResult.status === "fulfilled" ? classesResult.value : [];
-        const submissions = submissionsResult.status === "fulfilled" ? submissionsResult.value : [];
+        const failedSections = [
+          ["classes", classesResult],
+          ["assessments", submissionsResult],
+          ["attendance/progress", progressResult],
+          ["learner profile", profileResult],
+          ["course catalog", coursesResult],
+        ] as const;
+        const failedDetails = failedSections
+          .filter(([, result]) => result.status === "rejected")
+          .map(([name, result]) => `${name}${result.status === "rejected" && result.reason instanceof Error ? ` (${result.reason.message})` : ""}`);
+        const classes = classesResult.status === "fulfilled" ? classesResult.value.map((item): Enrollment => ({
+          id: item.id,
+          class_room: item.course,
+          class_title: item.course_title,
+          class_subject: "",
+          teacher_name: "",
+          status: item.status.toLowerCase() === "active" ? "ENROLLED" : item.status.toUpperCase(),
+        })) : [];
+        const submissions: Submission[] = submissionsResult.status === "fulfilled" ? submissionsResult.value.map((item) => ({
+          id: item.id,
+          assessment_title: item.assignment_title,
+          status: item.score === null ? "SUBMITTED" : "GRADED",
+          total_score: item.score,
+          submitted_at: item.submitted_at,
+          teacher_feedback: item.teacher_feedback,
+        })) : [];
         const profile = profileResult.status === "fulfilled" ? profileResult.value : {};
+        const apiCourses = coursesResult.status === "fulfilled" ? coursesResult.value : [];
+        const courses: AvailableCourse[] = apiCourses.length ? apiCourses : mockCourses;
         const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Learner";
 
         setData({
           name: fullName || user.username || "Learner",
           classes: classes.filter((item) => !item.status || item.status.toUpperCase() === "ENROLLED"),
+          courses,
           submissions,
           learningGoals: String(profile.learning_goals ?? ""),
           attendanceRate: progressResult.status === "fulfilled" ? findAttendanceRate(progressResult.value) : null,
         });
-        if (failures) setLoadNotice("Some learner records could not be loaded. Refresh to try again.");
+        setLoadNotice(failedDetails.length ? `Could not load ${failedDetails.join(", ")}. Check the API response details above; use Retry after the API is available.` : "");
       } catch {
         if (active) router.replace("/login");
       } finally {
@@ -580,13 +639,31 @@ export default function LearnerDashboardPage() {
         </section>
       )}
 
-      {loadNotice && <p role="status" className="rounded border border-[#ead9b7] bg-[#fbf7ed] px-3 py-2 text-[10px] text-[#705a30]">{loadNotice}</p>}
+      {loadNotice && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded border border-[#ead9b7] bg-[#fbf7ed] px-3 py-2 text-[10px] text-[#705a30]"><span>{loadNotice}</span><button type="button" onClick={() => window.location.reload()} className="font-semibold underline underline-offset-2">Retry</button></div>}
 
       <section aria-label="Your learning summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Summary label="Enrolled classes" value={loading ? "—" : String(data.classes.length)} detail="Your active enrollments" icon={<BookOpen size={15} />} />
         <Summary label="Assessment records" value={loading ? "—" : String(data.submissions.length)} detail="Submissions on your account" icon={<ClipboardList size={15} />} />
         <Summary label="Needs attention" value={loading ? "—" : String(activeSubmissions.length)} detail="In progress or awaiting review" icon={<GraduationCap size={15} />} />
         <Summary label="Attendance" value={loading ? "—" : data.attendanceRate === null ? "—" : `${data.attendanceRate}%`} detail="From your progress record" icon={<ChartNoAxesColumnIncreasing size={15} />} />
+      </section>
+
+      <section className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
+        <div className="flex items-center justify-between gap-3">
+          <div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">All available courses</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">{data.courses.some((course) => course.isDemo) ? "Sample courses from this project. Demo courses are not published to the API." : "Courses approved and visible to learners."}</p></div>
+          <Link href="/learner/courses" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">Browse and enroll</Link>
+        </div>
+        {loading ? <p className="mt-3 py-3 text-[10px] text-[#7a8575]">Loading available courses…</p> : data.courses.length ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {data.courses.map((course) => (
+              <article key={course.id} className="rounded-md border border-[#edf0e9] p-3 dark:border-white/10">
+                <div className="flex items-center justify-between gap-2"><h3 className="text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{course.title}</h3>{course.isDemo && <span className="shrink-0 rounded bg-[#f4eedb] px-1.5 py-0.5 text-[8px] font-semibold text-[#78622e]">Sample</span>}</div>
+                <p className="mt-1 line-clamp-2 text-[9px] text-[#798374] dark:text-[#9aa592]">{course.description || "Course details coming soon."}</p>
+                {course.teacher_name && <p className="mt-2 text-[8px] text-[#687463] dark:text-[#a6aea0]">Instructor: {course.teacher_name}</p>}
+              </article>
+            ))}
+          </div>
+        ) : <p className="mt-3 py-3 text-[10px] text-[#7a8575]">No courses are currently approved and visible to your account.</p>}
       </section>
 
       <section className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">

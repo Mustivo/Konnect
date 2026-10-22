@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import { currentUser, getTeacherProfile, updateCurrentUser, updateTeacherProfile } from "@/lib/api/auth";
+import { currentUser, deleteCurrentUser, getTeacherProfile, updateCurrentUser, updateTeacherProfile } from "@/lib/api/auth";
 import { Bell, Check, Globe2, Info, ShieldCheck, UserRound } from "lucide-react";
 
 type SettingsTab = "profile" | "notifications" | "classes" | "security";
@@ -69,6 +70,7 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
 }
 
 export default function TeacherSettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = useState(defaults);
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [notice, setNotice] = useState("");
@@ -119,6 +121,19 @@ export default function TeacherSettingsPage() {
       setNotice("Your settings have been saved.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Your settings could not be saved.");
+    }
+  }
+
+  async function deleteAccount() {
+    if (!window.confirm("Delete your teacher account? This action may be permanent.")) return;
+    try {
+      const response = await deleteCurrentUser();
+      if (!response.ok) throw new Error(`Account deletion failed (${response.status}).`);
+      localStorage.removeItem("konnect-access-token");
+      localStorage.removeItem("konnect-refresh-token");
+      router.replace("/login");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Your account could not be deleted.");
     }
   }
 
@@ -178,6 +193,8 @@ export default function TeacherSettingsPage() {
         {activeTab === "classes" && <section className="max-w-2xl rounded-xl border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]"><h2 className="text-[11px] font-bold text-[#273124] dark:text-[#e5ebdf]">Class preferences</h2><p className="mt-1 text-[7px] text-[#798374] dark:text-[#9aa592]">Set defaults for your teaching workspace.</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-[8px] font-semibold text-[#34402f] dark:text-[#d8e0d2]">Default class<select value={settings.defaultClass} onChange={(event) => update("defaultClass", event.target.value)} className="mt-1 h-8 w-full rounded-md border border-[#e1e6dc] bg-white px-2.5 text-[8px] font-normal dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]">{["Algebra I · Class A", "Algebra I · Class B", "Geometry · Class C"].map((name) => <option key={name}>{name}</option>)}</select></label><label className="text-[8px] font-semibold text-[#34402f] dark:text-[#d8e0d2]">Default exam duration<select value={settings.defaultDuration} onChange={(event) => update("defaultDuration", event.target.value)} className="mt-1 h-8 w-full rounded-md border border-[#e1e6dc] bg-white px-2.5 text-[8px] font-normal dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]">{["30 minutes", "45 minutes", "50 minutes", "60 minutes", "90 minutes"].map((duration) => <option key={duration}>{duration}</option>)}</select></label><label className="text-[8px] font-semibold text-[#34402f] dark:text-[#d8e0d2]">Exam reminder<select value={settings.reminderHours} onChange={(event) => update("reminderHours", event.target.value)} className="mt-1 h-8 w-full rounded-md border border-[#e1e6dc] bg-white px-2.5 text-[8px] font-normal dark:border-[#303b2d] dark:bg-[#202720] dark:text-[#e1e8dc]">{["12 hours before", "24 hours before", "48 hours before"].map((reminder) => <option key={reminder}>{reminder}</option>)}</select></label></div><div className="mt-4 flex justify-end"><button type="button" onClick={save} className="rounded-full bg-[#233c20] px-3 py-1.5 text-[7px] font-semibold text-white">Save changes</button></div></section>}
 
         {activeTab === "security" && <section className="max-w-2xl rounded-xl border border-[#e0e5dd] bg-white p-4 dark:border-[#2a312a] dark:bg-[#161b17]"><h2 className="text-[11px] font-bold text-[#273124] dark:text-[#e5ebdf]">Security</h2><p className="mt-1 text-[7px] text-[#798374] dark:text-[#9aa592]">Protect your teaching account and student conversations.</p><div className="mt-3 divide-y divide-[#edf0e9] dark:divide-[#2a312a]"><div className="flex items-center justify-between gap-4 py-3"><div><p className="text-[9px] font-semibold text-[#30392d] dark:text-[#e1e8dc]">Password</p><p className="text-[7px] text-[#798374] dark:text-[#9aa592]">Update your sign-in password.</p></div><Link href="/forgot-password" className="rounded-full bg-[#f1f4ed] px-3 py-1.5 text-[7px] font-semibold text-[#485443] dark:bg-[#252e22] dark:text-[#d1ddc7]">Change password</Link></div><label className="flex items-center justify-between gap-4 py-3"><span><span className="block text-[9px] font-semibold text-[#30392d] dark:text-[#e1e8dc]">Two-factor authentication</span><span className="text-[7px] text-[#798374] dark:text-[#9aa592]">Add an extra verification step when signing in.</span></span><input type="checkbox" checked={settings.twoFactor} onChange={(event) => update("twoFactor", event.target.checked)} className="size-4 accent-[#314d2c]" /></label></div><button type="button" onClick={save} className="mt-3 rounded-full bg-[#233c20] px-3 py-1.5 text-[7px] font-semibold text-white">Save changes</button></section>}
+
+        {activeTab === "security" && <section className="max-w-2xl rounded-xl border border-[#f0d6d2] bg-white p-4 dark:border-[#55312c] dark:bg-[#161b17]"><h2 className="text-[10px] font-bold text-[#913f34]">Delete teacher account</h2><p className="mt-1 text-[7px] text-[#798374] dark:text-[#9aa592]">Request permanent deletion of your account and profile.</p><button type="button" onClick={() => void deleteAccount()} className="mt-3 rounded-full border border-[#d69a91] px-3 py-1.5 text-[7px] font-semibold text-[#913f34] hover:bg-[#fff4f2]">Delete my account</button></section>}
       </div>
     </DashboardShell>
   );

@@ -535,18 +535,30 @@ async function proxy(
 
   const headers = new Headers();
   request.headers.forEach((value, key) => {
-    const k = key.toLowerCase();
-    if (!["host", "connection", "content-length", "origin", "referer", "expect"].includes(k)) {
-      headers.set(key, value);
-    }
+    if (!REQUEST_HEADERS_TO_SKIP.has(key.toLowerCase())) headers.set(key, value);
   });
   headers.set("Accept", "application/json");
+  return headers;
+}
+
+async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
+  const subpath = path.map(encodeURIComponent).join("/");
+
+  let target: URL;
+  try {
+    target = new URL(`/api/${subpath}/`, getBackendBase());
+  } catch (error) {
+    console.error("API proxy configuration error:", error);
+    return NextResponse.json({ detail: "The API service is not configured." }, { status: 503 });
+  }
+  target.search = request.nextUrl.search;
 
   try {
-    const response = await fetch(targetUrl.toString(), {
+    const response = await fetch(target, {
       method: request.method,
-      headers,
-      body: bodyBuffer,
+      headers: buildHeaders(request),
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
       cache: "no-store",
     });
 
@@ -900,11 +912,8 @@ async function proxy(
     }
 
     return NextResponse.json(
-      {
-        detail: error?.message || "Backend connection error",
-        cause: error?.cause?.message || String(error?.cause || ""),
-      },
-      { status: 502 }
+      { detail: "The API service is temporarily unavailable. Please try again shortly." },
+      { status: 502 },
     );
   }
 }

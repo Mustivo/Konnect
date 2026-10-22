@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiJson, currentUser, enrollInCourse, getCourses, getEnrollments } from "@/lib/api";
 import { BookOpen, Check, ChevronDown, Video } from "lucide-react";
+import { mockCourses } from "@/lib/mock/courses";
 
 type ApiCourse = {
   id: string;
@@ -143,6 +144,13 @@ export default function LearnerCoursesPage() {
           ...course,
           enrollmentStatus: enrollmentStatusLabel(enrollmentsByClass.get(course.id)?.status) || null,
         })));
+        if (usingMockCourses && catalogResult.status === "rejected") {
+          setNotice(`Live courses could not be loaded (${catalogResult.reason instanceof Error ? catalogResult.reason.message : "request failed"}). Showing sample courses from this project; sample courses cannot be enrolled in.`);
+        } else if (usingMockCourses) {
+          setNotice("No live courses are published yet. Showing sample courses from this project; sample courses cannot be enrolled in.");
+        } else if (enrollmentsResult.status === "rejected") {
+          setNotice(`/api/enrollments/ failed: ${enrollmentsResult.reason instanceof Error ? enrollmentsResult.reason.message : "Request failed"}. Courses are shown, but enrollment status is unavailable.`);
+        }
       } catch (error) {
         if (active) setNotice(error instanceof Error ? error.message : "Courses could not be loaded. Please try again.");
       } finally {
@@ -165,6 +173,10 @@ export default function LearnerCoursesPage() {
   });
 
   async function enroll(courseId: string) {
+    if (courses.some((course) => course.id === courseId && course.isDemo)) {
+      setNotice("This is a sample course from the project data. It must be published to the API before learners can enroll.");
+      return;
+    }
     setEnrollingId(courseId);
     setNotice("");
     try {
@@ -237,7 +249,7 @@ export default function LearnerCoursesPage() {
                   <p className="truncate text-[8px] font-bold uppercase tracking-wide text-[#718064] dark:text-[#a8be97]">{course.subject || "Course"}</p>
                   <h2 className="mt-1 text-[12px] font-semibold leading-snug text-[#1b2219] dark:text-[#f0f4ee]">{course.title}</h2>
                 </div>
-                {status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
+                {course.isDemo ? <span className="inline-flex shrink-0 rounded-full bg-[#f4eedb] px-2 py-1 text-[8px] font-semibold text-[#78622e]">Sample</span> : status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
               </div>
               <p className="mt-3 line-clamp-3 flex-1 text-[10px] leading-relaxed text-[#58645b] dark:text-[#a6aea0]">{course.description || "No course description has been added yet."}</p>
               <p className="mt-3 text-[9px] text-[#687463] dark:text-[#9aa592]">{course.teacher_name || "Instructor not listed"}</p>
@@ -265,6 +277,8 @@ export default function LearnerCoursesPage() {
                     View Class Schedule
                   </Link>
                 </div>
+              ) : course.isDemo ? (
+                <button type="button" disabled className="mt-3 min-h-9 cursor-not-allowed rounded-md border border-[#dfe5da] bg-[#f7f8f5] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:bg-[#1a2118] dark:text-[#9aa592]">Sample only</button>
               ) : isPending ? (
                 <button
                   type="button"
