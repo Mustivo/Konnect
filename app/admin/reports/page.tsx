@@ -49,16 +49,16 @@ const classInfo: ClassInfo[] = [
 const classById = (id: string) => classInfo.find((c) => c.id === id)!;
 
 const attendance: AttendanceRow[] = [
-  { id: "a1", classId: "algebra-a", teacher: "Edna Francis", initials: "EF", date: "12 Oct 2026", day: 12, attended: 26, total: 28 },
-  { id: "a2", classId: "geometry-b", teacher: "Edna Francis", initials: "EF", date: "13 Oct 2026", day: 13, attended: 29, total: 30 },
-  { id: "a3", classId: "biology-d", teacher: "Michael Reed", initials: "MR", date: "12 Oct 2026", day: 12, attended: 31, total: 32 },
+  { id: "a1", classId: "algebra-a", teacher: "Mutiti Stivo", initials: "MS", date: "12 Oct 2026", day: 12, attended: 26, total: 28 },
+  { id: "a2", classId: "geometry-b", teacher: "Mutiti Stivo", initials: "MS", date: "13 Oct 2026", day: 13, attended: 29, total: 30 },
+  { id: "a3", classId: "biology-d", teacher: "Mutiti Stivo", initials: "MS", date: "12 Oct 2026", day: 12, attended: 31, total: 32 },
 ];
 
 const initialIncidents: Incident[] = [
   {
     id: "INC-014", date: "14 Oct · 09:18", day: 14, classId: "algebra-a",
     person: "Ethan Brown", type: "Disruptive chat", session: "Teaching", clip: "00:45",
-    status: "Open", reporter: "Edna Francis", time: "09:18",
+    status: "Open", reporter: "Mutiti Stivo", time: "09:18",
     detail: "posted repeated off-topic messages", during: "Algebra I",
     evidence: "09:17:45–09:18:30", assignee: "Alex Morgan",
   },
@@ -66,14 +66,14 @@ const initialIncidents: Incident[] = [
   {
     id: "INC-013", date: "13 Oct · 11:24", day: 13, classId: "geometry-b",
     person: "Noah Williams", type: "Left full screen", session: "Exam", clip: "00:30",
-    status: "In review", reporter: "Edna Francis", time: "11:24",
+    status: "In review", reporter: "Mutiti Stivo", time: "11:24",
     detail: "left full screen", during: "Geometry",
     evidence: "11:23:50–11:24:20", assignee: "Alex Morgan",
   },
   {
     id: "INC-012", date: "12 Oct · 11:16", day: 12, classId: "english-e",
     person: "Emma Wilson", type: "Disruptive audio", session: "Teaching", clip: "00:35",
-    status: "Resolved", reporter: "Priya Shah", time: "11:16",
+    status: "Resolved", reporter: "Mutiti Stivo", time: "11:16",
     detail: "played disruptive audio", during: "English",
     evidence: "11:15:55–11:16:30", assignee: "Alex Morgan",
   },

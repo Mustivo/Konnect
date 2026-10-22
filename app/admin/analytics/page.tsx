@@ -5,8 +5,8 @@ import { Activity, BookOpen, GraduationCap, Users } from "lucide-react";
 
 const metrics = [
   { label: "Total learners", value: "1,248", change: "+86 this week", icon: GraduationCap, tone: "bg-[#eef4ff] text-[#3b5f9d]" },
-  { label: "Active teachers", value: "24", change: "4 applications pending", icon: Users, tone: "bg-[#f4f7f2] text-[#34482f]" },
-  { label: "Active classes", value: "62", change: "Across 24 teachers", icon: BookOpen, tone: "bg-[#f7f3ea] text-[#8d6b2f]" },
+  { label: "Verified teachers", value: "1", change: "Mutiti Stivo", icon: Users, tone: "bg-[#f4f7f2] text-[#34482f]" },
+  { label: "Courses", value: "15", change: "Assigned to Mutiti Stivo", icon: BookOpen, tone: "bg-[#f7f3ea] text-[#8d6b2f]" },
   { label: "Platform attendance", value: "92.9%", change: "Across recorded sessions", icon: Activity, tone: "bg-[#fdf1f4] text-[#ab5b6d]" },
 ];
 
@@ -21,9 +21,9 @@ const weeklyActivity = [
 ];
 
 const topClasses = [
-  { name: "Algebra I · Class A", teacher: "Edna Francis", attendance: "96.4%" },
-  { name: "Biology · Class D", teacher: "Michael Reed", attendance: "93.8%" },
-  { name: "Geometry · Class B", teacher: "Edna Francis", attendance: "91.2%" },
+  { name: "Algebra I · Class A", teacher: "Mutiti Stivo", attendance: "96.4%" },
+  { name: "Biology · Class D", teacher: "Mutiti Stivo", attendance: "93.8%" },
+  { name: "Geometry · Class B", teacher: "Mutiti Stivo", attendance: "91.2%" },
 ];
 
 export default function AdminAnalyticsPage() {

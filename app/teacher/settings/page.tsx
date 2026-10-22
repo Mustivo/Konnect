@@ -28,13 +28,13 @@ type TeacherSettings = {
 
 const storageKey = "konnect-teacher-settings";
 const defaults: TeacherSettings = {
-  firstName: "Edna",
-  lastName: "Francis",
-  email: "edna.francis@maplewood.school.edu",
+  firstName: "Mutiti",
+  lastName: "Stivo",
+  email: "mutitistivo@gmail.com",
   phoneNumber: "",
-  bio: "Helping students build confidence in mathematics, one clear step at a time.",
+  bio: "Passionate educator specializing in Python.",
   qualifications: "",
-  expertiseSubjects: "",
+  expertiseSubjects: "Python",
   language: "English (UK)",
   timezone: "London · GMT+1",
   photo: "",
@@ -78,6 +78,7 @@ export default function TeacherSettingsPage() {
 
   useEffect(() => {
     setSettings(readSettings());
+    if (new URLSearchParams(window.location.search).get("tab") === "notifications") setActiveTab("notifications");
     if (!window.localStorage.getItem("konnect-access-token")) return;
     currentUser().then((user) => {
       const [firstName, ...lastNameParts] = `${user.first_name} ${user.last_name}`.trim().split(/\s+/);

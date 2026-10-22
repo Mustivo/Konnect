@@ -3,18 +3,26 @@ import { apiRequest } from "./client";
 // Live session and attendance records belong to the configured external API.
 export async function getClassSessions(classId: string, query = "") {
   const response = await apiRequest(`/api/live-sessions/${query}`);
-  if (!response.ok) return response;
-  const payload = await response.json().catch(() => null) as { results?: Array<Record<string, unknown>>; sessions?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> | null;
-  const rows = Array.isArray(payload) ? payload : payload?.results || payload?.sessions || [];
   const wanted = String(classId).toLowerCase();
-  const results = rows.filter((row) => {
+  const filterRows = (rows: Array<Record<string, unknown>>) => rows.filter((row) => {
     const raw = row.class_room ?? row.class_id ?? row.class;
     const classValue = raw && typeof raw === "object"
       ? (raw as Record<string, unknown>).id ?? (raw as Record<string, unknown>).pk
       : raw;
-    return classValue == null || String(classValue).toLowerCase() === wanted;
+    return classValue != null && String(classValue).toLowerCase() === wanted;
   });
-  return Response.json(Array.isArray(payload) ? results : { ...(payload || {}), count: results.length, results });
+
+  if (response.ok) {
+    const payload = await response.json().catch(() => null) as { results?: Array<Record<string, unknown>>; sessions?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> | null;
+    const rows = Array.isArray(payload) ? payload : payload?.results || payload?.sessions || [];
+    const results = filterRows(rows);
+    if (results.length) return Response.json({ count: results.length, results });
+  }
+
+  // The local course database also keeps its own sessions for sample courses.
+  const localResponse = await apiRequest(`/api/sessions/class/${encodeURIComponent(classId)}/`);
+  if (localResponse.ok) return localResponse;
+  return response;
 }
 export const createClassSession = (_classId: string, payload: Record<string, unknown>) =>
   apiRequest("/api/live-sessions/", { method: "POST", body: JSON.stringify(payload) });

@@ -69,6 +69,10 @@ export default function AdminSettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"platform" | "notifications" | "security" | "audit">("platform");
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("section") === "notifications") setActiveTab("notifications");
+  }, []);
+
   // Platform settings state
   const [platformName, setPlatformName] = useState("Konnect");
   const [supportEmail, setSupportEmail] = useState("support@konnect.edu");

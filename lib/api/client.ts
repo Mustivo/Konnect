@@ -36,6 +36,13 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}) 
       continue;
     }
 
+    if (window.sessionStorage.getItem("konnect-auth-session-invalidated") === "1") {
+      return new Response(JSON.stringify({ detail: "This browser tab was signed out because another account became active." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const accessToken = window.localStorage.getItem("konnect-access-token");
     if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
     const response = await send();

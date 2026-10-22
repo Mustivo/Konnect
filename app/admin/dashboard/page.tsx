@@ -5,26 +5,17 @@ import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { BookOpen, BriefcaseBusiness, CircleAlert, GraduationCap, MessageSquareText, ShieldCheck, Users } from "lucide-react";
 import { getPendingAccounts, getPendingTeachers, type PendingAccount } from "@/lib/api/admin";
+import { apiJson, apiRequest } from "@/lib/api/client";
 
-const stats = [
-  { label: "Teachers", value: "25", note: "Faculty & instructors active", icon: Users, tone: "bg-[#f4f7f2] text-[#34482f]" },
-  { label: "Learners", value: "1,248", note: "86 this week", icon: GraduationCap, tone: "bg-[#eef4ff] text-[#3b5f9d]" },
-  { label: "Classes", value: "63", note: "Across 25 teachers", icon: BookOpen, tone: "bg-[#f7f3ea] text-[#8d6b2f]" },
-  { label: "Live now", value: "3", note: "1 waiting room", icon: MessageSquareText, tone: "bg-[#fdf1f4] text-[#ab5b6d]" },
-];
-
-const liveClasses = [
-  { className: "Python & Web Development - Class A", teacher: "Mutiti Stivo", learners: "34/100", status: "Live" },
-  { className: "Algebra - Class A", teacher: "Edna Francis", learners: "28/100", status: "Live" },
-  { className: "Biology - Class D", teacher: "Michael Reed", learners: "32/100", status: "Live" },
-];
-
-const activeTeachers = [
-  { id: "mutiti-stivo", initials: "MS", name: "Mutiti Stivo", email: "mutitistivo@gmail.com", subject: "Python & Computer Science", status: "Teaching Live", learners: "34", rating: "5.0" },
-  { id: "edna-francis", initials: "EF", name: "Edna Francis", email: "edna.francis@school.edu", subject: "Mathematics", status: "Teaching Live", learners: "28", rating: "4.9" },
-  { id: "michael-reed", initials: "MR", name: "Michael Reed", email: "michael.reed@school.edu", subject: "Science", status: "Teaching Live", learners: "32", rating: "4.8" },
-  { id: "priya-shah", initials: "PS", name: "Priya Shah", email: "priya.shah@school.edu", subject: "English", status: "Scheduled", learners: "25", rating: "4.9" },
-];
+type DashboardSummary = {
+  verified_teachers: number;
+  enrolled_learners: number;
+  classes: number;
+  live_now: number;
+  waiting_rooms: number;
+  verified_teacher_profiles: Array<{ id: string; name: string; email: string; subject: string; status: string }>;
+  live_sessions: Array<{ id: string; class_name: string; teacher: string; status: string }>;
+};
 
 function InitialsPill({ initials }: { initials: string }) {
   return (
@@ -35,13 +26,26 @@ function InitialsPill({ initials }: { initials: string }) {
 }
 
 export default function AdminDashboardPage() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [summaryUnavailable, setSummaryUnavailable] = useState(false);
   const [pendingTeacherCount, setPendingTeacherCount] = useState<number | null>(null);
   const [pendingAccounts, setPendingAccounts] = useState<PendingAccount[] | null>(null);
 
   useEffect(() => {
+    apiRequest("/api/admin/dashboard/summary/")
+      .then((response) => apiJson<DashboardSummary>(response))
+      .then(setSummary)
+      .catch(() => setSummaryUnavailable(true));
     getPendingTeachers().then((teachers) => setPendingTeacherCount(teachers.length)).catch(() => setPendingTeacherCount(null));
     getPendingAccounts().then(setPendingAccounts).catch(() => setPendingAccounts(null));
   }, []);
+
+  const stats = [
+    { label: "Verified teachers", value: summary ? String(summary.verified_teachers) : summaryUnavailable ? "Unavailable" : "—", note: "Verified teacher profiles in the database", icon: Users, tone: "bg-[#f4f7f2] text-[#34482f]" },
+    { label: "Learners", value: summary ? String(summary.enrolled_learners) : summaryUnavailable ? "Unavailable" : "—", note: "Unique learners in enrollment records", icon: GraduationCap, tone: "bg-[#eef4ff] text-[#3b5f9d]" },
+    { label: "Classes", value: summary ? String(summary.classes) : summaryUnavailable ? "Unavailable" : "—", note: "Class records in the database", icon: BookOpen, tone: "bg-[#f7f3ea] text-[#8d6b2f]" },
+    { label: "Live now", value: summary ? String(summary.live_now) : summaryUnavailable ? "Unavailable" : "—", note: summary ? `${summary.waiting_rooms} waiting room${summary.waiting_rooms === 1 ? "" : "s"}` : "From live-session records", icon: MessageSquareText, tone: "bg-[#fdf1f4] text-[#ab5b6d]" },
+  ];
 
   return (
     <DashboardShell role="admin">
@@ -142,36 +146,28 @@ export default function AdminDashboardPage() {
               <BriefcaseBusiness size={14} className="text-[#35522b]" />
               <h2 className="text-[15px] font-bold text-[#172115]">Live classrooms</h2>
             </div>
-            <span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{liveClasses.length} live</span>
+            <span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{summary ? `${summary.live_sessions.length} live` : summaryUnavailable ? "Unavailable" : "Loading"}</span>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-[#e2e7dd]">
-            <div className="grid grid-cols-[1.5fr_1.1fr_0.8fr_0.7fr] bg-[#f4f6f1] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#687564]">
+            <div className="grid grid-cols-[1.5fr_1.1fr_0.8fr] bg-[#f4f6f1] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#687564]">
               <span>Class</span>
               <span>Teacher</span>
-              <span>Learners</span>
-              <span className="text-right">Action</span>
+              <span className="text-right">Status</span>
             </div>
 
-            {liveClasses.map((room) => (
-              <div key={room.className} className="grid grid-cols-[1.5fr_1.1fr_0.8fr_0.7fr] items-center gap-3 border-t border-[#e2e7dd] bg-white px-3 py-3 text-[11px]">
-                <div className="font-bold text-[#172115]">{room.className}</div>
+            {summary?.live_sessions.map((room) => (
+              <div key={room.id} className="grid grid-cols-[1.5fr_1.1fr_0.8fr] items-center gap-3 border-t border-[#e2e7dd] bg-white px-3 py-3 text-[11px]">
+                <div className="font-bold text-[#172115]">{room.class_name}</div>
                 <div className="flex items-center gap-2">
                   <InitialsPill initials={room.teacher.split(" ").map((part) => part[0]).join("").slice(0, 2)} />
-                  <div>
-                    <span className="block font-semibold text-[#172115]">{room.teacher}</span>
-                    {room.teacher === "Mutiti Stivo" && (
-                      <span className="text-[9px] text-[#2b5a2d] font-medium">Head Teacher</span>
-                    )}
-                  </div>
+                  <span className="font-semibold text-[#172115]">{room.teacher}</span>
                 </div>
-                <div className="text-[#4a564a]">{room.learners}</div>
-                <div className="flex items-center justify-end gap-2">
-                  <span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{room.status}</span>
-                  <button type="button" className="rounded-md border border-[#dfe4dc] bg-white px-2.5 py-1 text-[10px] font-semibold text-[#5a6758] hover:bg-[#f4f6f1]">Join</button>
-                </div>
+                <div className="text-right"><span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{room.status}</span></div>
               </div>
             ))}
+            {summary && summary.live_sessions.length === 0 && <p className="border-t border-[#e2e7dd] px-3 py-4 text-center text-[11px] text-[#687564]">No live sessions are recorded right now.</p>}
+            {!summary && <p className="border-t border-[#e2e7dd] px-3 py-4 text-center text-[11px] text-[#687564]">{summaryUnavailable ? "Live session records are unavailable." : "Loading live session records…"}</p>}
           </div>
         </section>
 
@@ -179,39 +175,35 @@ export default function AdminDashboardPage() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users size={14} className="text-[#35522b]" />
-              <h2 className="text-[15px] font-bold text-[#172115]">Active Teachers &amp; Faculty</h2>
+              <h2 className="text-[15px] font-bold text-[#172115]">Verified Teachers</h2>
             </div>
-            <span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{activeTeachers.length} featured</span>
+            <span className="rounded-full bg-[#edf4e8] px-2 py-1 text-[9px] font-bold text-[#2b5a2d]">{summary ? `${summary.verified_teacher_profiles.length} verified` : summaryUnavailable ? "Unavailable" : "Loading"}</span>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-[#e2e7dd]">
-            <div className="grid grid-cols-[1.4fr_1.2fr_0.8fr_0.8fr] bg-[#f4f6f1] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#687564]">
+            <div className="grid grid-cols-[1.4fr_1.2fr_0.8fr] bg-[#f4f6f1] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#687564]">
               <span>Teacher</span>
               <span>Subject</span>
-              <span>Rating / Learners</span>
               <span className="text-right">Status</span>
             </div>
 
-            {activeTeachers.map((teacher) => (
-              <div key={teacher.id} className="grid grid-cols-[1.4fr_1.2fr_0.8fr_0.8fr] items-center gap-3 border-t border-[#e2e7dd] bg-white px-3 py-3 text-[11px]">
+            {summary?.verified_teacher_profiles.map((teacher) => (
+              <div key={teacher.id} className="grid grid-cols-[1.4fr_1.2fr_0.8fr] items-center gap-3 border-t border-[#e2e7dd] bg-white px-3 py-3 text-[11px]">
                 <div className="flex items-center gap-2.5">
-                  <InitialsPill initials={teacher.initials} />
+                  <InitialsPill initials={teacher.name.split(" ").map((part) => part[0]).join("").slice(0, 2)} />
                   <div>
                     <p className="font-bold text-[#172115]">{teacher.name}</p>
                     <p className="text-[10px] text-[#6d766d]">{teacher.email}</p>
                   </div>
                 </div>
                 <div className="text-[#3a463a] font-medium">{teacher.subject}</div>
-                <div className="text-[#4a564a]">★ {teacher.rating} · {teacher.learners} learners</div>
                 <div className="flex justify-end">
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                    teacher.status === "Teaching Live" ? "bg-[#edf4e8] text-[#2b5a2d]" : "bg-[#f4f6f1] text-[#687564]"
-                  }`}>
-                    {teacher.status}
-                  </span>
+                  <span className="rounded-full bg-[#edf4e8] px-2 py-0.5 text-[9px] font-bold text-[#2b5a2d]">{teacher.status}</span>
                 </div>
               </div>
             ))}
+            {summary && summary.verified_teacher_profiles.length === 0 && <p className="border-t border-[#e2e7dd] px-3 py-4 text-center text-[11px] text-[#687564]">No verified teacher profiles are recorded.</p>}
+            {!summary && <p className="border-t border-[#e2e7dd] px-3 py-4 text-center text-[11px] text-[#687564]">{summaryUnavailable ? "Teacher records are unavailable." : "Loading verified teacher records…"}</p>}
           </div>
         </section>
 

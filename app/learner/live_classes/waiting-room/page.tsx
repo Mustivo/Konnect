@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson, currentUser } from "@/lib/api";
-import { getLiveJoinRequests, getSession, joinSession, requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, getLiveJoinRequests, getSession, joinSession, requestJoinSession } from "@/lib/api/sessions";
 import {
   ArrowLeft,
   Check,
@@ -23,7 +23,7 @@ const fallbackSession = {
   id: "uiux",
   title: "Design systems & component libraries",
   course: "UI/UX Design — From Wireframes to Prototypes",
-  teacher: "Amara Okafor",
+  teacher: "Mutiti Stivo",
   time: "Tue, 6 Oct 2026 · 14:00–15:30 BST",
 };
 
@@ -94,6 +94,7 @@ function LiveClassWaitingRoomContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestIdRef = useRef("");
+  const autoRequestHandledRef = useRef(false);
   const admissionStorageKey = `konnect-live-class-admission:${cleanSessionId}`;
   const requestStorageKey = `konnect-live-class-request:${cleanSessionId}`;
   useEffect(() => {
@@ -238,7 +239,8 @@ function LiveClassWaitingRoomContent() {
   useEffect(() => {
     if (!mounted) return;
     const autoReq = searchParams.get("autoRequest") === "1" || searchParams.get("request") === "1";
-    if (autoReq && admissionState === "ready") {
+    if (autoReq && admissionState === "ready" && !autoRequestHandledRef.current) {
+      autoRequestHandledRef.current = true;
       void sendJoinRequest();
     }
   }, [mounted, searchParams, admissionState]);
@@ -515,34 +517,45 @@ function LiveClassWaitingRoomContent() {
       }
     } catch {}
 
-    // Notify backend API
-    void requestJoinSession(cleanSessionId, {
-      requestId,
-      id: requestId,
-      learner_id: requestId,
-      learner_name: effectiveName,
-      class_title: session.title || session.course || "Live Class",
-      teacher_name: session.teacher || "Mutiti Stivo",
-      requested_at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    }).catch(() => undefined);
+    // Persist on the server so the host can see and respond from another device.
+    try {
+      await requestJoinSession(cleanSessionId, {
+        requestId,
+        id: requestId,
+        learner_id: requestId,
+        learner_name: effectiveName,
+        class_title: session.title || session.course || "Live Class",
+        teacher_name: session.teacher || "Mutiti Stivo",
+        requested_at: new Date().toISOString(),
+      });
+    } catch {
+      setAdmissionState("ready");
+      requestIdRef.current = "";
+      setRequestError("Your request could not reach the live class host. Check your connection and try again.");
+      try { localStorage.removeItem(requestStorageKey); } catch {}
+    }
   }
 
   function cancelJoinRequest() {
+    const requestId = requestIdRef.current;
     try {
       localStorage.removeItem(requestStorageKey);
       localStorage.removeItem(admissionStorageKey);
-      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
-      if (rawAll) {
-        const parsedAll = JSON.parse(rawAll);
-        if (Array.isArray(parsedAll)) {
-          const filtered = parsedAll.filter((r: { requestId?: string; learnerId?: string }) => r.requestId !== requestIdRef.current && r.learnerId !== requestIdRef.current);
-          window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(filtered));
+      const rawRequests = localStorage.getItem("konnect-all-live-requests");
+      if (rawRequests) {
+        const requests = JSON.parse(rawRequests);
+        if (Array.isArray(requests)) {
+          localStorage.setItem("konnect-all-live-requests", JSON.stringify(requests.filter((request: { requestId?: string; learnerId?: string; id?: string }) =>
+            request.requestId !== requestId && request.learnerId !== requestId && request.id !== requestId
+          )));
         }
       }
     } catch {}
     requestIdRef.current = "";
     setAdmissionState("ready");
     setRequestError("");
+    if (requestId) void cancelLiveJoinRequest(cleanSessionId, requestId).catch(() => undefined);
+    router.replace("/learner/live_classes");
   }
 
   function enterClass() {

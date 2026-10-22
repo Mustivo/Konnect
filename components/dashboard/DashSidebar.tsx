@@ -203,11 +203,14 @@ export default function DashSidebar({ role = "learner", onNavigate }: { role?: D
                     (item.name === "Reports" && pathname.startsWith("/admin/reports")) ||
                     (item.name === "Settings" && pathname.startsWith("/admin/settings"))
                 : isTeacher
-                  ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Students Roster" && pathname === "/teacher/student") || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname === "/teacher/analytics") || (item.name === "Messages" && pathname === "/teacher/messages") || (item.name === "Settings" && pathname === "/teacher/settings")
+                  ? (item.name === "Dashboard" && pathname === "/teacher/dashboard") || (item.name === "Classes" && pathname.startsWith("/teacher/classes")) || (item.name === "Attendance" && pathname.startsWith("/teacher/attendance")) || (item.name === "Students Roster" && pathname.startsWith("/teacher/student")) || (item.name === "Activities" && ["/teacher/activities", "/teacher/activities/assignments", "/teacher/activities/exams"].includes(pathname)) || (item.name === "Analytics" && pathname.startsWith("/teacher/analytics")) || (item.name === "Messages" && pathname.startsWith("/teacher/messages")) || (item.name === "Settings" && pathname.startsWith("/teacher/settings"))
                   : (item.name === "Dashboard" && (pathname === "/learner" || pathname === "/learner/dashboard")) ||
                     (item.name === "My Courses" && pathname.startsWith("/learner/courses")) ||
                     (item.name === "Live Classes" && pathname === "/learner/live_classes") ||
+                    (item.name === "Calendar" && pathname.startsWith("/learner/calender")) ||
+                    (item.name === "Tasks" && pathname.startsWith("/learner/tasks")) ||
                     (item.name === "Attendance" && pathname === "/learner/attendance") ||
+                    (item.name === "Grades" && pathname.startsWith("/learner/grades")) ||
                     (item.name === "Resources" && pathname === "/learner/resource") ||
                     (item.name === "Messages" && pathname === "/learner/message") ||
                     (item.name === "Settings" && pathname === "/learner/settings");

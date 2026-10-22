@@ -101,7 +101,7 @@ function getInitialDatabase(): DatabaseSchema {
       uiux: [
         {
           id: "teacher-host",
-          name: "Amara Okafor",
+          name: "Mutiti Stivo",
           role: "teacher",
           status: "active",
           joined_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
@@ -112,7 +112,7 @@ function getInitialDatabase(): DatabaseSchema {
       react: [
         {
           id: "teacher-host",
-          name: "Sarah Mitchell",
+          name: "Mutiti Stivo",
           role: "teacher",
           status: "active",
           joined_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
@@ -129,7 +129,7 @@ function getInitialDatabase(): DatabaseSchema {
           message: "Welcome everyone to today's UI/UX live design workshop!",
           text: "Welcome everyone to today's UI/UX live design workshop!",
           sender_id: 102,
-          sender_name: "Amara Okafor",
+          sender_name: "Mutiti Stivo",
           created_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
           timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
         },
@@ -139,7 +139,7 @@ function getInitialDatabase(): DatabaseSchema {
           message: "Feel free to post questions about typography scales in the chat.",
           text: "Feel free to post questions about typography scales in the chat.",
           sender_id: 102,
-          sender_name: "Amara Okafor",
+          sender_name: "Mutiti Stivo",
           created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
           timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
         },
@@ -241,12 +241,12 @@ export function getDbEnrollments(): MockEnrollmentItem[] {
   return db.enrollments;
 }
 
-export function enrollStudentDb(classId: string | number, studentId = 1): MockEnrollmentItem {
+export function enrollStudentDb(classId: string | number, studentId: number | string = 1): MockEnrollmentItem {
   const db = loadDatabase();
   const matched = getDbClassById(classId);
 
   const existing = db.enrollments.find(
-    (e) => (e.class_room.toLowerCase() === String(classId).toLowerCase() || String(e.school_class) === String(classId)) && e.student === studentId
+    (e) => (e.class_room.toLowerCase() === String(classId).toLowerCase() || String(e.school_class) === String(classId)) && String(e.student) === String(studentId)
   );
   if (existing) return existing;
 

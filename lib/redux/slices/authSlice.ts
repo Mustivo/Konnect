@@ -111,9 +111,13 @@ export const loginWithRedux = createAsyncThunk<
     user.username = user.username || user.email.split("@")[0];
 
     if (typeof window !== "undefined" && user?.email) {
-      window.localStorage.setItem("konnect-user-email", user.email);
+      const activeEmail = user.email.trim().toLowerCase();
+      window.localStorage.setItem("konnect-session-owner", activeEmail);
+      window.localStorage.setItem("konnect-user-email", activeEmail);
       window.localStorage.setItem("konnect-user", JSON.stringify(user));
-      document.cookie = `konnect-user-email=${user.email}; path=/; max-age=604800; SameSite=Lax`;
+      window.sessionStorage.removeItem("konnect-auth-session-invalidated");
+      document.cookie = `konnect-user-email=${activeEmail}; path=/; max-age=604800; SameSite=Lax`;
+      window.dispatchEvent(new CustomEvent("konnect-auth-session-started", { detail: { email: activeEmail } }));
     }
 
     return { tokens, user };
@@ -201,6 +205,13 @@ export const authSlice = createSlice({
       state.user = action.payload;
       state.isAuthenticated = true;
     },
+    clearAuthState: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.isAuthenticated = false;
+      state.notice = null;
+    },
     logout: (state) => {
       state.user = null;
       state.accessToken = null;
@@ -212,6 +223,7 @@ export const authSlice = createSlice({
         window.localStorage.removeItem("konnect-refresh-token");
         window.localStorage.removeItem("konnect-user-email");
         window.localStorage.removeItem("konnect-user");
+        window.localStorage.removeItem("konnect-session-owner");
         document.cookie = "konnect-access-token=; path=/; max-age=0; SameSite=Lax";
         document.cookie = "konnect-user-email=; path=/; max-age=0; SameSite=Lax";
       }
@@ -270,5 +282,5 @@ export const authSlice = createSlice({
   },
 });
 
-export const { setNotice, clearNotice, setCredentials, setUser, logout } = authSlice.actions;
+export const { setNotice, clearNotice, setCredentials, setUser, clearAuthState, logout } = authSlice.actions;
 export default authSlice.reducer;

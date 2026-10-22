@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, BookOpen, ChartNoAxesColumnIncreasing, Check, ClipboardList, GraduationCap, Loader2, Video, X } from "lucide-react";
-import { apiJson, getCourses, getLearnerEnrollments, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
+import { apiJson, getCourses, getLearnerClasses, getLearnerEnrollments, getLearnerProgressGrades, getMyAssessmentSubmissions } from "@/lib/api";
 import { currentUser, getLearnerProfile } from "@/lib/api/auth";
-import { cancelLiveJoinRequest, requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, getClassSessions, requestJoinSession } from "@/lib/api/sessions";
 import { mockCourses } from "@/lib/mock/courses";
 
 type ActiveLiveSession = {
@@ -31,16 +31,25 @@ type Enrollment = {
 
 type ApiEnrollment = {
   id: string;
-  course: string;
-  course_title: string;
+  course?: string;
+  course_title?: string;
+  class_room?: string;
+  class_title?: string;
+  class_subject?: string;
+  teacher_name?: string;
   status: string;
 };
+
+type ApiLiveSession = { status?: string };
 
 type AvailableCourse = {
   id: string;
   title: string;
   description?: string;
+  subject?: string;
   teacher_name?: string;
+  banner_image?: string | null;
+  image?: string | null;
   status?: string;
   isDemo?: boolean;
 };
@@ -90,6 +99,34 @@ async function allPages<T>(requestPage: (query: string) => Promise<Response>) {
     if (!result.next) break;
   }
   return records;
+}
+
+function enrollmentCourseId(item: ApiEnrollment) {
+  return String(item.class_room || item.course || "").trim();
+}
+
+async function getEnrollmentRecords() {
+  const [remoteResult, localResult] = await Promise.allSettled([
+    allPages<ApiEnrollment>(getLearnerEnrollments),
+    allPages<ApiEnrollment>(getLearnerClasses),
+  ]);
+  const combined = [
+    ...(localResult.status === "fulfilled" ? localResult.value : []),
+    ...(remoteResult.status === "fulfilled" ? remoteResult.value : []),
+  ];
+  const byCourse = new Map<string, ApiEnrollment>();
+  for (const item of combined) {
+    const id = enrollmentCourseId(item);
+    if (id) byCourse.set(id, item);
+  }
+  if (remoteResult.status === "rejected" && localResult.status === "rejected") {
+    throw remoteResult.reason;
+  }
+  return [...byCourse.values()];
+}
+
+function normalizedCourseId(id: string) {
+  return id.replace(/^demo-/i, "");
 }
 
 const initialData: LearnerData = {
@@ -484,7 +521,7 @@ export default function LearnerDashboardPage() {
         }
 
         const [classesResult, submissionsResult, progressResult, profileResult, coursesResult] = await Promise.allSettled([
-          allPages<ApiEnrollment>(getLearnerEnrollments),
+          getEnrollmentRecords(),
           allPages<ApiSubmission>(getMyAssessmentSubmissions),
           jsonRequest<unknown>(getLearnerProgressGrades()),
           getLearnerProfile(),
@@ -502,14 +539,55 @@ export default function LearnerDashboardPage() {
         const failedDetails = failedSections
           .filter(([, result]) => result.status === "rejected")
           .map(([name, result]) => `${name}${result.status === "rejected" && result.reason instanceof Error ? ` (${result.reason.message})` : ""}`);
-        const classes = classesResult.status === "fulfilled" ? classesResult.value.map((item): Enrollment => ({
-          id: item.id,
-          class_room: item.course,
-          class_title: item.course_title,
-          class_subject: "",
-          teacher_name: "",
-          status: item.status.toLowerCase() === "active" ? "ENROLLED" : item.status.toUpperCase(),
-        })) : [];
+        const apiCourses = coursesResult.status === "fulfilled" ? coursesResult.value : [];
+        const courses: AvailableCourse[] = apiCourses.length ? apiCourses : mockCourses;
+        const apiEnrollments = classesResult.status === "fulfilled" ? classesResult.value : [];
+        const courseById = new Map(courses.map((course) => [normalizedCourseId(course.id).toLowerCase(), course]));
+        const classesById = new Map<string, Enrollment>();
+        for (const item of apiEnrollments) {
+          const id = enrollmentCourseId(item);
+          if (!id) continue;
+          const course = courseById.get(normalizedCourseId(id).toLowerCase());
+          const status = item.status.toLowerCase() === "active" ? "ENROLLED" : item.status.toUpperCase();
+          classesById.set(normalizedCourseId(id).toLowerCase(), {
+            id: item.id,
+            class_room: normalizedCourseId(id),
+            class_title: item.course_title || item.class_title || course?.title || "Course",
+            class_subject: item.class_subject || course?.subject || "Class",
+            teacher_name: "Mutiti Stivo",
+            status,
+          });
+        }
+
+        // Courses with a scheduled/live session are available to join, so list them as enrolled too.
+        const notYetEnrolled = courses.filter((course) => {
+          const existing = classesById.get(normalizedCourseId(course.id).toLowerCase());
+          return !existing || (existing.status || "").toUpperCase() !== "ENROLLED";
+        });
+        const liveAvailability = await Promise.all(notYetEnrolled.map(async (course) => {
+          try {
+            const response = await getClassSessions(normalizedCourseId(course.id));
+            const payload = await apiJson<Collection<ApiLiveSession>>(response);
+            const sessions = Array.isArray(payload) ? payload : payload.results ?? [];
+            const available = sessions.some((session) => !["COMPLETED", "CANCELLED", "CANCELED", "ENDED", "EXPIRED"].includes(String(session.status || "").toUpperCase()));
+            return available ? course : null;
+          } catch {
+            return null;
+          }
+        }));
+        for (const course of liveAvailability) {
+          if (!course) continue;
+          const id = normalizedCourseId(course.id);
+          classesById.set(id.toLowerCase(), {
+            id: `live-${id}`,
+            class_room: id,
+            class_title: course.title,
+            class_subject: course.subject || "Live class",
+            teacher_name: "Mutiti Stivo",
+            status: "ENROLLED",
+          });
+        }
+        const classes = [...classesById.values()];
         const submissions: Submission[] = submissionsResult.status === "fulfilled" ? submissionsResult.value.map((item) => ({
           id: item.id,
           assessment_title: item.assignment_title,
@@ -519,8 +597,6 @@ export default function LearnerDashboardPage() {
           teacher_feedback: item.teacher_feedback,
         })) : [];
         const profile = profileResult.status === "fulfilled" ? profileResult.value : {};
-        const apiCourses = coursesResult.status === "fulfilled" ? coursesResult.value : [];
-        const courses: AvailableCourse[] = apiCourses.length ? apiCourses : mockCourses;
         const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.name || user.username || "Learner";
 
         setData({
@@ -650,16 +726,20 @@ export default function LearnerDashboardPage() {
 
       <section className="rounded-lg border border-[#e2e7dd] bg-white p-4 dark:border-white/10 dark:bg-[#1b211a]">
         <div className="flex items-center justify-between gap-3">
-          <div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">All available courses</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">{data.courses.some((course) => course.isDemo) ? "Sample courses from this project. Demo courses are not published to the API." : "Courses approved and visible to learners."}</p></div>
+          <div><h2 className="text-[12px] font-bold text-[#172115] dark:text-[#ecf1ea]">All available courses</h2><p className="mt-1 text-[9px] text-[#7a8575] dark:text-[#a6aea0]">{data.courses.some((course) => course.isDemo) ? "Sample courses are available to enroll in this project." : "Courses approved and visible to learners."}</p></div>
           <Link href="/learner/courses" className="text-[9px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">Browse and enroll</Link>
         </div>
         {loading ? <p className="mt-3 py-3 text-[10px] text-[#7a8575]">Loading available courses…</p> : data.courses.length ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {data.courses.map((course) => (
-              <article key={course.id} className="rounded-md border border-[#edf0e9] p-3 dark:border-white/10">
-                <div className="flex items-center justify-between gap-2"><h3 className="text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]">{course.title}</h3>{course.isDemo && <span className="shrink-0 rounded bg-[#f4eedb] px-1.5 py-0.5 text-[8px] font-semibold text-[#78622e]">Sample</span>}</div>
+              <article key={course.id} className="overflow-hidden rounded-md border border-[#edf0e9] dark:border-white/10">
+                {course.banner_image || course.image ? <img src={course.banner_image || course.image || ""} alt={`${course.title} course`} loading="lazy" className="h-24 w-full object-cover" /> : null}
+                <div className="p-3">
+                <div className="flex items-center justify-between gap-2"><h3 className="text-[10px] font-semibold text-[#273124] dark:text-[#e5ebdf]"><Link href={`/learner/courses/enroll?courseId=${encodeURIComponent(course.id)}`} onClick={() => { try { sessionStorage.setItem("konnect-enrollment-course", JSON.stringify({ ...course, description: course.description || "", subject: course.subject || "General", teacher_name: course.teacher_name || "Konnect instructor", banner_image: course.banner_image || course.image || null, isDemo: Boolean(course.isDemo) })); } catch {} }} className="hover:underline">{course.title}</Link></h3>{course.isDemo && <span className="shrink-0 rounded bg-[#f4eedb] px-1.5 py-0.5 text-[8px] font-semibold text-[#78622e]">Sample</span>}</div>
                 <p className="mt-1 line-clamp-2 text-[9px] text-[#798374] dark:text-[#9aa592]">{course.description || "Course details coming soon."}</p>
                 {course.teacher_name && <p className="mt-2 text-[8px] text-[#687463] dark:text-[#a6aea0]">Instructor: {course.teacher_name}</p>}
+                <Link href={`/learner/courses/enroll?courseId=${encodeURIComponent(course.id)}`} className="mt-2 inline-block text-[8px] font-semibold text-[#40522c] hover:underline dark:text-[#c5d6bc]">View course and enroll</Link>
+                </div>
               </article>
             ))}
           </div>

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Provider } from "react-redux";
 import { makeStore, type AppStore } from "@/lib/redux/store";
+import AuthSessionGuard from "@/components/providers/AuthSessionGuard";
 
 export default function ReduxProvider({
   children,
@@ -14,5 +15,10 @@ export default function ReduxProvider({
     storeRef.current = makeStore();
   }
 
-  return <Provider store={storeRef.current}>{children}</Provider>;
+  return (
+    <Provider store={storeRef.current}>
+      <AuthSessionGuard />
+      {children}
+    </Provider>
+  );
 }

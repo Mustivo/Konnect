@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Search, Bell, CalendarDays, Plus } from "lucide-react";
 
 type DashboardRole = "learner" | "teacher" | "admin";
@@ -20,11 +20,46 @@ const teacherPageHeaders: Record<string, { title: string; description: string; s
 
 export default function DashNav({ role = "learner", menuButton }: { role?: DashboardRole; menuButton?: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState("Today");
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const isTeacher = role === "teacher";
   const isAdmin = role === "admin";
   const isTeacherDashboard = isTeacher && pathname === "/teacher/dashboard";
   const teacherPageHeader = isTeacher ? teacherPageHeaders[pathname] : undefined;
+  const destinations = useMemo(() => isAdmin ? [
+    ["Dashboard", "/admin/dashboard"], ["Classes", "/admin/classes"], ["Teacher approvals", "/admin/approval"],
+    ["Management", "/admin/management"], ["Analytics", "/admin/analytics"], ["Reports", "/admin/reports"], ["Settings", "/admin/settings"],
+  ] : isTeacher ? [
+    ["Dashboard", "/teacher/dashboard"], ["Classes", "/teacher/classes"], ["Attendance", "/teacher/attendance"], ["Students", "/teacher/student"],
+    ["Assignments", "/teacher/activities/assignments"], ["Exams", "/teacher/activities/exams"], ["Analytics", "/teacher/analytics"],
+    ["Messages", "/teacher/messages"], ["Settings", "/teacher/settings"],
+  ] : [
+    ["Dashboard", "/learner/dashboard"], ["Courses", "/learner/courses"], ["Live classes", "/learner/live_classes"],
+    ["Calendar", "/learner/calender"], ["Assignments", "/learner/tasks/assignment"], ["Exams", "/learner/tasks/exams"],
+    ["Attendance", "/learner/attendance"], ["Grades", "/learner/grades"], ["Resources", "/learner/resource"],
+    ["Messages", "/learner/message"], ["Settings", "/learner/settings"],
+  ], [isAdmin, isTeacher]);
+  const filteredDestinations = destinations.filter(([label]) => label.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 6);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!search.trim()) return;
+    const target = filteredDestinations[0];
+    if (target) router.push(target[1]);
+    setSearchOpen(false);
+  }
+
+  function renderSearch(placeholder: string, widthClass = "max-w-[335px]") {
+    return <form onSubmit={submitSearch} role="search" className={`relative h-9 min-w-0 ${widthClass} flex-1`}>
+      <Search size={13} className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]" />
+      <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(true)} onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)} onKeyDown={(event) => { if (event.key === "Escape") setSearchOpen(false); }} placeholder={placeholder} aria-label="Search dashboard pages" aria-expanded={searchOpen && Boolean(search.trim())} className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors" />
+      {searchOpen && search.trim() && <div className="absolute left-0 right-0 top-10 z-50 overflow-hidden rounded-lg border border-[#e2e5dc] bg-white p-1 shadow-lg dark:border-[#303b2d] dark:bg-[#1b2419]">
+        {filteredDestinations.length ? filteredDestinations.map(([label, href]) => <Link key={href} href={href} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearch(""); setSearchOpen(false); }} className="block rounded px-3 py-2 text-[12px] text-[#263322] hover:bg-[#f1f4ed] dark:text-[#e1e8dc] dark:hover:bg-[#263123]">{label}</Link>) : <p className="px-3 py-2 text-[12px] text-[#687564]">No matching dashboard pages</p>}
+      </div>}
+    </form>;
+  }
 
   useEffect(() => {
     if (isTeacher) return;
@@ -50,39 +85,16 @@ export default function DashNav({ role = "learner", menuButton }: { role?: Dashb
           <p className="truncate text-[9px] text-[#707c6c] dark:text-[#9aa592]">{teacherPageHeader.description}</p>
         </div>
       ) : (
-        <div className="relative h-9 min-w-0 max-w-[335px] flex-1">
-          <Search
-            size={13}
-            className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]"
-          />
-
-          <input
-            type="text"
-            placeholder={isAdmin ? "Search teachers, classes, incidents..." : isTeacher ? "Search classes, students, approvals..." : "Search courses, topics, teachers..."}
-            className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors"
-          />
-        </div>
+        renderSearch("Search dashboard pages...")
       )}
 
       <div className="flex shrink-0 items-center gap-2">
-        {!isTeacher && <button type="button" aria-label={`Current date: ${currentDate}`} className="flex h-8 min-w-[132px] items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2.5 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors">
+        {!isTeacher && <Link href={isAdmin ? "/admin/reports" : "/learner/calender"} aria-label={`Open calendar, current date: ${currentDate}`} title="Open calendar" className="flex h-8 min-w-[132px] items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#e4e7df] bg-white px-2.5 text-[12px] font-semibold text-[#40522c] shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#b4e3a8] transition-colors hover:bg-[#f5f7f2]">
           <CalendarDays size={13} />
           <span>{currentDate}</span>
-        </button>}
+        </Link>}
 
-        {teacherPageHeader && (
-          <div className="relative h-9 w-[min(260px,24vw)] min-w-[150px]">
-            <Search
-              size={13}
-              className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[#9ca3af] dark:text-[#788875]"
-            />
-            <input
-              type="text"
-              placeholder={teacherPageHeader.searchPlaceholder}
-              className="h-9 w-full rounded-lg border border-[#e2e5dc] bg-white pl-[34px] pr-3 text-[13px] text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.05)] outline-none placeholder:text-[#9ca3af] focus:border-[#40522c] dark:border-[#212f1f] dark:bg-[#141d13] dark:text-[#ecf1ea] dark:placeholder:text-[#6f7e6d] dark:focus:border-[#aee09f] transition-colors"
-            />
-          </div>
-        )}
+        {teacherPageHeader && renderSearch(teacherPageHeader.searchPlaceholder, "w-[min(260px,24vw)] min-w-[150px] max-w-none")}
 
         {isTeacher && (!teacherPageHeader || isTeacherDashboard) ? (
           <div className="flex shrink-0 items-center gap-1.5">
@@ -99,16 +111,8 @@ export default function DashNav({ role = "learner", menuButton }: { role?: Dashb
           </button>
         ) : null}
 
-        <Link href={isAdmin ? "/admin/dashboard#notifications" : isTeacher ? "/teacher/dashboard#notifications" : "/learner/settings?section=notifications"} onClick={() => {
-          if (!isAdmin && !isTeacher && window.location.pathname === "/learner/settings") {
-            window.dispatchEvent(new CustomEvent("konnect-settings-section", { detail: "notifications" }));
-          }
-        }} aria-label={`Notifications, ${isAdmin ? 4 : isTeacher ? 1 : 2} unread`} title={`${isAdmin ? 4 : isTeacher ? 1 : 2} unread notifications`} className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f7f2] dark:border-[#212f1f] dark:bg-[#141d13] dark:hover:bg-[#1b2819]">
+        <Link href={isAdmin ? "/admin/settings?section=notifications" : isTeacher ? "/teacher/settings?tab=notifications" : "/learner/settings?section=notifications"} aria-label="Open notification settings" title="Notification settings" className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[#e4e7df] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f7f2] dark:border-[#212f1f] dark:bg-[#141d13] dark:hover:bg-[#1b2819]">
           <Bell size={15} className="text-[#40522c] dark:text-[#b4e3a8]" />
-
-          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#f2f3ed] bg-[#e5484d] px-1 text-[8px] font-bold leading-none text-white dark:border-[#111510]">
-            {isAdmin ? 4 : isTeacher ? 1 : 2}
-          </span>
         </Link>
 
       </div>

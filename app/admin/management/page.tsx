@@ -18,20 +18,13 @@ type Teacher = {
 };
 
 const initialTeachers: Teacher[] = [
-  { id: "mutiti-stivo", initials: "MS", name: "Mutiti Stivo", subject: "Python & Computer Science", best: true, active: 3, limit: 3, rating: 5.0, suspended: false, attendance: 99 },
-  { id: "edna-francis", initials: "EF", name: "Edna Francis", subject: "Mathematics", best: true, active: 3, limit: 3, rating: 4.9, suspended: false },
-  { id: "michael-reed", initials: "MR", name: "Michael Reed", subject: "Science", best: false, active: 2, limit: 3, rating: 4.8, suspended: false, attendance: 96 },
-  { id: "priya-shah", initials: "PS", name: "Priya Shah", subject: "English", best: true, active: 3, limit: 3, rating: 4.9, suspended: false },
-  { id: "oliver-grant", initials: "OG", name: "Oliver Grant", subject: "History", best: false, active: 2, limit: 3, rating: 4.5, suspended: false },
-  { id: "helen-wright", initials: "HW", name: "Helen Wright", subject: "Geography", best: false, active: 1, limit: 3, rating: 4.3, suspended: false },
-  { id: "thomas-lee", initials: "TL", name: "Thomas Lee", subject: "Physics", best: false, active: 0, limit: 3, rating: 3.8, suspended: true },
+  { id: "mutiti-stivo", initials: "MS", name: "Mutiti Stivo", subject: "Python", best: true, active: 15, limit: 20, rating: 5.0, suspended: false, attendance: 99 },
 ];
 
-// Platform-wide numbers from the screenshot (the page only lists the first 6 teachers)
-const TOTAL_TEACHERS = 24;
-const BASE_SUSPENDED = 2;
-const BASE_BEST = 3;
-const DEFAULT_LIMIT = 3;
+const TOTAL_TEACHERS = 1;
+const BASE_SUSPENDED = 0;
+const BASE_BEST = 1;
+const DEFAULT_LIMIT = 20;
 const initialSuspendedListed = initialTeachers.filter((t) => t.suspended).length;
 const initialBestListed = initialTeachers.filter((t) => t.best).length;
 
@@ -58,8 +51,8 @@ export default function TeacherManagementPage() {
   const [teachers, setTeachers] = useState(initialTeachers);
   const [query, setQuery] = useState("");
 
-  const [limitTargetId, setLimitTargetId] = useState("edna-francis");
-  const [limitDraft, setLimitDraft] = useState("3");
+  const [limitTargetId, setLimitTargetId] = useState("mutiti-stivo");
+  const [limitDraft, setLimitDraft] = useState("20");
   const [limitSaved, setLimitSaved] = useState(false);
 
   const [note, setNote] = useState("Consistent, engaging science lessons.");
@@ -320,7 +313,7 @@ export default function TeacherManagementPage() {
           <p className="mt-[18px] text-[10px] leading-[14px] text-[#778271]">
             {q
               ? `Showing ${visible.length} matching ${visible.length === 1 ? "teacher" : "teachers"}`
-              : `Showing 1–${teachers.length} of ${TOTAL_TEACHERS} teachers · Page 1 of 4`}
+              : `Showing 1–${teachers.length} of ${TOTAL_TEACHERS} teachers · Page 1 of 1`}
           </p>
         </section>
 

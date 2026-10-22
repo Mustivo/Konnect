@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiJson, currentUser, enrollInCourse, getCourses, getEnrollments } from "@/lib/api";
+import { apiJson, currentUser, enrollInCourse, getCourses, getEnrollments, getLearnerClasses } from "@/lib/api";
 import { BookOpen, Check, ChevronDown, Video } from "lucide-react";
 import { mockCourses } from "@/lib/mock/courses";
 
@@ -25,8 +25,12 @@ type ApiCourse = {
 
 type ApiEnrollment = {
   id: string;
-  course: string | { id?: string };
+  course?: string | { id?: string };
+  class_room?: string;
   course_title?: string;
+  class_title?: string;
+  class_subject?: string;
+  teacher_name?: string;
   status: string;
 };
 
@@ -45,6 +49,7 @@ const statusLabel: Record<string, string> = {
 };
 
 function courseIdFromEnrollment(enrollment: ApiEnrollment) {
+  if (enrollment.class_room) return enrollment.class_room;
   return typeof enrollment.course === "string" ? enrollment.course : String(enrollment.course?.id || "");
 }
 
@@ -70,6 +75,24 @@ async function getAllPages<T>(requestPage: (query?: string) => Promise<Response>
     if (!result.next) break;
   }
   return records;
+}
+
+async function getEnrollmentRecords() {
+  const [remoteResult, localResult] = await Promise.allSettled([
+    getAllPages<ApiEnrollment>(getEnrollments),
+    getAllPages<ApiEnrollment>(getLearnerClasses),
+  ]);
+  const records = [
+    ...(localResult.status === "fulfilled" ? localResult.value : []),
+    ...(remoteResult.status === "fulfilled" ? remoteResult.value : []),
+  ];
+  const byId = new Map<string, ApiEnrollment>();
+  for (const enrollment of records) {
+    const id = courseIdFromEnrollment(enrollment);
+    if (id) byId.set(id, enrollment);
+  }
+  if (remoteResult.status === "rejected" && localResult.status === "rejected") throw remoteResult.reason;
+  return [...byId.values()];
 }
 
 export default function LearnerCoursesPage() {
@@ -132,7 +155,7 @@ export default function LearnerCoursesPage() {
       try {
         const [catalogResult, enrollmentsResult] = await Promise.allSettled([
           getAllPages<ApiCourse>(getCourses),
-          getAllPages<ApiEnrollment>(getEnrollments),
+          getEnrollmentRecords(),
         ]);
         if (!active) return;
 
@@ -140,14 +163,23 @@ export default function LearnerCoursesPage() {
         const enrollments = enrollmentsResult.status === "fulfilled" ? enrollmentsResult.value : [];
         const usingMockCourses = catalog.length === 0;
         const availableCourses: ApiCourse[] = usingMockCourses ? mockCourses : catalog;
-        const enrollmentsByClass = new Map(enrollments.map((enrollment) => [courseIdFromEnrollment(enrollment), enrollment]));
+        const enrollmentsByClass = new Map<string, ApiEnrollment>();
+        for (const enrollment of enrollments) {
+          const id = courseIdFromEnrollment(enrollment);
+          if (id) {
+            enrollmentsByClass.set(id, enrollment);
+            enrollmentsByClass.set(`demo-${id}`, enrollment);
+          }
+        }
         const classesById = new Map(availableCourses.map((course) => [course.id, course]));
         for (const enrollment of enrollments) {
           const id = courseIdFromEnrollment(enrollment);
-          if (id && !classesById.has(id) && enrollmentStatusLabel(enrollment.status) !== "DROPPED") {
+          if (id && !classesById.has(id) && !classesById.has(`demo-${id}`) && enrollmentStatusLabel(enrollment.status) !== "DROPPED") {
             classesById.set(id, {
               id,
-              title: enrollment.course_title || "Course",
+              title: enrollment.course_title || enrollment.class_title || "Course",
+              subject: enrollment.class_subject,
+              teacher_name: "Mutiti Stivo",
               banner_image: null,
             });
           }
@@ -157,7 +189,7 @@ export default function LearnerCoursesPage() {
           ...course,
           title: course.title || course.name || "Course",
           subject: course.subject || course.category,
-          teacher_name: course.teacher_name || course.instructor,
+          teacher_name: "Mutiti Stivo",
           banner_image: course.banner_image || course.image || null,
           enrollmentStatus: enrollmentsByClass.has(course.id)
             ? enrollmentStatusLabel(enrollmentsByClass.get(course.id)?.status)
@@ -192,25 +224,15 @@ export default function LearnerCoursesPage() {
   });
 
   async function enroll(courseId: string) {
-    if (courses.some((course) => course.id === courseId && course.isDemo)) {
-      setNotice("This is a sample course from the project data. It must be published to the API before learners can enroll.");
-      return;
-    }
     setEnrollingId(courseId);
     setNotice("");
     try {
       const user = await currentUser();
-      await apiJson(await enrollInCourse(courseId, String(user.id)));
-      const enrollments = await getAllPages<ApiEnrollment>(getEnrollments);
-      const savedEnrollment = enrollments.find((enrollment) => courseIdFromEnrollment(enrollment) === courseId);
-      if (!savedEnrollment) {
-        setNotice("The request was sent, but it is not in your enrollment records yet. Refresh to check its status.");
-        return;
-      }
+      const savedEnrollment = await apiJson<ApiEnrollment | null>(await enrollInCourse(courseId, String(user.id)));
+      const status = enrollmentStatusLabel(savedEnrollment?.status || "active");
       setCourses((current) => current.map((course) => course.id === courseId
-        ? { ...course, enrollmentStatus: enrollmentStatusLabel(savedEnrollment.status) }
+        ? { ...course, enrollmentStatus: status }
         : course));
-      const status = enrollmentStatusLabel(savedEnrollment.status);
       setNotice(`Course status: ${statusLabel[status] ?? status.toLowerCase()}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not enroll in this course. Please try again.");
@@ -266,7 +288,7 @@ export default function LearnerCoursesPage() {
                 <span className="grid size-8 shrink-0 place-items-center rounded bg-[#edf4e8] text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]"><BookOpen size={15} /></span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[8px] font-bold uppercase tracking-wide text-[#718064] dark:text-[#a8be97]">{course.subject || "Course"}</p>
-                  <h2 className="mt-1 text-[12px] font-semibold leading-snug text-[#1b2219] dark:text-[#f0f4ee]">{course.title}</h2>
+                  <Link href={`/learner/courses/enroll?courseId=${encodeURIComponent(course.id)}`} onClick={() => { try { sessionStorage.setItem("konnect-enrollment-course", JSON.stringify({ ...course, description: course.description || "", subject: course.subject || "General", teacher_name: course.teacher_name || "Konnect instructor", banner_image: course.banner_image || null, isDemo: Boolean(course.isDemo) })); } catch {} }} className="mt-1 block text-[12px] font-semibold leading-snug text-[#1b2219] hover:underline dark:text-[#f0f4ee]">{course.title}</Link>
                 </div>
                 {course.isDemo ? <span className="inline-flex shrink-0 rounded-full bg-[#f4eedb] px-2 py-1 text-[8px] font-semibold text-[#78622e]">Sample</span> : status && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#edf4e8] px-2 py-1 text-[8px] font-semibold text-[#405b35] dark:bg-[#263521] dark:text-[#c5d6bc]">{status === "COMPLETED" && <Check size={10} />}{statusLabel[status] ?? status}</span>}
               </div>
@@ -296,8 +318,6 @@ export default function LearnerCoursesPage() {
                     View Class Schedule
                   </Link>
                 </div>
-              ) : course.isDemo ? (
-                <button type="button" disabled className="mt-3 min-h-9 cursor-not-allowed rounded-md border border-[#dfe5da] bg-[#f7f8f5] text-[10px] font-semibold text-[#687463] dark:border-[#273724] dark:bg-[#1a2118] dark:text-[#9aa592]">Sample only</button>
               ) : isPending ? (
                 <button
                   type="button"

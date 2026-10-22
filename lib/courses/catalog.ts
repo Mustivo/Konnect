@@ -28,7 +28,7 @@ function normalizeCourse(record: CourseRecord): CourseCatalogItem {
     title: asText(record.title ?? record.name, "Course"),
     description: asText(record.description ?? record.subtitle, "Course details coming soon."),
     subject: asText(record.subject ?? record.category, "General"),
-    teacher_name: asText(record.teacher_name ?? record.instructor, "Konnect instructor"),
+    teacher_name: "Mutiti Stivo",
     banner_image: asText(record.banner_image ?? record.image) || null,
     isDemo: Boolean(record.isDemo),
     level: asText(record.level) || undefined,

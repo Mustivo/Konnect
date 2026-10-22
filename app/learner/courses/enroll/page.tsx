@@ -37,7 +37,7 @@ export default function CourseEnrollmentPage() {
       const match = catalog.find((item) => item.id === id);
       if (match) {
         setCourse(match);
-        setIsLiveCourse(!match.isDemo);
+        setIsLiveCourse(true);
       } else {
         try {
           const stored = JSON.parse(sessionStorage.getItem("konnect-enrollment-course") || "null") as StoredCourse | null;

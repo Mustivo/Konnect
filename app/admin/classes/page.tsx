@@ -49,8 +49,8 @@ const classes: ClassRow[] = [
     id: "algebra-a",
     name: "Algebra I · Class A",
     short: "Algebra I · A",
-    teacher: "Edna Francis",
-    initials: "EF",
+    teacher: "Mutiti Stivo",
+    initials: "MS",
     learners: 28,
     session: "14 Oct · 09:00–09:50",
     status: "Live",
@@ -71,25 +71,25 @@ const classes: ClassRow[] = [
     id: "biology-d",
     name: "Biology · Class D",
     short: "Biology · D",
-    teacher: "Michael Reed",
-    initials: "MR",
+    teacher: "Mutiti Stivo",
+    initials: "MS",
     learners: 32,
     session: "14 Oct · 09:00–09:50",
     status: "Live",
     // placeholder: the screenshot doesn't show this class's details
     live: { started: "09:00", raisedHands: 0, roster: [] },
   },
-  { id: "geometry-b", name: "Geometry · Class B", short: "Geometry · B", teacher: "Edna Francis", initials: "EF", learners: 30, session: "15 Oct · 10:00–11:50", status: "Scheduled" },
-  { id: "precalculus-c", name: "Precalculus · Class C", short: "Precalculus · C", teacher: "Edna Francis", initials: "EF", learners: 25, session: "14 Oct · 14:00–14:50", status: "Scheduled" },
-  { id: "english-e", name: "English · Class E", short: "English · E", teacher: "Priya Shah", initials: "PS", learners: 29, session: "14 Oct · 11:00–11:50", status: "Scheduled" },
+  { id: "geometry-b", name: "Geometry · Class B", short: "Geometry · B", teacher: "Mutiti Stivo", initials: "MS", learners: 30, session: "15 Oct · 10:00–11:50", status: "Scheduled" },
+  { id: "precalculus-c", name: "Precalculus · Class C", short: "Precalculus · C", teacher: "Mutiti Stivo", initials: "MS", learners: 25, session: "14 Oct · 14:00–14:50", status: "Scheduled" },
+  { id: "english-e", name: "English · Class E", short: "English · E", teacher: "Mutiti Stivo", initials: "MS", learners: 29, session: "14 Oct · 11:00–11:50", status: "Scheduled" },
 ];
 
 const records: RecordRow[] = [
-  { id: "r1", date: "12 Oct · 09:00", teacher: "Edna Francis", initials: "EF", className: "Algebra I · Class A", attended: 26, total: 28, minutes: 50, incident: null },
-  { id: "r2", date: "13 Oct · 11:00", teacher: "Edna Francis", initials: "EF", className: "Geometry · Class B", attended: 29, total: 30, minutes: 50, incident: "INC-013" },
-  { id: "r3", date: "12 Oct · 09:00", teacher: "Michael Reed", initials: "MR", className: "Biology · Class D", attended: 31, total: 32, minutes: 50, incident: null },
+  { id: "r1", date: "12 Oct · 09:00", teacher: "Mutiti Stivo", initials: "MS", className: "Algebra I · Class A", attended: 26, total: 28, minutes: 50, incident: null },
+  { id: "r2", date: "13 Oct · 11:00", teacher: "Mutiti Stivo", initials: "MS", className: "Geometry · Class B", attended: 29, total: 30, minutes: 50, incident: "INC-013" },
+  { id: "r3", date: "12 Oct · 09:00", teacher: "Mutiti Stivo", initials: "MS", className: "Biology · Class D", attended: 31, total: 32, minutes: 50, incident: null },
   // placeholder: this row is hidden behind the toolbar in the screenshot (only its date is visible)
-  { id: "r4", date: "12 Oct · 11:00", teacher: "Priya Shah", initials: "PS", className: "English · Class E", attended: 27, total: 29, minutes: 50, incident: null },
+  { id: "r4", date: "12 Oct · 11:00", teacher: "Mutiti Stivo", initials: "MS", className: "English · Class E", attended: 27, total: 29, minutes: 50, incident: null },
 ];
 
 const sectionId: Record<TabId, string> = {

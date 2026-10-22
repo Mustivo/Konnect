@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiJson, getLearnerClasses } from "@/lib/api";
 import { currentUser } from "@/lib/api/auth";
-import { cancelLiveJoinRequest, getActiveLiveSessions, getClassSessions, getLiveJoinRequests, requestJoinSession } from "@/lib/api/sessions";
+import { cancelLiveJoinRequest, getActiveLiveSessions, getClassSessions, getLiveJoinRequests } from "@/lib/api/sessions";
 import {
   CalendarDays,
   Check,
@@ -437,7 +437,7 @@ export default function LiveClassesPage() {
     void cancelLiveJoinRequest(cleanSessionId, learnerIdRef.current).catch(() => undefined);
   }
 
-  async function handleAskToJoin(rawSessionId: string, sessionTitle?: string) {
+  function handleAskToJoin(rawSessionId: string, _sessionTitle?: string) {
     const cleanSessionId = String(rawSessionId || "general").toLowerCase().trim();
 
     // STRICT 1-CLASS LIMIT: If learner is already waiting for or attending another class
@@ -451,57 +451,8 @@ export default function LiveClassesPage() {
       return;
     }
 
-    // Immediately mark as waiting on this page so Ask to Join button is replaced
-    setRequestStatuses((prev) => ({ ...prev, [cleanSessionId]: "waiting" }));
-    window.localStorage.setItem(`konnect-live-class-requested:${cleanSessionId}`, "waiting");
-
-    const reqPayload = {
-      type: "join-request",
-      sessionId: cleanSessionId,
-      learnerId: learnerIdRef.current,
-      learnerName: currentUserName,
-      classTitle: sessionTitle || "Live Class Session",
-      timestamp: Date.now(),
-    };
-
-    try {
-      // 1. BroadcastChannel
-      if (typeof BroadcastChannel !== "undefined") {
-        const ch = new BroadcastChannel("konnect-live-class-admission");
-        ch.postMessage(reqPayload);
-        ch.close();
-      }
-
-      // 2. localStorage direct & shared
-      window.localStorage.setItem(`konnect-live-class-request:${cleanSessionId}`, JSON.stringify(reqPayload));
-      const rawAll = window.localStorage.getItem("konnect-all-live-requests");
-      let allReqs = [];
-      try {
-        allReqs = rawAll ? JSON.parse(rawAll) : [];
-      } catch {}
-      if (!Array.isArray(allReqs)) allReqs = [];
-      allReqs = allReqs.filter((r: { id?: string; learnerId?: string }) => r.id !== reqPayload.learnerId && r.learnerId !== reqPayload.learnerId);
-      allReqs.push({
-        id: reqPayload.learnerId,
-        sessionId: cleanSessionId,
-        learnerId: reqPayload.learnerId,
-        learnerName: currentUserName,
-        classTitle: sessionTitle || "Live Class Session",
-        status: "waiting",
-        requestedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        timestamp: Date.now(),
-      });
-      window.localStorage.setItem("konnect-all-live-requests", JSON.stringify(allReqs));
-
-      // 3. Backend API
-      await requestJoinSession(cleanSessionId, {
-        id: learnerIdRef.current,
-        requestId: learnerIdRef.current,
-        learner_id: learnerIdRef.current,
-        learner_name: currentUserName,
-        class_title: sessionTitle || "Live Class Session",
-      }).catch(() => undefined);
-    } catch {}
+    // The waiting room creates and tracks the request; avoid creating a second request here.
+    router.push(`/learner/live_classes/waiting-room?session=${encodeURIComponent(cleanSessionId)}&autoRequest=1`);
   }
 
   // Monitor whether a teacher is currently live in a studio session
@@ -803,14 +754,14 @@ export default function LiveClassesPage() {
 
             <div>
               {lessons.map((lesson, idx) => {
-                const targetId = activeLiveSession?.sessionId || lesson.id;
                 const cleanLessonId = lesson.id.toLowerCase().trim();
-                const cleanTargetId = targetId.toLowerCase().trim();
                 const isThisLive = Boolean(
                   activeLiveSession &&
                   (activeLiveSession.sessionId === lesson.id ||
                    activeLiveSession.classId === lesson.id)
                 );
+                const targetId = isThisLive && activeLiveSession ? activeLiveSession.sessionId : lesson.id;
+                const cleanTargetId = targetId.toLowerCase().trim();
 
                 const isExpired = checkLessonExpiration(lesson);
                 const currentStatus = isExpired ? undefined : (requestStatuses[cleanTargetId] || requestStatuses[cleanLessonId]);
